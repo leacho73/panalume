@@ -3,7 +3,7 @@
 <p align="center"><a href="https://github.com/leacho73/panalume/releases"><img src="https://img.shields.io/github/v/release/leacho73/panalume?include_prereleases&label=beta&color=7aa2ff" alt="Latest beta"></a></p>
 
 <p align="center"><b>A glassy, fast, drag-and-drop dashboard for Home Assistant.</b><br>
-Put any card anywhere, make it any size, style it any way — and run it on a wall tablet, phone or desktop.<br><sub>Formerly <i>Glasshouse</i>.</sub></p>
+Put any card anywhere, make it any size, style it any way — and run it on a wall tablet, phone or desktop.</p>
 
 <p align="center"><img src="docs/screenshots/home.webp" alt="Panalume on a wall tablet" width="900"></p>
 
