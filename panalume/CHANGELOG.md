@@ -1,4 +1,5 @@
 # Changelog
+
 ## 0.30.2
 
 - **Robot vacuum card.** A round button (with a battery ring, when the vacuum reports one) starts, pauses or resumes cleaning, with the status under it, a **Dock** button, a **Locate** (beep) button and a suction-power picker. It only shows what the vacuum says it supports, and picks up battery, area-cleaned, time and error sensors automatically when the integration has them (Roborock, Ecovacs, Dreame, Valetudo, SwitchBot…). Small cards become a single row.

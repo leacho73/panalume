@@ -91,7 +91,9 @@
   });
 
   const small = $derived(h < 150 || w < 240);
-  const ringSize = $derived(Math.max(56, Math.min(w - 48, h - 28 - 34 - (stats.length || problem ? 22 : 0) - 52 - 20, 170)));
+  // The suction picker wraps onto its own row on narrower cards: leave room for it.
+  const extraRow = $derived(fans.length && w < 380 ? 40 : 0);
+  const ringSize = $derived(Math.max(56, Math.min(w - 48, h - 28 - 34 - (stats.length || problem ? 22 : 0) - 52 - 20 - extraRow, 170)));
   const R = 44, C = 2 * Math.PI * R;
   const battColor = $derived(batt <= 15 ? '#ff6b6b' : batt <= 30 ? '#ffb547' : color);
   const battIcon = $derived(batt <= 15 ? 'mdi:battery-alert-variant-outline' : batt <= 40 ? 'mdi:battery-low' : batt <= 75 ? 'mdi:battery-medium' : 'mdi:battery-high');
