@@ -239,7 +239,13 @@ server.on('upgrade', (req, socket, head) => {
   }
   if (!req.url.split('?')[0].endsWith('/api/websocket')) return socket.destroy();
   wss.handleUpgrade(req, socket, head, (client) => {
-    const ha = new WebSocket(HA_URL.replace(/^http/, 'ws') + '/api/websocket', { perMessageDeflate: true });
+    // Running on its own without a token: nothing to connect with, so say so.
+    if (!SUP && !TOKEN) {
+      client.send(JSON.stringify({ type: 'unreachable', message: 'Panalume has no Home Assistant token: set HA_TOKEN (see the README)' }));
+      return client.close();
+    }
+    // Give up after 10 s, so a wrong address shows a message instead of "Connecting…" for minutes.
+    const ha = new WebSocket(HA_URL.replace(/^http/, 'ws') + '/api/websocket', { perMessageDeflate: true, handshakeTimeout: 10000 });
     const queue = [];
     let ready = false;
     ha.on('message', (data, isBinary) => {
@@ -263,7 +269,7 @@ server.on('upgrade', (req, socket, head) => {
     });
     // Can't reach Home Assistant at all: say so (in the log and on the screen).
     ha.on('error', (e) => {
-      once('reach', `Can't reach Home Assistant at ${HA_URL}: ${e.message}`);
+      once('reach', `Can't reach Home Assistant at ${HA_URL}: ${e.message || e.code || 'connection refused'}`);
       if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify({ type: 'unreachable', message: `Can't reach Home Assistant at ${HA_URL}` }));
     });
     client.on('message', (data) => (ready ? ha.send(data.toString()) : queue.push(data.toString())));
