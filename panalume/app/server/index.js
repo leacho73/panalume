@@ -123,6 +123,14 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+// Log a problem once a minute at most, not on every reconnect.
+const said = {};
+function once(key, text) {
+  if (Date.now() - (said[key] || 0) < 60e3) return;
+  said[key] = Date.now();
+  console.error(text);
+}
+
 // Websocket proxy: authenticate to HA server-side, then tell the browser auth_ok
 // and pipe frames both ways. The browser never sees the token.
 const wss = new WebSocketServer({ noServer: true, perMessageDeflate: true });
@@ -244,10 +252,19 @@ server.on('upgrade', (req, socket, head) => {
           queue.splice(0).forEach((m) => ha.send(m));
           return;
         }
+        if (msg.type === 'auth_invalid') {
+          once('auth', 'Home Assistant rejected the token. Check HA_TOKEN is a current long-lived access token.');
+          msg.message = 'Home Assistant rejected Panalume\'s access token';
+        }
         client.send(JSON.stringify(msg));
         return client.close();
       }
       client.send(data, { binary: isBinary });
+    });
+    // Can't reach Home Assistant at all: say so (in the log and on the screen).
+    ha.on('error', (e) => {
+      once('reach', `Can't reach Home Assistant at ${HA_URL}: ${e.message}`);
+      if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify({ type: 'unreachable', message: `Can't reach Home Assistant at ${HA_URL}` }));
     });
     client.on('message', (data) => (ready ? ha.send(data.toString()) : queue.push(data.toString())));
     const close = () => { client.close(); ha.close(); };
@@ -284,5 +301,10 @@ async function refreshPanel() {
   }
 }
 
-server.listen(PORT, () => console.log(`Panalume on :${PORT} -> ${HA_URL}`));
+server.listen(PORT, () => {
+  console.log(`Panalume on :${PORT} -> ${HA_URL}`);
+  // Outside Home Assistant OS (e.g. the Docker image) it needs an address and a token.
+  if (!SUP && !TOKEN) console.error('No Home Assistant token. Set HA_URL (e.g. http://192.168.1.10:8123) and HA_TOKEN (a long-lived access token from your HA profile → Security), or HA_TOKEN_FILE.');
+  else if (!SUP && !process.env.HA_URL) console.warn('HA_URL is not set, so Panalume is trying http://localhost:8123. Set HA_URL to your Home Assistant address.');
+});
 refreshPanel();

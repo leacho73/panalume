@@ -186,7 +186,7 @@
   {/if}
 {/if}
 
-{#if !conn.connected}<div class="offline"><Icon icon="mdi:lan-disconnect" size="1em" /> Connecting to Home Assistant…</div>{/if}
+{#if !conn.connected}<div class="offline"><Icon icon="mdi:lan-disconnect" size="1em" /> {conn.problem || 'Connecting to Home Assistant…'}</div>{/if}
 <div class="toasts">{#each toasts as t (t.id)}<div class="toast">{t.text}</div>{/each}</div>
 <Popup />
 
