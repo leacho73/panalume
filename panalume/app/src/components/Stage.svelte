@@ -8,7 +8,7 @@
   // Shift/Ctrl-click or drag a box on empty space to select several.
   // Positions snap to a 10px grid (hold Shift while dragging for 1px).
   import CardFrame from './CardFrame.svelte';
-  import { app, layout, GRID, changed, zoneList, ensureEditable, selectionSet, fitOverflow, usualGap } from '../lib/config.svelte.js';
+  import { app, layout, GRID, changed, zoneList, ensureEditable, selectionSet, fitOverflow, usualGap, cardHidden } from '../lib/config.svelte.js';
 
   let { available, autoDevice, offset = 0 } = $props(); // offset: space taken on the left (the editor panel when docked left)
   let vh = $state(innerHeight);
@@ -69,7 +69,35 @@
   const local = (e, zone) => ({ x: (e.clientX - left) / scale - origin(zone).x, y: (e.clientY + scrollY) / scale - origin(zone).y });
   const mainList = $derived(L.zones[app.view] || []);
   const sideList = $derived(L.zones.sidebar || []);
-  const mainH = $derived(Math.max(vh / scale / mainZ, mainList.reduce((m, p) => Math.max(m, p.y + p.h), 0) + (app.editing ? 400 : 20)));
+  // On phones with their own layout, a card hidden by its "Visible when" template
+  // gives its space to the cards below it instead of leaving a gap (the automatic
+  // phone layout leaves hidden cards out altogether). Only rows where nothing else is
+  // showing close up, so a hidden card beside a visible one keeps the row as it is.
+  const lift = $derived.by(() => {
+    if (app.editing || app.device !== 'phone') return null;
+    const hid = mainList.map((p) => cardHidden(app.config.cards[p.card]));
+    if (!hid.some(Boolean)) return null;
+    const G = usualGap(mainList) || 12;
+    const span = (p) => [p.y, p.y + p.h + G];
+    const shown = mainList.filter((_, i) => !hid[i]).map(span).sort((a, b) => a[0] - b[0]);
+    const bands = [];
+    for (const [a0, b] of mainList.filter((_, i) => hid[i]).map(span)) {
+      let a = a0;
+      for (const [c, d] of shown) {
+        if (d <= a || c >= b) continue;
+        if (c > a) bands.push([a, c]);
+        a = Math.max(a, d);
+        if (a >= b) break;
+      }
+      if (a < b) bands.push([a, b]);
+    }
+    bands.sort((x, y) => x[0] - y[0]);
+    const merged = [];
+    for (const [a, b] of bands) { const m = merged.at(-1); if (m && a <= m[1]) m[1] = Math.max(m[1], b); else merged.push([a, b]); }
+    return { hid, bands: merged, total: merged.reduce((n, [a, b]) => n + b - a, 0) };
+  });
+  const liftY = (y) => (lift ? lift.bands.reduce((n, [a, b]) => n + (b <= y ? b - a : a < y ? y - a : 0), 0) : 0);
+  const mainH = $derived(Math.max(vh / scale / mainZ, mainList.reduce((m, p) => Math.max(m, p.y + p.h), 0) - (lift?.total || 0) + (app.editing ? 400 : 20)));
   const sideH = $derived(Math.max(vh / scale / sideZ, sideList.reduce((m, p) => Math.max(m, p.y + p.h), 0) + 20));
 
   // Starting to edit puts any cards hanging off the edge back inside for good.
@@ -455,9 +483,10 @@
     {@const card = app.config.cards[p.card]}
     {@const k = name === 'sidebar' ? ks : kx}
     {@const pw = Math.round(p.w * k)}
-    {#if card}
+    {@const main = name !== 'sidebar' && lift}
+    {#if card && !(main && lift.hid[i])}
       <div class="place" class:sel={inSel(name, i)} class:primary={isPrimary(name, i) && sel.size === 1} class:grouped={app.editing && p.group}
-        style="left:{Math.round(p.x * k)}px;top:{p.y}px;width:{pw}px;height:{p.h}px;z-index:{(p.z || 0) + (op && inSel(name, i) ? 1000 : isPrimary(name, i) ? 500 : 0)}">
+        style="left:{Math.round(p.x * k)}px;top:{main ? p.y - liftY(p.y) : p.y}px;width:{pw}px;height:{p.h}px;z-index:{(p.z || 0) + (op && inSel(name, i) ? 1000 : isPrimary(name, i) ? 500 : 0)}">
         <CardFrame {card} w={pw} h={p.h} editing={app.editing} />
         {#if app.editing}
           <div class="grab" role="button" tabindex="-1" ondblclick={() => dbl(name, i)}

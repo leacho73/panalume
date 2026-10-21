@@ -5,7 +5,7 @@
 const GAP = 12;
 const ASPECT = new Set(['camera', 'image', 'iframe', 'powerflow']);
 
-export function reflow(master, width, views, cards) {
+export function reflow(master, width, views, cards, skip = null) {
   const W = width - 32;
   const half = Math.floor((W - GAP) / 2);
   const mainW = master.width - (master.sidebar.enabled ? master.sidebar.width : 0);
@@ -23,6 +23,7 @@ export function reflow(master, width, views, cards) {
     const place = (items, srcW) => {
       let pending = null; // a half-width card waiting for a partner
       for (const p of items) {
+        if (skip?.(p)) continue;
         const small = p.w <= srcW * 0.3 && type(p) !== 'markdown';
         if (small) {
           if (pending) {

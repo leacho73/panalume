@@ -6,6 +6,7 @@ import { toast, validEntityId } from './ha.svelte.js';
 // Each layout has a design width (the stage is scaled to fit the screen), an
 // optional sidebar, and per-zone placements ('sidebar' or a view id).
 import { reflow } from './reflow.js';
+import { t, truthy } from './tpl.js';
 import { clientId } from './live.js';
 
 export const DEVICES = {
@@ -20,9 +21,11 @@ export const MODES = { same: 'Same as tablet (scaled to fit)', auto: 'Automatic 
 export const MODE_SHORT = { same: 'same as tablet', auto: 'automatic', custom: 'own layout' };
 export const GRID = 10;
 
+const GOOGLE_INTER = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap';
+
 export const DEFAULT_THEME = {
   font: 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-  fontUrl: 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap',
+  fontUrl: '', // Inter is built in (src/inter.css); a Google Fonts link here loads another font
   background: 'radial-gradient(1200px 800px at 10% -10%, #1d2a4a 0%, transparent 60%), radial-gradient(1000px 700px at 110% 110%, #2a1d3d 0%, transparent 55%), #0b0f17',
   text: '#eef2f8',
   muted: 'rgba(238,242,248,.6)',
@@ -106,13 +109,18 @@ export function setPanelSide(side) {
   try { localStorage.setItem('hd-panel-side', app.panelSide); } catch {}
 }
 
+/** A card its "Visible when" template currently hides. */
+export const cardHidden = (c) => !!c?.visible && !truthy(t(c.visible, { entity_id: c.props?.entity }));
+
 /** The layout a device actually shows (main, a reflow of main, or its own). */
 export function layout(dev = app.device) {
   const ls = app.config.layouts;
   const l = ls[dev];
   if (dev === 'tablet' || l.mode === 'custom') return l;
   if (l.mode === 'same') return ls.tablet;
-  return reflow(ls.tablet, l.width, app.config.views, app.config.cards);
+  // Outside editing, hidden cards are left out of the automatic phone layout, so
+  // the rest close up (and small cards re-pair) instead of leaving gaps.
+  return reflow(ls.tablet, l.width, app.config.views, app.config.cards, app.editing ? null : (p) => cardHidden(app.config.cards[p.card]));
 }
 
 /** Which stored layout edits on this device go to. */
@@ -173,6 +181,8 @@ function init(cfg) {
     cfg.layouts[dev].display ??= d.display;
   }
   cfg.theme = { ...DEFAULT_THEME, ...cfg.theme };
+  // Inter used to load from Google Fonts by default; it's built in now.
+  if (cfg.theme.fontUrl === GOOGLE_INTER) cfg.theme.fontUrl = '';
   for (const c of Object.values(cfg.cards)) normalise(c);
   app.config = cfg;
   lastSaved = JSON.stringify(cfg);

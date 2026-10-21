@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.32.0
+
+- **Hidden cards no longer leave gaps on phones.** When a card is hidden by its **Visible when** template, the automatic phone layout leaves it out, so the cards below move up and small cards pair up again. On a phone with its own layout, rows left empty by hidden cards close up too. Tablets and desktops keep their layout as it is, and while editing every card is still shown.
+- **Hue light card with scenes** (contributed by Asben91). The Light card for a Philips Hue room or zone, with the room's Hue scenes as buttons instead of colour buttons: tap one to set it, and dynamic scenes play animated. Scenes are found automatically in Hue's own order, or pick your own (from any room, in your order). The scene row scrolls sideways when there are many.
+- **Robot vacuum card: map picker.** A **Map** dropdown next to suction power switches between your vacuum's maps (e.g. Roborock's *selected map*). It's found automatically, can be set by hand under **Map picker**, and hidden with **Show**.
+- **Inter is built in.** The default font no longer loads from Google Fonts, so Panalume makes no requests outside your home network. It looks the same, loads a little faster, and works on tablets with no internet access. Dashboards that had the old Google link saved switch over automatically, and you can still add any Google Font under **Theme**.
+- Service actions: the **Data** box now shows an example, and explains that a script's fields go straight in when you call the script directly (`script.my_script`), with no `"data"` wrapper.
+
 ## 0.31.1
 
 - **Sensor card: hide parts, and values that fit.** New **Show** buttons hide the icon, name, value or unit. The value now shrinks to fit the card, so a long state like *Detected* is no longer cut off on a small card, and **Value size %** sets its size yourself without making everything else bigger. **Value** now says it can be your own text, no template needed.
