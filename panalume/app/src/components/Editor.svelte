@@ -60,7 +60,7 @@
     ...(a?.action === 'more-info' || a?.action === 'toggle' || a?.action === 'fullscreen' ? [{ key: 'entity', label: 'Entity (blank: the card’s own)', type: 'entity' }] : []),
     ...(a?.action === 'popup' ? [{ key: 'title', label: 'Pop-up title', type: 'text' }, { key: 'cards', label: 'Cards in pop-up', type: 'cards' }] : []),
     ...(a?.action === 'navigate' ? [{ key: 'view', label: 'View', type: 'select', options: app.config.views.map((v) => ({ value: v.id, label: v.name })) }] : []),
-    ...(a?.action === 'service' ? [{ key: 'service', label: 'Service (domain.service)', type: 'text', placeholder: 'light.turn_on' }, { key: 'data', label: 'Data (JSON, template ok)', type: 'textarea' }] : []),
+    ...(a?.action === 'service' ? [{ key: 'service', label: 'Service (domain.service)', type: 'text', placeholder: 'light.turn_on' }, { key: 'data', label: 'Data (JSON, template ok)', type: 'textarea', hint: 'e.g. {"brightness_pct": 50}. For a script, call it directly (script.my_script) and put its fields here, with no "data" wrapper.' }] : []),
     ...(a?.action === 'url' ? [{ key: 'url', label: 'URL', type: 'text' }] : []),
   ];
   const THEME = [

@@ -8,12 +8,14 @@
     if (!v) return {};
     const p = v.slice(7);
     const first = (...n) => n.map((x) => `sensor.${p}_${x}`).find((id) => states.has(id)) || '';
+    const sel = ['selected_map', 'map', 'current_map'].map((x) => `select.${p}_${x}`).find((id) => states.has(id)) || '';
     return {
       entity: v,
       battery: first('battery', 'battery_level'),
       area: first('cleaned_area', 'cleaning_area', 'last_clean_area', 'total_cleaned_area'),
       time: first('cleaning_time', 'cleaning_duration', 'last_clean_duration'),
       error: first('error', 'vacuum_error'),
+      map: sel,
     };
   }
   export const meta = {
@@ -23,7 +25,7 @@
     autofill,
     sections: [
       { key: 'state', label: 'Status' }, { key: 'battery', label: 'Battery', section: 'battery' }, { key: 'stats', label: 'Area / time cleaned', section: 'stats' },
-      { key: 'controls', label: 'Start / pause / dock', section: 'controls' }, { key: 'fan', label: 'Suction power', section: 'fan' }, { key: 'locate', label: 'Locate (beep)', section: 'locate' },
+      { key: 'controls', label: 'Start / pause / dock', section: 'controls' }, { key: 'fan', label: 'Suction power', section: 'fan' }, { key: 'map', label: 'Map', section: 'map' }, { key: 'locate', label: 'Locate (beep)', section: 'locate' },
     ],
     fields: [
       { key: 'entity', label: 'Vacuum', type: 'entity', domain: 'vacuum' },
@@ -32,6 +34,7 @@
       { key: 'area', label: 'Area cleaned (optional)', type: 'entity', domain: 'sensor', section: 'stats' },
       { key: 'time', label: 'Cleaning time (optional)', type: 'entity', domain: 'sensor', section: 'stats' },
       { key: 'error', label: 'Error message (optional)', type: 'entity', domain: 'sensor' },
+      { key: 'map', label: 'Map picker (optional, e.g. a Roborock\'s selected map)', type: 'entity', domain: 'select', section: 'map' },
     ],
   };
 </script>
@@ -79,6 +82,9 @@
   const goHome = $derived(show('controls') && can(HOME) && !dead && !['docked', 'returning'].includes(st));
   const canLocate = $derived(show('locate') && can(LOCATE, true) && !dead);
   const fans = $derived(show('fan') && can(FAN, true) && !dead ? e?.attributes.fan_speed_list || [] : []);
+  // A map picker (e.g. Roborock's select.<vacuum>_selected_map), when one is set.
+  const mapEnt = $derived(show('map') && props.map ? ent(props.map) : null);
+  const maps = $derived(mapEnt && !['unavailable', 'unknown'].includes(mapEnt.state) && !dead ? mapEnt.attributes.options || [] : []);
   const cap = (s) => String(s).replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
 
   const area = $derived(show('stats') && props.area ? ent(props.area) : null);
@@ -92,7 +98,8 @@
 
   const small = $derived(h < 150 || w < 240);
   // The suction picker wraps onto its own row on narrower cards: leave room for it.
-  const extraRow = $derived(fans.length && w < 380 ? 40 : 0);
+  const pickers = $derived((fans.length ? 1 : 0) + (maps.length ? 1 : 0));
+  const extraRow = $derived(!pickers || w >= 380 ? 0 : pickers === 2 && w < 300 ? 80 : 40);
   const ringSize = $derived(Math.max(56, Math.min(w - 48, h - 28 - 34 - (stats.length || problem ? 22 : 0) - 52 - 20 - extraRow, 170)));
   const R = 44, C = 2 * Math.PI * R;
   const battColor = $derived(batt <= 15 ? '#ff6b6b' : batt <= 30 ? '#ffb547' : color);
@@ -126,7 +133,7 @@
       {#if problem}<div class="sub bad">{problem}</div>
       {:else if stats.length}<div class="sub">{stats.map((x) => stateText(x)).join(' · ')}</div>{/if}
     </div>
-    {#if !dead && (show('controls') || canLocate || fans.length)}
+    {#if !dead && (show('controls') || canLocate || fans.length || maps.length)}
       <div class="btns" data-stop>
         {#if show('controls')}
           <button class="main" class:go={!cleaning} onclick={main}><Icon icon={mainIcon} size="1.1em" /> {mainLabel}</button>
@@ -136,6 +143,11 @@
         {#if fans.length}
           <select value={e.attributes.fan_speed} onchange={(ev) => call('set_fan_speed', { fan_speed: ev.currentTarget.value })} title="Suction power">
             {#each fans as f}<option value={f}>{cap(f)}</option>{/each}
+          </select>
+        {/if}
+        {#if maps.length}
+          <select value={mapEnt.state} onchange={(ev) => callService('select', 'select_option', { option: ev.currentTarget.value }, { entity_id: mapEnt.entity_id })} title="Map">
+            {#each maps as m}<option value={m}>{m}</option>{/each}
           </select>
         {/if}
       </div>
