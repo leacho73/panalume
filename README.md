@@ -162,3 +162,7 @@ export const meta = {
 Use `t()` / `ent()` from `lib/tpl.js` so every setting can be a template. Release by bumping `version` in `panalume/config.yaml` and adding a `CHANGELOG.md` entry.
 
 *Screenshots and the demo video use a demo house with made-up entities.*
+
+## Licence
+
+MIT, see [LICENSE](LICENSE).
