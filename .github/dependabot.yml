@@ -1,5 +1,6 @@
 # Weekly updates for the app's libraries, monthly for the build tools and the
-# Docker base image; each grouped into one pull request. Security fixes come
+# Docker base image (within the same Node version); each grouped into one pull
+# request. Security fixes come
 # straight away. Nothing here releases anything: updates go out with the next
 # release.
 version: 2
@@ -18,3 +19,8 @@ updates:
     directory: /panalume
     schedule: { interval: monthly }
     labels: [dependencies]
+    # Moving to a new Node version changes what every install runs on, so
+    # that's done on purpose in a release, not suggested here.
+    ignore:
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
