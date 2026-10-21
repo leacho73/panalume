@@ -1,0 +1,20 @@
+# Weekly updates for the app's libraries, monthly for the build tools and the
+# Docker base image; each grouped into one pull request. Security fixes come
+# straight away. Nothing here releases anything: updates go out with the next
+# release.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /panalume/app
+    schedule: { interval: weekly }
+    groups: { libraries: { patterns: ["*"] } }
+    labels: [dependencies]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: monthly }
+    groups: { actions: { patterns: ["*"] } }
+    labels: [dependencies]
+  - package-ecosystem: docker
+    directory: /panalume
+    schedule: { interval: monthly }
+    labels: [dependencies]
