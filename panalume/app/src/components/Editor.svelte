@@ -52,7 +52,7 @@
     { key: 'fontWeight', label: 'Font weight', type: 'select', options: ['', '300', '400', '500', '600', '700'] },
     { key: 'align', label: 'Text align', type: 'select', options: ['', 'left', 'center', 'right'] },
     { key: 'scale', label: 'Content size % (text, buttons, everything — also the −/+ under the card)', type: 'number' },
-    { key: 'css', label: 'Custom CSS (declarations)', type: 'textarea' },
+    { key: 'css', label: 'Custom CSS', type: 'textarea', hint: 'Declarations style the card, e.g. border-radius: 30px. Rules style parts inside it, e.g. & .name { white-space: normal }.' },
   ];
   const ACTIONS = ['default', 'toggle', 'more-info', 'fullscreen', 'popup', 'navigate', 'service', 'url', 'none'];
   const actFields = (a) => [

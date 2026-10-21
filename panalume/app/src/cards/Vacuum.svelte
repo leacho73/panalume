@@ -46,6 +46,7 @@
   // shows what the vacuum says it can do. Small cards become a single row.
   import Icon from '../components/Icon.svelte';
   import { t, ent } from '../lib/tpl.js';
+  import { stateWord } from '../lib/i18n.svelte.js';
   import { name, stateText, formatNumber } from '../lib/entity.js';
   import { callService } from '../lib/ha.svelte.js';
   let { props, w = 300, h = 250 } = $props();
@@ -59,7 +60,8 @@
     cleaning: ['Cleaning', '#4fb4ff'], returning: ['Heading home', '#b48cff'], paused: ['Paused', '#ffb547'], docked: ['Docked', '#5bd88f'],
     idle: ['Idle', '#8a94a8'], error: ['Needs attention', '#ff6b6b'], unavailable: ['Unavailable', '#8a94a8'], unknown: ['Unknown', '#8a94a8'],
   };
-  const [label, color] = $derived(LOOK[st] || [st.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()), '#8a94a8']);
+  const [label0, color] = $derived(LOOK[st] || [st.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()), '#8a94a8']);
+  const label = $derived(stateWord('vacuum', null, st) || label0);
 
   // What the vacuum supports (HA's feature flags). If it doesn't say, assume the basics.
   const feat = $derived(Number(e?.attributes.supported_features) || 0);

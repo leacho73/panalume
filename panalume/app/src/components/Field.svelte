@@ -2,6 +2,7 @@
   // Generic settings field, bound to obj[key]. Text fields accept HA templates.
   import EntityPicker from './EntityPicker.svelte';
   import IconPicker from './IconPicker.svelte';
+  import MediaFolderPicker from './MediaFolderPicker.svelte';
   import Icon from './Icon.svelte';
   import { states } from '../lib/ha.svelte.js';
   import { changed, app } from '../lib/config.svelte.js';
@@ -17,7 +18,9 @@
 <div class="field" class:wide={f.type === 'textarea' || f.type === 'entities' || f.type === 'cards'}>
   {#if f.type !== 'bool'}<label for={f.key}>{f.label}{#if isTpl(obj[f.key])}<span class="tpl">template</span>{/if}
     {#if ontoggle}<button type="button" class="eye" class:off={hide} title={hide ? 'Hidden on the card — click to show' : 'Shown on the card — click to hide'} onclick={ontoggle}><Icon icon={hide ? 'mdi:eye-off-outline' : 'mdi:eye'} size="15px" /></button>{/if}</label>{/if}
-  {#if f.type === 'entity'}
+  {#if f.type === 'media-folder'}
+    <MediaFolderPicker value={obj[f.key] || ''} title={obj[f.key + '_title'] || ''} onpick={(id, title) => { obj[f.key + '_title'] = title; set(id); }} />
+  {:else if f.type === 'entity'}
     <EntityPicker bind:value={() => obj[f.key] || '', set} domain={f.domain} />
   {:else if f.type === 'entities'}
     <div class="ents">

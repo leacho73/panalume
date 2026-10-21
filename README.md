@@ -27,6 +27,7 @@ Panalume is a Home Assistant **app** that gives you a dashboard you design in th
 - **Groups & multi-select** — rooms move as one; select several cards to group, align, size or space them evenly, or show / hide the same part on all of them at once. Copy cards to another view. Undo, duplicate, keyboard nudging.
 - **Fast** — a ~75 KB (gzipped) Svelte app that only subscribes to the entities your cards use.
 - **Stays in your home** — Panalume talks only to your own Home Assistant, with no analytics or telemetry. The only outside requests are ones you choose: icons from other icon sets (via Iconify) or a Google font.
+- **Your language** — states show in Home Assistant's language, using its own translations.
 
 ## Energy, front and centre
 
@@ -80,6 +81,8 @@ Detects Samsung SmartThings washers, Home Connect (Bosch / Neff / Siemens) dishw
 <td width="45%"><img src="docs/screenshots/vacuum.webp" alt="Robot vacuum card"><br><sub><b>Robot vacuum</b>: status, battery, area and time cleaned, Start / Pause / Dock, Locate, suction power and a map picker (Roborock, Ecovacs, Dreame, Valetudo and others detected automatically).</sub></td>
 </tr></table>
 
+**Lawn mower**: start, pause and dock, battery, the mower's activity and next start (Husqvarna, Gardena, Worx and others detected automatically).
+
 <table><tr>
 <td width="62%"><img src="docs/screenshots/printer.webp" alt="3D printer card"><br><sub><b>3D printer</b>: progress ring around the model, time left and finish time, layers, nozzle / bed / chamber temperatures, filament colour, Pause / Resume / Stop, light and speed (Bambu Lab printers detected automatically; OctoPrint too).</sub></td>
 <td width="38%"><img src="docs/screenshots/lock.webp" alt="Door lock card"><br><sub><b>Door lock</b>: a padlock whose shackle lifts when unlocked; tap to lock, tap twice to unlock; door sensor, battery and Open door.</sub></td>
@@ -106,7 +109,7 @@ Phones get an automatic single-column version of your tablet layout: navigation 
 
 ### All the cards
 
-Button / tile · Light · Hue light with scenes · Thermostat (draggable dial) · Climate group (several thermostats / AC units at once) · Door lock · 3D printer · Hot tub · Washing machine · Tumble dryer · Dishwasher · Air fryer · Robot vacuum · Media player (artwork, volume, source, speaker grouping) · Cover / blind · Slider · Option picker · Entities list · Glance · Sensor with graph · Gauge · History graph · Weather · Calendar (today's and upcoming events) · Clock · Sun & moon (sunrise / sunset, moon phase, moonrise / moonset) · Text / Markdown · Template lines · People · Camera (tap for full-screen live view; plays the video stream for cameras whose pictures fail, e.g. Tapo) · Web page · Image · Navigation · Divider · Alarm panel · and the energy cards above.
+Button / tile · Light · Hue light with scenes · Thermostat (draggable dial) · Climate group (several thermostats / AC units at once) · Door lock · 3D printer · Hot tub · Washing machine · Tumble dryer · Dishwasher · Air fryer · Robot vacuum · Lawn mower · Media player (artwork, volume, source, speaker grouping) · Cover / blind · Slider · Option picker · Entities list · Glance · Sensor with graph · Gauge · History graph · Weather · Calendar (today's and upcoming events) · Clock · Sun & moon (sunrise / sunset, moon phase, moonrise / moonset) · Text / Markdown · Template lines · People · Photo frame (Immich and local albums) · Camera (tap for full-screen live view; plays the video stream for cameras whose pictures fail, e.g. Tapo) · Web page · Image · Navigation · Divider · Alarm panel · and the energy cards above.
 
 ### Coming from ha-fusion?
 

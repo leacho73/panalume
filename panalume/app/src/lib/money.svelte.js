@@ -3,6 +3,7 @@
 // 35,2 øre. Energy prices are usually a fraction of the currency per kWh, so
 // they're shown in the small unit where the currency has a familiar one.
 import { send, conn } from './ha.svelte.js';
+import { loadTranslations } from './i18n.svelte.js';
 
 export const money = $state({ currency: 'GBP', locale: undefined });
 
@@ -22,6 +23,7 @@ export function loadMoney() {
     // HA's language (e.g. "de", or "en-GB") plus its country gives the number format.
     const lang = c?.language || '';
     money.locale = lang.includes('-') ? lang : lang && c?.country ? `${lang}-${c.country}` : lang || undefined;
+    loadTranslations(lang);
   }).catch(() => (asked = false));
 }
 

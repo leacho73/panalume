@@ -24,6 +24,7 @@
   // speed for all of them, plus a row per unit to adjust or switch it alone.
   import Icon from '../components/Icon.svelte';
   import { t } from '../lib/tpl.js';
+  import { stateWord, attrWord } from '../lib/i18n.svelte.js';
   import { name, formatNumber } from '../lib/entity.js';
   import { callService } from '../lib/ha.svelte.js';
   import { app } from '../lib/config.svelte.js';
@@ -35,7 +36,7 @@
   const MODE = { off: ['mdi:power', 'Off'], heat: ['mdi:fire', 'Heat'], cool: ['mdi:snowflake', 'Cool'], auto: ['mdi:thermostat-auto', 'Auto'], heat_cool: ['mdi:sun-snowflake-variant', 'Heat/Cool'], dry: ['mdi:water-percent', 'Dry'], fan_only: ['mdi:fan', 'Fan'] };
   const ORDER = ['off', 'heat', 'cool', 'heat_cool', 'auto', 'dry', 'fan_only'];
   const ACTION = { heating: 'Heating', preheating: 'Pre-heating', cooling: 'Cooling', drying: 'Drying', fan: 'Fan', idle: 'Idle', off: 'Off' };
-  const label = (m) => MODE[m]?.[1] || m.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+  const label = (m) => stateWord('climate', null, m) || MODE[m]?.[1] || m.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
 
   const units = $derived((props.entities || []).map((id) => states.get(id)).filter(Boolean));
   const isOff = (e) => e.state === 'off' || e.state === 'unavailable';
@@ -152,7 +153,7 @@
           <div class="hero" data-stop>
             <button class="rb" onclick={() => nudgeAll(-1)} disabled={!on.length} aria-label="Lower all"><Icon icon="mdi:minus" size="1.3em" /></button>
             <div class="rc">
-              <div class="act">{busy ? ACTION[busy] : on.length ? (mode ? label(mode) : 'Mixed modes') : 'All off'}</div>
+              <div class="act">{busy ? attrWord('climate', 'hvac_action', busy) || ACTION[busy] : on.length ? (mode ? label(mode) : 'Mixed modes') : 'All off'}</div>
               <div class="tgt" class:pending={pending != null} class:mix={on.length && groupShown == null}>
                 {#if !on.length}Off
                 {:else if groupShown != null}{formatNumber(groupShown, step < 1 ? 1 : 0)}<small>{unit}</small>
@@ -189,7 +190,7 @@
               <button class="pw" onclick={() => power(e)} title={isOff(e) ? 'Turn on' : 'Turn off'}><Icon icon="mdi:power" size="1em" /></button>
               <button class="un" onclick={() => (app.popup = { entity: e.entity_id })}>
                 <span class="nm">{short(e)}</span>
-                <span class="st">{[isOff(e) ? 'Off' : ACTION[e.attributes.hvac_action] || label(e.state), e.attributes.current_temperature != null ? formatNumber(e.attributes.current_temperature, 1) + unit : ''].filter(Boolean).join(' · ')}</span>
+                <span class="st">{[isOff(e) ? label('off') : attrWord('climate', 'hvac_action', e.attributes.hvac_action) || ACTION[e.attributes.hvac_action] || label(e.state), e.attributes.current_temperature != null ? formatNumber(e.attributes.current_temperature, 1) + unit : ''].filter(Boolean).join(' · ')}</span>
               </button>
               {#if !isOff(e) && v != null}
                 <button class="sb" onclick={() => setTemp([e.entity_id], v - step)} aria-label="Lower {short(e)}"><Icon icon="mdi:minus" size="1em" /></button>

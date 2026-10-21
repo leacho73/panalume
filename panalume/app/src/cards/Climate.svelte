@@ -20,6 +20,7 @@
   // what the unit is doing — warm when heating, cool when cooling, grey when off.
   import Icon from '../components/Icon.svelte';
   import { t, ent } from '../lib/tpl.js';
+  import { stateWord, attrWord } from '../lib/i18n.svelte.js';
   import { name, domain, formatNumber } from '../lib/entity.js';
   import { callService } from '../lib/ha.svelte.js';
   let { props, w = 300, h = 340 } = $props();
@@ -43,13 +44,13 @@
   const color = $derived(COLORS[action] && action !== 'idle' ? COLORS[action] : MODE_COLOR[mode] || '#7aa2ff');
   const MODE = { off: ['mdi:power', 'Off'], heat: ['mdi:fire', 'Heat'], cool: ['mdi:snowflake', 'Cool'], auto: ['mdi:thermostat-auto', 'Auto'], heat_cool: ['mdi:sun-snowflake-variant', 'Heat/Cool'], dry: ['mdi:water-percent', 'Dry'], fan_only: ['mdi:fan', 'Fan'], eco: ['mdi:leaf', 'Eco'], heat_pump: ['mdi:heat-pump', 'Heat pump'], electric: ['mdi:flash', 'Electric'], performance: ['mdi:rocket-launch', 'Boost'], high_demand: ['mdi:rocket-launch', 'High demand'], gas: ['mdi:fire', 'Gas'] };
   const ACTION = { heating: ['mdi:fire', 'Heating'], preheating: ['mdi:fire', 'Pre-heating'], cooling: ['mdi:snowflake', 'Cooling'], drying: ['mdi:water-percent', 'Drying'], fan: ['mdi:fan', 'Fan'], idle: ['mdi:pause-circle-outline', 'Idle'], off: ['mdi:power', 'Off'] };
-  const label = (m) => MODE[m]?.[1] || m.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
+  const label = (m) => stateWord('climate', null, m) || MODE[m]?.[1] || m.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
   // Some units don't say what they're doing, only
   // their mode (e.g. Tuya air conditioners, Hive and other hot water): show the
   // mode then, rather than claiming they're idle.
   const actView = $derived(!a.hvac_action && !off && mode
     ? [MODE[mode]?.[0] || 'mdi:thermostat', label(mode)]
-    : [ACTION[action]?.[0] || 'mdi:thermostat', ACTION[action]?.[1] || action]);
+    : [ACTION[action]?.[0] || 'mdi:thermostat', attrWord('climate', 'hvac_action', action) || ACTION[action]?.[1] || action]);
 
   // Pending target while adjusting; sent after a short pause.
   let pending = $state(null);

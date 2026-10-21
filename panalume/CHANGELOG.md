@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.33.0
+
+- **Lawn mower card.** For robot mowers (Husqvarna Automower, Gardena, Worx Landroid, Mammotion and others). A big round button starts, pauses or resumes mowing, with a ring showing the battery, and **Dock** sends it home. Underneath: the status, the mower's own activity in plain words (e.g. *Parked until the next start*), the next scheduled start and operating hours. It finds the mower and its sensors automatically, only shows what the mower supports, and small cards become a single row.
+- **Photo frame card.** A slideshow of a folder or album from Home Assistant's media browser: your own media folders, Immich albums (with the Immich integration) and other photo sources. Photos fade from one to the next with a slow zoom; tap for the next one. Choose the album with **Choose** in the card's settings, and set the seconds per photo, shuffle or in order, and whether to fill the card or show the whole photo. New photos appear on their own.
+- **States in your language.** Panalume now uses Home Assistant's own translations, so states appear in Home Assistant's language: *Ligado*, *Aberto*, *A aquecer* in Portuguese, *Eingeschaltet* in German, and so on. That covers state text on every card, lights, thermostat modes, weather and the vacuum and mower status. English setups are unchanged, and Panalume's own menus stay in English.
+- **Camera sound.** The full-screen live view has a speaker button for cameras that send sound. It can be added to a camera card too, under **Speaker button**.
+- **Custom CSS for parts of a card.** A card's **Custom CSS** can now style parts inside it as well as the card itself, e.g. `& .name { white-space: normal }`. Buttons also have a **Wrap long names onto two lines** option.
+- The People card no longer splits a single word (e.g. *Ausente*) across two lines.
+
 ## 0.32.0
 
 - **Hidden cards no longer leave gaps on phones.** When a card is hidden by its **Visible when** template, the automatic phone layout leaves it out, so the cards below move up and small cards pair up again. On a phone with its own layout, rows left empty by hidden cards close up too. Tablets and desktops keep their layout as it is, and while editing every card is still shown.

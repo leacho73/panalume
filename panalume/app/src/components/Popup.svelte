@@ -13,7 +13,7 @@
 
 {#if app.popup?.camera}
   <div class="full" role="dialog" aria-modal="true" bind:clientWidth={vw} bind:clientHeight={vh}>
-    <Camera props={{ entity: app.popup.camera, name: app.popup.name, mode: 'live', fit: 'contain', show_name: true }} w={vw} h={vh} />
+    <Camera props={{ entity: app.popup.camera, name: app.popup.name, mode: 'live', fit: 'contain', show_name: true, sound: true }} w={vw} h={vh} />
     <button class="x" onclick={close} aria-label="Close"><Icon icon="mdi:close" size="1.5em" /></button>
   </div>
 {:else if app.popup}

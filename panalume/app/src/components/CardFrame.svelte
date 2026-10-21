@@ -6,6 +6,7 @@
   import { app, setView } from '../lib/config.svelte.js';
   import { callService } from '../lib/ha.svelte.js';
   import { toggle, canToggle, domain } from '../lib/entity.js';
+  import { splitCss } from '../lib/css.js';
 
   let { card, w, h, editing = false, inPopup = false } = $props();
   const def = $derived(cards[card.type]);
@@ -15,6 +16,7 @@
   const z = $derived(((Number(app.config.theme.cardScale) || 100) / 100) * ((Number(s.scale) || 100) / 100));
   const visible = $derived(!card.visible || truthy(t(card.visible, vars)));
 
+  const cssParts = $derived(s.css ? splitCss(t(s.css, vars), `[data-card="${card.id}"][data-card]`) : { decls: '', rules: '' });
   const px = (v) => (v === '' || v == null ? null : /^-?\d+(\.\d+)?$/.test(String(v)) ? v + 'px' : v);
   const style = $derived.by(() => {
     const out = [];
@@ -35,7 +37,7 @@
     add('text-align', t(s.align, vars));
     const img = t(s.backgroundImage, vars);
     if (img) add('background-image', img.startsWith('url(') || img.includes('gradient(') ? img : `url('${img}')`);
-    if (s.css) out.push(t(s.css, vars));
+    if (cssParts.decls) out.push(cssParts.decls);
     return out.join(';');
   });
 
@@ -91,7 +93,8 @@
 </script>
 
 {#if visible || editing}
-  <div role="presentation" class="card {card.type}" class:tappable class:hidden={!visible} class:popup={inPopup} {style}
+  {#if cssParts.rules}{@html `<style>${cssParts.rules}</style>`}{/if}
+  <div role="presentation" data-card={card.id} class="card {card.type}" class:tappable class:hidden={!visible} class:popup={inPopup} {style}
     onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={() => clearTimeout(holdTimer)}>
     <div class="content" style="zoom:{z};{inPopup ? 'width:100%;height:100%' : `width:${w / z}px;height:${h / z}px`}">
       {#if def}

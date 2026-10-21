@@ -18,6 +18,7 @@
 <script>
   import Icon from '../components/Icon.svelte';
   import { t, ent } from '../lib/tpl.js';
+  import { stateWord } from '../lib/i18n.svelte.js';
   import { subscribe } from '../lib/ha.svelte.js';
   let { props, w } = $props();
   const show = (k) => !props.hide?.[k];
@@ -56,7 +57,7 @@
         {#if show('temp')}<div class="temp">{a.temperature != null ? Math.round(a.temperature) + '°' : '—'}</div>{/if}
         {#if today}<div class="hl"><span>↑ {Math.round(today.temperature)}°</span>{#if today.templow != null}<span class="lo">↓ {Math.round(today.templow)}°</span>{/if}</div>{/if}
       </div>
-      {#if show('cond')}<div class="cond">{t(props.name) || COND[e?.state] || (e?.state || '').replace(/-/g, ' ')}</div>{/if}
+      {#if show('cond')}<div class="cond">{t(props.name) || stateWord('weather', null, e?.state) || COND[e?.state] || (e?.state || '').replace(/-/g, ' ')}</div>{/if}
     </div>
     <div class="extra">
       {#if a.humidity != null && show('humidity')}<span><Icon icon="mdi:water-percent" size="1em" /> {a.humidity}%</span>{/if}

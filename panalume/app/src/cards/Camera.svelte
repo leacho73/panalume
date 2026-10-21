@@ -10,12 +10,14 @@
       { key: 'mode', label: 'Mode', type: 'select', options: [{ value: 'snapshot', label: 'Snapshot' }, { value: 'live', label: 'Live' }, { value: 'video', label: 'Video stream (for cameras whose pictures fail)' }] },
       { key: 'refresh', label: 'Snapshot refresh (s)', type: 'number' },
       { key: 'trigger', label: 'Take a new picture each refresh (Blink: on unless unticked; uses the camera battery)', type: 'bool' },
+      { key: 'sound', label: 'Speaker button (live video from cameras with sound; full screen always has it)', type: 'bool' },
       { key: 'fit', label: 'Fit', type: 'select', options: [{ value: 'auto', label: 'Auto' }, { value: 'crop', label: 'Fill the card (crops edges)' }, { value: 'contain', label: 'Whole picture' }] },
     ],
   };
 </script>
 
 <script>
+  import Icon from '../components/Icon.svelte';
   import { t, ent } from '../lib/tpl.js';
   import { name } from '../lib/entity.js';
   import { haImage, send, callService, subscribe } from '../lib/ha.svelte.js';
@@ -157,6 +159,10 @@
   // waiting a little longer each time (HA stops streams nobody's watching,
   // e.g. while the screen was off).
   let vidErr = $state(''), playing = $state(false);
+  // Sound: video starts muted (browsers only autoplay muted video); the speaker
+  // button turns it on for streams that carry audio (null = can't tell yet).
+  let muted = $state(true), hasAudio = $state(null);
+  const toggleSound = () => { muted = !muted; if (vid) { vid.muted = muted; if (!muted) vid.play?.().catch(() => {}); } };
   $effect(() => {
     if (!video || !vid) return;
     wake;
@@ -165,6 +171,7 @@
     let stop = null, stopped = false, retry, tries = 0, slow, step = 0;
     vidErr = '';
     playing = false;
+    hasAudio = null;
     const end = () => { stop?.(); stop = null; clearTimeout(slow); el.srcObject = null; el.removeAttribute('src'); el.load?.(); };
     const next = (why) => {
       end();
@@ -183,7 +190,7 @@
       (kind === 'web_rtc' ? webrtc : hlsPlay)(id, el, (why) => { if (!stopped) next(why); }).then((fn) => { if (stopped) fn?.(); else stop = fn; });
     };
     // Only a picture counts: a WebRTC stream can "play" with no video in it.
-    const ok = () => { if (!el.videoWidth) return; tries = 0; vidErr = ''; playing = true; clearTimeout(slow); };
+    const ok = () => { if (!el.videoWidth) return; tries = 0; vidErr = ''; playing = true; clearTimeout(slow); if (el.srcObject) hasAudio = el.srcObject.getAudioTracks().length > 0; };
     const progress = () => { if (el.videoWidth) lastOk = Date.now(); };
     el.addEventListener('timeupdate', progress);
     el.addEventListener('playing', ok);
@@ -205,7 +212,7 @@
       pc.addTransceiver('audio', { direction: 'recvonly' });
       if (cfg?.dataChannel) pc.createDataChannel(cfg.dataChannel);
       const ms = new MediaStream();
-      pc.ontrack = (ev) => { ms.addTrack(ev.track); el.srcObject = ms; el.play?.().catch(() => {}); };
+      pc.ontrack = (ev) => { ms.addTrack(ev.track); if (ev.track.kind === 'audio') hasAudio = true; el.srcObject = ms; el.play?.().catch(() => {}); };
       const sendCand = (c) => send({ type: 'camera/webrtc/candidate', entity_id: id, session_id: session, candidate: c }).catch(() => {});
       pc.onicecandidate = (ev) => {
         if (!ev.candidate) return;
@@ -239,6 +246,7 @@
       if (!Hls.isSupported()) el.src = src;
       else {
         hls = new Hls({ liveSyncDurationCount: 2 });
+        hls.on(Hls.Events.MANIFEST_PARSED, (_, d) => { hasAudio = (d.levels || []).some((l) => l.audioCodec) || (d.audioTracks || []).length > 0 ? true : null; });
         hls.on(Hls.Events.ERROR, (_, d) => { if (d.fatal && !done) { done = true; hls.destroy(); fail('Video stream failed, retrying…'); } });
         hls.loadSource(src);
         hls.attachMedia(el);
@@ -253,8 +261,11 @@
 
 <div class="cam">
   {#if video}
-    <video bind:this={vid} muted autoplay playsinline poster={camId ? `ha/api/camera_proxy/${camId}` : undefined} style="object-fit:{fit}" onloadedmetadata={(ev) => (ratio = ev.currentTarget.videoWidth / ev.currentTarget.videoHeight || 0)}></video>
+    <video bind:this={vid} {muted} autoplay playsinline poster={camId ? `ha/api/camera_proxy/${camId}` : undefined} style="object-fit:{fit}" onloadedmetadata={(ev) => (ratio = ev.currentTarget.videoWidth / ev.currentTarget.videoHeight || 0)}></video>
     {#if vidErr}<div class="msg">{vidErr}</div>{:else if !playing}<div class="msg starting">Starting video…</div>{/if}
+    {#if props.sound && playing && hasAudio !== false}
+      <button class="snd" data-stop onclick={toggleSound} aria-label={muted ? 'Turn sound on' : 'Mute'} title={muted ? 'Turn sound on' : 'Mute'}><Icon icon={muted ? 'mdi:volume-off' : 'mdi:volume-high'} size="1.3em" /></button>
+    {/if}
   {:else if shown}<img src={shown} alt="" style="object-fit:{fit}" class:broken onerror={() => { broken = true; failed++; }} onload={(ev) => { broken = false; ratio = ev.currentTarget.naturalWidth / ev.currentTarget.naturalHeight || 0; }} />{/if}
   {#if !video && (broken || (!shown && failed >= 2))}<div class="msg">No picture from this camera</div>{/if}
   {#if props.show_name}<div class="lbl">{t(props.name) || name(e)}</div>{/if}
@@ -266,5 +277,6 @@
   img.broken { visibility: hidden; }
   .msg { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: .85em; padding: 12px; text-align: center; }
   .msg.starting { place-items: end center; padding-bottom: 2.4em; text-shadow: 0 1px 4px #000; }
+  .snd { position: absolute; right: 12px; bottom: 12px; z-index: 2; width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(0,0,0,.5); color: #fff; display: grid; place-items: center; backdrop-filter: blur(6px); }
   .lbl { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 14px 10px; background: linear-gradient(transparent, rgba(0,0,0,.6)); font-weight: 600; font-size: .9em; }
 </style>

@@ -22,6 +22,7 @@
   import Icon from '../components/Icon.svelte';
   import Slider from '../components/Slider.svelte';
   import { t, ent } from '../lib/tpl.js';
+  import { stateWord } from '../lib/i18n.svelte.js';
   import { name, entityIcon, lightColor, toggle } from '../lib/entity.js';
   import { callService, states } from '../lib/ha.svelte.js';
   let { props, h = 170 } = $props();
@@ -59,7 +60,7 @@
       <div class="name">{t(props.name) || name(e)}</div>
       {#if show('state')}
         <div class="state">
-          {on ? (dimmable ? `${pct}%` : 'On') : e?.state === 'off' ? 'Off' : e?.state || '—'}
+          {on ? (dimmable ? `${pct}%` : stateWord('light', null, 'on') || 'On') : e?.state === 'off' ? stateWord('light', null, 'off') || 'Off' : e?.state || '—'}
           {#if show('members') && members}<span class="mem">{' · '}{membersOn}/{members.length} on</span>{/if}
         </div>
       {/if}

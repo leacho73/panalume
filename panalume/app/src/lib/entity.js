@@ -1,5 +1,6 @@
 // Entity helpers: names, formatted states, default icons, toggling.
 import { callService } from './ha.svelte.js';
+import { stateWord } from './i18n.svelte.js';
 
 export const domain = (id) => id?.split('.')[0] || '';
 
@@ -60,9 +61,12 @@ export function stateText(e, { digits, unit = true } = {}) {
   if (d === 'cover' && e.attributes.current_position != null && e.state === 'open') return e.attributes.current_position + '%';
   if (d === 'climate') {
     const t = e.attributes.current_temperature;
-    return t != null ? `${formatNumber(t, 1)}°` : LABEL[e.state] || e.state;
+    return t != null ? `${formatNumber(t, 1)}°` : stateWord(d, null, e.state) || LABEL[e.state] || e.state;
   }
   if (e.attributes.device_class === 'timestamp' || d === 'input_datetime') return relTime(e.state);
+  // In Home Assistant's language when it isn't English (Ligado, Aberta…).
+  const word = stateWord(d, e.attributes.device_class, e.state);
+  if (word) return word;
   if (d === 'binary_sensor' && (e.state === 'on' || e.state === 'off')) {
     const w = BINARY[e.attributes.device_class];
     if (w) return w[e.state === 'on' ? 0 : 1];
