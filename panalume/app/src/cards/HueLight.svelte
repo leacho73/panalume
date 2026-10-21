@@ -1,10 +1,17 @@
 <script module>
-  import { send } from '../lib/ha.svelte.js';
+  import { renderTemplate } from '../lib/ha.svelte.js';
+
+  // Hue scenes are scene.* entities with a group_name. One live template (shared
+  // by every Hue card) lists them, and the dashboard watches just those, rather
+  // than fetching every entity in Home Assistant.
+  const SCENES = "{{ states.scene | selectattr('attributes.group_name', 'defined') | map(attribute='entity_id') | join(',') }}";
+  const sceneIds = () => String(renderTemplate(SCENES) || '').split(',').filter((id) => id.startsWith('scene.'));
 
   export const meta = {
     type: 'hue-light', name: 'Hue light (scenes)', icon: 'mdi:lightbulb-group', category: 'Controls',
     size: { w: 300, h: 170 }, tap: 'toggle', hold: 'more-info',
     defaults: { entity: '', dynamic: true },
+    watch: () => sceneIds(),
     sections: [
       { key: 'brightness', label: 'Brightness slider' }, { key: 'temp', label: 'Warm / cool' }, { key: 'scenes', label: 'Hue scenes' },
       { key: 'state', label: 'State text' }, { key: 'members', label: 'Group count' }, { key: 'glow', label: 'Glow' },
@@ -19,16 +26,6 @@
     ],
   };
 
-  // Hue scenes are separate scene.* entities that the dashboard doesn't watch,
-  // so fetch them once and share the answer between every Hue light card.
-  let cache = null, cacheAt = 0;
-  function sceneStates() {
-    if (!cache || Date.now() - cacheAt > 30000) {
-      cacheAt = Date.now();
-      cache = send({ type: 'get_states' }).then((all) => all.filter((s) => s.entity_id.startsWith('scene.') && s.attributes?.group_name), () => { cache = null; return []; });
-    }
-    return cache;
-  }
 </script>
 
 <script>
@@ -39,7 +36,7 @@
   import Slider from '../components/Slider.svelte';
   import { t, ent } from '../lib/tpl.js';
   import { name, entityIcon, lightColor, toggle } from '../lib/entity.js';
-  import { callService, states, conn } from '../lib/ha.svelte.js';
+  import { callService, states } from '../lib/ha.svelte.js';
   let { props, h = 170 } = $props();
   const show = (k) => !props.hide?.[k];
   const e = $derived(ent(props.entity));
@@ -60,30 +57,19 @@
   // (hue_scenes); the scene entities carry the group's name and type.
   const group = $derived(String(t(props.group) || a.friendly_name || '').trim());
   const hueNames = $derived(Array.isArray(a.hue_scenes) ? a.hue_scenes : []);
-  const key = $derived(`${group}|${a.hue_type || ''}|${hueNames.join('|')}`);
   const picked = $derived(Array.isArray(props.sceneList) ? props.sceneList : []);
-  let scenes = $state([]);
-  let pool = $state([]);
-  let loaded = $state(false);
-  $effect(() => {
-    if (!conn.connected || (!group && !picked.length)) return;
-    key; // reload when the group's scene list changes
-    let live = true;
-    sceneStates().then((all) => {
-      if (!live) return;
-      pool = all;
-      const seen = new Set();
-      const mine = all
-        .filter((s) => s.attributes.group_name === group && (!a.hue_type || !s.attributes.group_type || s.attributes.group_type === a.hue_type))
-        .filter((s) => { const n = s.attributes.name || s.attributes.friendly_name; if (seen.has(n)) return false; seen.add(n); return true; })
-        .map((s) => ({ id: s.entity_id, name: s.attributes.name || s.attributes.friendly_name, dynamic: !!s.attributes.is_dynamic }));
-      // Hue's own order when the light lists its scenes, otherwise alphabetical.
-      const rank = (n) => { const i = hueNames.indexOf(n); return i < 0 ? 999 : i; };
-      mine.sort((x, y) => rank(x.name) - rank(y.name) || x.name.localeCompare(y.name));
-      scenes = mine;
-      loaded = true;
-    });
-    return () => (live = false);
+  const pool = $derived(sceneIds().map((id) => states.get(id)).filter(Boolean));
+  const loaded = $derived(renderTemplate(SCENES) != null && sceneIds().every((id) => states.has(id)));
+  const scenes = $derived.by(() => {
+    if (!group) return [];
+    const seen = new Set();
+    const mine = pool
+      .filter((s) => s.attributes.group_name === group && (!a.hue_type || !s.attributes.group_type || s.attributes.group_type === a.hue_type))
+      .filter((s) => { const n = s.attributes.name || s.attributes.friendly_name; if (seen.has(n)) return false; seen.add(n); return true; })
+      .map((s) => ({ id: s.entity_id, name: s.attributes.name || s.attributes.friendly_name, dynamic: !!s.attributes.is_dynamic }));
+    // Hue's own order when the light lists its scenes, otherwise alphabetical.
+    const rank = (n) => { const i = hueNames.indexOf(n); return i < 0 ? 999 : i; };
+    return mine.sort((x, y) => rank(x.name) - rank(y.name) || x.name.localeCompare(y.name));
   });
 
   // Scenes you picked yourself are shown exactly as listed (their order is the
@@ -91,7 +77,7 @@
   const shown = $derived.by(() => {
     if (!picked.length) return scenes;
     return picked.map((id) => {
-      const st = pool.find((x) => x.entity_id === id) || states.get(id);
+      const st = states.get(id);
       return { id, name: st?.attributes?.name || st?.attributes?.friendly_name || id, dynamic: !!st?.attributes?.is_dynamic };
     });
   });
