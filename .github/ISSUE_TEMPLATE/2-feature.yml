@@ -1,0 +1,20 @@
+name: Feature request
+description: An idea to make Panalume better
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: What would it help with?
+      description: How you'd use it. Screenshots or examples from elsewhere are welcome.
+  - type: input
+    id: entities
+    attributes:
+      label: Integrations or devices involved (if any)
+      placeholder: e.g. Roborock S8, Octopus Energy

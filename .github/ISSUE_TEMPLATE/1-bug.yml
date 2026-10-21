@@ -1,0 +1,50 @@
+name: Bug report
+description: Something in Panalume isn't working as it should
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this! A few details help a lot.
+        Please don't paste access tokens, passwords or addresses you'd rather keep private.
+  - type: input
+    id: version
+    attributes:
+      label: Panalume version
+      description: Settings → Apps → Panalume shows it (or the Docker image tag).
+      placeholder: e.g. 0.31.1
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How is it installed?
+      options:
+        - Home Assistant app (App Store)
+        - Docker
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and browser
+      placeholder: e.g. Wall tablet with Fully Kiosk, iPhone Safari, Windows Chrome
+    validations:
+      required: true
+  - type: input
+    id: card
+    attributes:
+      label: Which card (if it's about one)?
+      placeholder: e.g. Robot vacuum, Energy usage
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: shots
+    attributes:
+      label: Screenshots
+      description: Drag images in here. They help more than anything else.

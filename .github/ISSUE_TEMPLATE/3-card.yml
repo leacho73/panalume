@@ -1,0 +1,22 @@
+name: New card
+description: Ask for a card for a device or integration Panalume doesn't cover yet
+labels: [new card]
+body:
+  - type: input
+    id: what
+    attributes:
+      label: Device or integration
+      placeholder: e.g. a robot lawn mower (Husqvarna Automower integration)
+    validations:
+      required: true
+  - type: textarea
+    id: show
+    attributes:
+      label: What should the card show and do?
+    validations:
+      required: true
+  - type: textarea
+    id: entities
+    attributes:
+      label: The entities it has
+      description: The entity IDs and states from Home Assistant (Settings → Devices → your device) help us build it. Change any names you'd rather not share.

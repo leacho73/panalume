@@ -1,0 +1,14 @@
+name: Question
+description: Not sure how to do something in Panalume
+labels: [question]
+body:
+  - type: textarea
+    id: q
+    attributes:
+      label: What are you trying to do?
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What have you tried?
