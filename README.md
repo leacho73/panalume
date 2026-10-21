@@ -26,6 +26,7 @@ Panalume is a Home Assistant **app** that gives you a dashboard you design in th
 - **Pop-ups & actions** — tap / hold to toggle, open a detailed pop-up, open a pop-up of other cards, change view, call a service or open a URL.
 - **Groups & multi-select** — rooms move as one; select several cards to group, align, size or space them evenly, or show / hide the same part on all of them at once. Copy cards to another view. Undo, duplicate, keyboard nudging.
 - **Fast** — a ~75 KB (gzipped) Svelte app that only subscribes to the entities your cards use.
+- **No tracking** — no analytics or telemetry. Panalume only talks to your own Home Assistant (plus icons from Iconify if you pick a non-standard icon set, or a Google font if you choose one).
 
 ## Energy, front and centre
 
