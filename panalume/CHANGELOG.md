@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.34.0
+
+- **Older tablets.** Panalume now runs on older iPads and Macs (Safari 14 and 15, e.g. iPads that stop at iPadOS 15), which showed a blank screen before. Newer devices are unchanged.
+- **Vacuum: clean chosen rooms.** Tap one or more rooms on the vacuum card, then **Clean**. Rooms are cleaned in the order you tap them. The rooms come from Home Assistant: match the vacuum's rooms to your areas in its settings in Home Assistant (Dreame, Roborock and others support this). With the Dreame integration, its own room list works too.
+- **Vacuum: map.** The vacuum card can show the vacuum's map, e.g. the Dreame integration's map camera. It's found automatically, and on bigger cards it takes the place of the round button.
+- **Power flow: appliances.** Add up to four appliances to the power flow card, such as a heat pump or hot tub. Each shows its own power around the house, with a matching icon.
+
 ## 0.33.0
 
 - **Lawn mower card.** For robot mowers (Husqvarna Automower, Gardena, Worx Landroid, Mammotion and others). A big round button starts, pauses or resumes mowing, with a ring showing the battery, and **Dock** sends it home. Underneath: the status, the mower's own activity in plain words (e.g. *Parked until the next start*), the next scheduled start and operating hours. It finds the mower and its sensors automatically, only shows what the mower supports, and small cards become a single row.

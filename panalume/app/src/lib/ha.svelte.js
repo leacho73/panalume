@@ -106,7 +106,7 @@ function apply(ev) {
 }
 
 /** Home Assistant's own rule for a valid entity ID (e.g. `sensor._status` isn't one). */
-export const validEntityId = (id) => /^(?!.+__)(?!_)[\da-z_]+(?<!_)\.(?!_)[\da-z_]+(?<!_)$/.test(id);
+export const validEntityId = (id) => /^(?!.*__)[\da-z](?:[\da-z_]*[\da-z])?\.[\da-z](?:[\da-z_]*[\da-z])?$/.test(id);
 
 let entitySub = null;
 let watchedKey = '';

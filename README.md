@@ -44,7 +44,7 @@ First-class cards for UK energy setups, with entities **auto-detected** when you
 | **Energy cost today** | Cost, kWh, average p/kWh, export, solar, yesterday, peak/off-peak split, half-hourly usage coloured by rate |
 | **Solar** | Generating now, today's curve against the Solcast forecast, above / below forecast, where it's going, tomorrow and the week ahead |
 | **Energy flow** | Self-powered %, solar / battery / house figures and a live flow chart of every route power is taking |
-| **Power flow** | Solar, grid, battery, home and EV with animated flows (up to two solar arrays and two batteries) |
+| **Power flow** | Solar, grid, battery, home and EV with animated flows (up to two solar arrays and two batteries, plus up to four appliances) |
 | **Home battery** | Charge %, kWh left, charge / discharge power, time to full or to reserve, health, today in / out (SolarEdge auto-detected) |
 | **Predbat** | What Predbat is doing, the 24-hour charge / export plan with predicted battery %, costs and savings, Charge / Export / Hold now |
 | **Heat pump** | Live COP / SCOP, power in and heat out, flow and outdoor temperature, hot water with Boost |
@@ -78,7 +78,7 @@ Detects Samsung SmartThings washers, Home Connect (Bosch / Neff / Siemens) dishw
 
 <table><tr>
 <td width="55%"><img src="docs/screenshots/airfryer.webp" alt="Air fryer card"><br><sub><b>Air fryer</b>: works on any smart plug with a power sensor. Cooking, paused or finished, and a timer for the whole cook; taking the basket out to shake the food doesn't stop the clock (you choose how long a power cut may last, 3 minutes by default).</sub></td>
-<td width="45%"><img src="docs/screenshots/vacuum.webp" alt="Robot vacuum card"><br><sub><b>Robot vacuum</b>: status, battery, area and time cleaned, Start / Pause / Dock, Locate, suction power and a map picker (Roborock, Ecovacs, Dreame, Valetudo and others detected automatically).</sub></td>
+<td width="45%"><img src="docs/screenshots/vacuum.webp" alt="Robot vacuum card"><br><sub><b>Robot vacuum</b>: status, battery, area and time cleaned, Start / Pause / Dock, Locate, suction power, cleaning chosen rooms, the map and a map picker (Roborock, Ecovacs, Dreame, Valetudo and others detected automatically).</sub></td>
 </tr></table>
 
 **Lawn mower**: start, pause and dock, battery, the mower's activity and next start (Husqvarna, Gardena, Worx and others detected automatically).

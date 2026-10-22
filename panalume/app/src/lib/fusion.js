@@ -187,7 +187,7 @@ function addEnergy(cfg, add) {
   const evName = (p) => p.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
   for (const id of states.keys()) {
     let m;
-    if ((m = id.match(/^sensor\.((?!octopus)[a-z0-9_]+?)(?<!target)_state_of_charge$/))) {
+    if ((m = id.match(/^sensor\.((?!octopus)[a-z0-9_]+?)_state_of_charge$/)) && !m[1].endsWith('target')) {
       // Audi / VW style
       const p = m[1];
       const s = (x, d = 'sensor') => `${d}.${p}_${x}`;

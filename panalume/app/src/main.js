@@ -1,3 +1,4 @@
+import './lib/compat.js';
 import { mount } from 'svelte';
 import './inter.css';
 import './app.css';

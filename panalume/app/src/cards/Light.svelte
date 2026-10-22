@@ -21,6 +21,7 @@
   // warm/cool and colour buttons. Tap toggles, hold for full controls.
   import Icon from '../components/Icon.svelte';
   import Slider from '../components/Slider.svelte';
+  import { canMix } from '../lib/compat.js';
   import { t, ent } from '../lib/tpl.js';
   import { stateWord } from '../lib/i18n.svelte.js';
   import { name, entityIcon, lightColor, toggle } from '../lib/entity.js';
@@ -69,7 +70,7 @@
 
   {#if dimmable && show('brightness')}
     <div class="bri">
-      <Slider value={pct} min={1} max={100} color="linear-gradient(90deg, color-mix(in srgb, var(--lc) 45%, transparent), var(--lc))" height={compact ? 34 : 42}
+      <Slider value={pct} min={1} max={100} color={canMix ? 'linear-gradient(90deg, color-mix(in srgb, var(--lc) 45%, transparent), var(--lc))' : 'var(--lc)'} height={compact ? 34 : 42}
         label={on ? '' : 'Off'} unit="%" onchange={(v) => svc({ brightness_pct: v })} />
     </div>
   {/if}
