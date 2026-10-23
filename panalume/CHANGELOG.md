@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.35.0
+
+- **Calendar: week and month views.** Choose **View → Week** or **Month** in the calendar card's settings. Arrows move through the weeks or months and **Today** jumps back; tap a day to see its events in full. The week starts on the right day for your language, or pick it yourself. There's also a **12-hour times** option.
+- **Updates & notifications card** (thanks, Asben91). Pending Home Assistant updates with **Install** (tap twice to confirm), open repairs, and notifications with **Dismiss**, all in one card.
+- **Home view, and going back to it.** **Layout → Home view** picks the view each device opens on, or **Home view on this screen only** gives one screen its own (e.g. the kitchen tablet opens on Kitchen). **Go back to the home view after … minutes** returns there when a screen is left on another page. Handy for kiosk apps where you can't change the address; `?view=` and `?return=` still work too.
+- **Vacuum: cleaning mode.** A picker for the vacuum's cleaning mode (e.g. Dreame's vacuum / mop / both), found automatically.
+- The vacuum's map now follows the robot while it cleans (it stayed still until the page was reloaded).
+
 ## 0.34.0
 
 - **Older tablets.** Panalume now runs on older iPads and Macs (Safari 14 and 15, e.g. iPads that stop at iPadOS 15), which showed a blank screen before. Newer devices are unchanged.

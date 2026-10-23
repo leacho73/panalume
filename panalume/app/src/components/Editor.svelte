@@ -5,8 +5,10 @@
   import { cards, categories } from '../lib/registry.js';
   import {
     app, layout, DEVICES, DEFAULT_THEME, changed, addCard, selectedCard, selectedPlacement, removeSelected,
-    duplicateSelected, copyToView, copyLayout, importConfig, selectionSet, groupSelected, ungroupSelected, ensureEditable, setMode, MODES, DISPLAYS, zoneList, addView, removeView, setView, isPlacedAnywhere, placeExisting, zoneWidth, setMainWidth,
+    duplicateSelected, copyToView, copyLayout, importConfig, selectionSet, groupSelected, ungroupSelected, ensureEditable, setMode, MODES, DISPLAYS, zoneList, addView, removeView, setView, isPlacedAnywhere, placeExisting, zoneWidth, setMainWidth, screenHome, setScreenHome,
   } from '../lib/config.svelte.js';
+  // Settings kept on this screen only (not in the shared layout).
+  const screenOpts = $state({ home: screenHome() });
 
   import { fromFusion } from '../lib/fusion.js';
   import { toast } from '../lib/ha.svelte.js';
@@ -334,6 +336,9 @@
       <div class="fields">
         <Field obj={app.config.layouts[app.device]} f={{ key: 'kiosk', label: `Hide Home Assistant's header bar on ${app.device === 'tablet' ? 'tablets' : DEVICES[app.device].label.toLowerCase() + 's'}`, type: 'bool' }} />
         <Field obj={app.config.layouts[app.device]} f={{ key: 'display', label: `Sizing on ${app.device === 'tablet' ? 'tablets' : DEVICES[app.device].label.toLowerCase() + 's'}`, type: 'select', options: Object.entries(DISPLAYS).map(([value, label]) => ({ value, label })) }} />
+        <Field obj={app.config.layouts[app.device]} f={{ key: 'home_view', label: `Home view on ${app.device === 'tablet' ? 'tablets' : DEVICES[app.device].label.toLowerCase() + 's'}`, type: 'select', options: [{ value: '', label: 'The first view' }, ...app.config.views.map((v) => ({ value: v.id, label: v.name }))], hint: 'The view this device opens on and goes back to. ?view= in the address does the same and wins.' }} />
+        <Field obj={screenOpts} f={{ key: 'home', label: 'Home view on this screen only', type: 'select', options: [{ value: '', label: 'Same as above' }, ...app.config.views.map((v) => ({ value: v.id, label: v.name }))], hint: 'Saved on this screen, e.g. the kitchen tablet going to Kitchen and the living-room one to Living room, even in kiosk apps that can\'t change the address.' }} onset={(v) => { screenOpts.home = v; setScreenHome(v); }} />
+        <Field obj={app.config.layouts[app.device]} f={{ key: 'return_mins', label: 'Go back to the home view after (minutes without a touch, blank = never)', type: 'number', hint: 'For wall tablets left on another page. ?return=5 in the address does the same and wins.' }} />
       </div>
       {#if app.device === 'tablet' || app.config.layouts[app.device].mode === 'custom'}
         <div class="fields">

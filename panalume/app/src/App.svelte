@@ -123,19 +123,20 @@
     }
   }
 
-  // ?return=5: after 5 minutes without a touch, go back to this screen's own view
-  // (?view=, or the first view) and close any pop-up. For wall tablets.
-  const returnMins = Number(param('return'));
-  if (returnMins > 0) {
-    let last = Date.now();
-    for (const ev of ['pointerdown', 'keydown', 'wheel']) addEventListener(ev, () => (last = Date.now()), { capture: true, passive: true });
-    setInterval(() => {
-      if (!app.config || app.editing || Date.now() - last < returnMins * 60e3) return;
-      app.popup = null;
-      const home = startView();
-      if (home && app.view !== home) setView(home);
-    }, 10e3);
-  }
+  // After some minutes without a touch, go back to this screen's own view and close any
+  // pop-up. For wall tablets: ?return=5 in the address, or this device's setting in the
+  // Layout tab (the address wins, so kiosk apps that can't change the address still work).
+  const returnParam = Number(param('return'));
+  const returnMins = () => (returnParam > 0 ? returnParam : Math.max(0, Number(app.config?.layouts[app.device]?.return_mins) || 0));
+  let lastTouch = Date.now();
+  for (const ev of ['pointerdown', 'keydown', 'wheel']) addEventListener(ev, () => (lastTouch = Date.now()), { capture: true, passive: true });
+  setInterval(() => {
+    const mins = returnMins();
+    if (!mins || !app.config || app.editing || Date.now() - lastTouch < mins * 60e3) return;
+    app.popup = null;
+    const home = startView();
+    if (home && app.view !== home) setView(home);
+  }, 10e3);
 
   // Live: reload the layout as soon as another screen saves, and the page after an add-on update.
   connectLive({ onConfig: reloadFromServer, canReload: () => !app.editing && !app.dirty });
