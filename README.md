@@ -78,7 +78,7 @@ Detects Samsung SmartThings washers, Home Connect (Bosch / Neff / Siemens) dishw
 
 <table><tr>
 <td width="55%"><img src="docs/screenshots/airfryer.webp" alt="Air fryer card"><br><sub><b>Air fryer</b>: works on any smart plug with a power sensor. Cooking, paused or finished, and a timer for the whole cook; taking the basket out to shake the food doesn't stop the clock (you choose how long a power cut may last, 3 minutes by default).</sub></td>
-<td width="45%"><img src="docs/screenshots/vacuum.webp" alt="Robot vacuum card"><br><sub><b>Robot vacuum</b>: status, battery, area and time cleaned, Start / Pause / Dock, Locate, suction power, cleaning chosen rooms, the map and a map picker (Roborock, Ecovacs, Dreame, Valetudo and others detected automatically).</sub></td>
+<td width="45%"><img src="docs/screenshots/vacuum.webp" alt="Robot vacuum card"><br><sub><b>Robot vacuum</b>: status, battery, area and time cleaned, Start / Pause / Dock, Locate, suction power, cleaning mode, cleaning chosen rooms, the map and a map picker (Roborock, Ecovacs, Dreame, Valetudo and others detected automatically).</sub></td>
 </tr></table>
 
 **Lawn mower**: start, pause and dock, battery, the mower's activity and next start (Husqvarna, Gardena, Worx and others detected automatically).
@@ -90,7 +90,7 @@ Detects Samsung SmartThings washers, Home Connect (Bosch / Neff / Siemens) dishw
 
 <table><tr>
 <td width="50%"><img src="docs/screenshots/climate-group.webp" alt="Climate group card"><br><sub><b>Climate group</b>: upstairs and downstairs AC (or any thermostats) from one card: one target, mode and fan speed for all of them, and a row per unit to switch it or adjust it on its own.</sub></td>
-<td width="50%"><img src="docs/screenshots/calendar.webp" alt="Calendar card"><br><sub><b>Calendar</b>: today's and upcoming events from any of Home Assistant's calendars (Google, CalDAV, Local calendar, holidays…), each in its own colour, grouped by day; what's on now is highlighted, and tapping an event shows its details.</sub></td>
+<td width="50%"><img src="docs/screenshots/calendar.webp" alt="Calendar card"><br><sub><b>Calendar</b>: today's and upcoming events from any of Home Assistant's calendars (Google, CalDAV, Local calendar, holidays…), each in its own colour, grouped by day; what's on now is highlighted, and tapping an event shows its details. Or a week or month view, with 12-hour times if you prefer.</sub></td>
 </tr></table>
 
 ## Edit in the browser
@@ -109,7 +109,7 @@ Phones get an automatic single-column version of your tablet layout: navigation 
 
 ### All the cards
 
-Button / tile · Light · Hue light with scenes · Thermostat (draggable dial) · Climate group (several thermostats / AC units at once) · Door lock · 3D printer · Hot tub · Washing machine · Tumble dryer · Dishwasher · Air fryer · Robot vacuum · Lawn mower · Media player (artwork, volume, source, speaker grouping) · Cover / blind · Slider · Option picker · Entities list · Glance · Sensor with graph · Gauge · History graph · Weather · Calendar (today's and upcoming events) · Clock · Sun & moon (sunrise / sunset, moon phase, moonrise / moonset) · Text / Markdown · Template lines · People · Photo frame (Immich and local albums) · Camera (tap for full-screen live view; plays the video stream for cameras whose pictures fail, e.g. Tapo) · Web page · Image · Navigation · Divider · Alarm panel · and the energy cards above.
+Button / tile · Light · Hue light with scenes · Thermostat (draggable dial) · Climate group (several thermostats / AC units at once) · Door lock · 3D printer · Hot tub · Washing machine · Tumble dryer · Dishwasher · Air fryer · Robot vacuum · Lawn mower · Media player (artwork, volume, source, speaker grouping) · Cover / blind · Slider · Option picker · Entities list · Glance · Sensor with graph · Gauge · History graph · Weather · Calendar (upcoming events, week or month) · Clock · Sun & moon (sunrise / sunset, moon phase, moonrise / moonset) · Text / Markdown · Template lines · People · Photo frame (Immich and local albums) · Camera (tap for full-screen live view; plays the video stream for cameras whose pictures fail, e.g. Tapo) · Web page · Image · Navigation · Divider · Alarm panel · Updates & notifications · and the energy cards above.
 
 ### Coming from ha-fusion?
 
@@ -127,7 +127,7 @@ Button / tile · Light · Hue light with scenes · Thermostat (draggable dial) �
 2. Install **Panalume**, start it and turn on **Show in sidebar**.
 3. Open **Panalume** from the sidebar and press **E** to start building.
 
-Wall tablet tips: set **Layout → Tablet → Sizing** to *Fit the whole view on screen* and tick *Hide Home Assistant's header bar*. Or add options to the tablet's URL:
+Wall tablet tips: set **Layout → Tablet → Sizing** to *Fit the whole view on screen* and tick *Hide Home Assistant's header bar*. **Home view** (for all tablets, or this screen only) and **Go back to the home view after … minutes** are in the Layout tab too. Or add options to the tablet's URL:
 
 | Option | Does |
 |---|---|
