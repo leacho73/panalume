@@ -140,6 +140,38 @@ Wall tablet tips: set **Layout → Tablet → Sizing** to *Fit the whole view on
 
 e.g. `…/panalume?view=Upstairs&return=5&noedit&fit=screen&kiosk`
 
+### Without the App Store (Home Assistant Container or Core)
+
+If your Home Assistant runs in Docker or as Core, run Panalume as its own container. It needs your Home Assistant address and a **long-lived access token** (your HA profile → **Security** → *Long-lived access tokens*):
+
+```sh
+docker run -d --name panalume --restart unless-stopped -p 8099:8099 \
+  -v panalume:/data \
+  -e HA_URL=http://192.168.1.10:8123 \
+  -e HA_TOKEN=your-long-lived-token \
+  ghcr.io/leacho73/panalume
+```
+
+Or with Docker Compose:
+
+```yaml
+services:
+  panalume:
+    image: ghcr.io/leacho73/panalume
+    restart: unless-stopped
+    ports: ["8099:8099"]
+    volumes: [panalume:/data]
+    environment:
+      HA_URL: http://192.168.1.10:8123
+      HA_TOKEN: your-long-lived-token
+volumes:
+  panalume:
+```
+
+Then open `http://<that machine>:8099`. Your dashboard is saved in the `/data` volume. Update with `docker pull ghcr.io/leacho73/panalume` and recreate the container; images are published for each release (64-bit PCs, and 64-bit and 32-bit Raspberry Pi).
+
+> **There's no login.** Anyone who can reach port 8099 can use and edit the dashboard with the token's access to your home, so only run it on a network you trust (don't forward the port to the internet). `HA_TOKEN_FILE` can point at a file holding the token instead, e.g. a Docker secret.
+
 ## Develop
 
 ```sh
