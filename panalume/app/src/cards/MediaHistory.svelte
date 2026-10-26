@@ -7,9 +7,13 @@
     defaults: { title: 'Recently watched', entity: '', max: 8, show_user: true, show_player: true },
     // Any sensor that carries recent plays in an `items` or `data` attribute (Tautulli history).
     autofill: () => ({
-      entity: [...states.keys()].find((id) => {
+      // Only lists that look like plays (a title plus who / when / how much), so other sensors
+      // with a list (e.g. Upcoming Media's `data`) aren't picked up.
+      entity: [...states.keys()].filter((id) => id.startsWith('sensor.')).find((id) => {
         const a = states.get(id)?.attributes || {};
-        return Array.isArray(a.items) || Array.isArray(a.data);
+        const list = Array.isArray(a.items) ? a.items : Array.isArray(a.data) ? a.data : null;
+        const x = list?.find((r) => r && typeof r === 'object' && r.title);
+        return !!x && ('user' in x || 'friendly_name' in x) && ('date' in x || 'percent_complete' in x || 'watched_status' in x);
       }) || '',
     }),
     fields: [
