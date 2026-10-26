@@ -4,7 +4,7 @@
   export const meta = {
     type: 'upcoming', name: 'Upcoming media', icon: 'mdi:movie-open-star', category: 'Media',
     size: { w: 520, h: 360 }, tap: 'none',
-    defaults: { title: '', entities: [], layout: 'posters', days: 30, max: 6, show_source: true, show_rating: true },
+    defaults: { title: '', entities: [], layout: 'list', days: 30, max: 6, show_source: true, show_rating: true },
     // Sensors from the Upcoming Media integration: their items live in the data attribute.
     autofill: () => ({
       entities: [...states.keys()]
@@ -15,7 +15,7 @@
     fields: [
       { key: 'title', label: 'Title', type: 'text' },
       { key: 'entities', label: 'Upcoming media sensors', type: 'entities', domain: 'sensor', hint: 'From the Upcoming Media integration: Sonarr, Radarr, Lidarr or Readarr. Add several to mix film and TV in one card.' },
-      { key: 'layout', label: 'Layout', type: 'select', options: [{ value: 'posters', label: 'Posters' }, { value: 'list', label: 'List' }] },
+      { key: 'layout', label: 'Layout', type: 'select', options: [{ value: 'list', label: 'List' }, { value: 'posters', label: 'Posters (pictures load from the internet, e.g. TMDB)' }] },
       { key: 'days', label: 'Days ahead', type: 'number' },
       { key: 'max', label: 'Most items shown', type: 'number' },
       { key: 'show_source', label: 'Where it comes from (Sonarr / Radarr)', type: 'bool' },
@@ -139,7 +139,8 @@
         <a class="it" href={it.link || undefined} target={it.link ? '_blank' : undefined} rel="noopener"
            title={tip(it)} style="--src:{it.src.color}" aria-label={[it.title, whenLabel(it)].filter(Boolean).join(', ')}>
           <div class="art">
-            {#if it.poster}
+            <!-- Pictures from outside Home Assistant (e.g. TMDB) only with the Posters layout, which says so. -->
+            {#if it.poster && (layout === 'posters' || it.poster.startsWith('/'))}
               <img src={haImage(it.poster)} alt="" loading="lazy" />
             {:else}
               <div class="blank"><Icon icon="mdi:movie-open-outline" size="1.6em" /></div>
