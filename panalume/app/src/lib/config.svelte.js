@@ -1,4 +1,4 @@
-import { param } from './params.js';
+import { param, parentHash } from './params.js';
 import { toast, validEntityId } from './ha.svelte.js';
 // Dashboard config: cards are defined once and placed on layouts. The main
 // (tablet) layout is shown everywhere by default: desktop scales it, phone gets
@@ -74,7 +74,7 @@ function starter() {
 export function detectDevice() {
   const q = param('device');
   if (q && DEVICES[q]) return q;
-  const saved = localStorage.getItem('hd-device');
+  const saved = screenDevice();
   if (saved && DEVICES[saved]) return saved;
   const w = Math.min(innerWidth, screen.width || innerWidth);
   if (w < 700) return 'phone';
@@ -207,7 +207,12 @@ function init(cfg) {
     const v = want && cfg.views.find((x) => x.id.toLowerCase() === want || x.name.toLowerCase() === want);
     homeView = v?.id ?? null;
     const own = [screenHome(), cfg.layouts[app.device]?.home_view].find((id) => id && cfg.views.some((x) => x.id === id));
+    // A view named in Home Assistant's address (…/panalume#energy, e.g. a bookmark) opens that
+    // view this time; the home view (for going back) stays as it is.
+    const linked = (parentHash() || '').toLowerCase();
+    const l = linked && cfg.views.find((x) => x.id.toLowerCase() === linked || x.name.toLowerCase() === linked);
     if (v) app.view = v.id;
+    else if (l) app.view = l.id;
     else if (own) app.view = own;
   }
   firstInit = false;
@@ -264,11 +269,17 @@ export async function undoLast() {
   await fetch('api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Client': clientId }, body: prev });
 }
 
-export function setDevice(d) {
-  app.device = d;
+// The layout this screen uses, chosen in the Layout tab and kept in this browser only
+// ('' = work it out from the screen). For tablets detected as desktops, in kiosk apps
+// that can't add ?device= to the address.
+export function screenDevice() {
+  try { return localStorage.getItem('hd-device') || ''; } catch { return ''; }
+}
+export function setScreenDevice(d) {
+  try { d ? localStorage.setItem('hd-device', d) : localStorage.removeItem('hd-device'); } catch {}
+  app.device = detectDevice();
   app.selected = null;
   app.multi = [];
-  localStorage.setItem('hd-device', d);
 }
 
 export function setView(id) {
@@ -366,6 +377,21 @@ export function removeSelected(deleteCard = false) {
   changed();
 }
 
+// "Close gaps" on the selected card's group: outside edit mode, when a card in the
+// group is hidden by its "Visible when", the group's cards below it move up. Kept on
+// each of the group's placements.
+export function groupCloses() {
+  const p = selectedPlacement();
+  return !!p?.group && !!p.close;
+}
+export function setGroupCloses(on) {
+  const p = selectedPlacement();
+  if (!p?.group) return;
+  ensureEditable();
+  for (const q of zoneList(app.selected.zone)) if (q.group === p.group) { if (on) q.close = true; else delete q.close; }
+  changed();
+}
+
 export function groupSelected() {
   ensureEditable();
   const list = zoneList(app.selected.zone);
@@ -379,7 +405,7 @@ export function groupSelected() {
 export function ungroupSelected() {
   ensureEditable();
   const list = zoneList(app.selected.zone);
-  for (const i of selectionSet()) delete list[i].group;
+  for (const i of selectionSet()) { delete list[i].group; delete list[i].close; }
   app.multi = [];
   changed();
 }

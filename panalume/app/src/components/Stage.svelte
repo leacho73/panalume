@@ -73,15 +73,12 @@
   // gives its space to the cards below it instead of leaving a gap (the automatic
   // phone layout leaves hidden cards out altogether). Only rows where nothing else is
   // showing close up, so a hidden card beside a visible one keeps the row as it is.
-  const lift = $derived.by(() => {
-    if (app.editing || app.device !== 'phone') return null;
-    const hid = mainList.map((p) => cardHidden(app.config.cards[p.card]));
-    if (!hid.some(Boolean)) return null;
-    const G = usualGap(mainList) || 12;
+  // The vertical bands a list's hidden cards free up (where nothing else in the list is showing).
+  function freedBands(list, hid, G) {
     const span = (p) => [p.y, p.y + p.h + G];
-    const shown = mainList.filter((_, i) => !hid[i]).map(span).sort((a, b) => a[0] - b[0]);
+    const shown = list.filter((_, i) => !hid[i]).map(span).sort((a, b) => a[0] - b[0]);
     const bands = [];
-    for (const [a0, b] of mainList.filter((_, i) => hid[i]).map(span)) {
+    for (const [a0, b] of list.filter((_, i) => hid[i]).map(span)) {
       let a = a0;
       for (const [c, d] of shown) {
         if (d <= a || c >= b) continue;
@@ -94,9 +91,33 @@
     bands.sort((x, y) => x[0] - y[0]);
     const merged = [];
     for (const [a, b] of bands) { const m = merged.at(-1); if (m && a <= m[1]) m[1] = Math.max(m[1], b); else merged.push([a, b]); }
-    return { hid, bands: merged, total: merged.reduce((n, [a, b]) => n + b - a, 0) };
+    return merged;
+  }
+  const upBy = (bands, y) => bands.reduce((n, [a, b]) => n + (b <= y ? b - a : a < y ? y - a : 0), 0);
+  const lift = $derived.by(() => {
+    if (app.editing || app.device !== 'phone') return null;
+    const hid = mainList.map((p) => cardHidden(app.config.cards[p.card]));
+    if (!hid.some(Boolean)) return null;
+    const bands = freedBands(mainList, hid, usualGap(mainList) || 12);
+    return { hid, bands, total: bands.reduce((n, [a, b]) => n + b - a, 0) };
   });
-  const liftY = (y) => (lift ? lift.bands.reduce((n, [a, b]) => n + (b <= y ? b - a : a < y ? y - a : 0), 0) : 0);
+  const liftY = (y) => (lift ? upBy(lift.bands, y) : 0);
+  // Elsewhere (tablets and desktops), the same only inside a card
+  // group ticked "Close gaps when a card in this group is hidden": the group's cards move
+  // up into the space, and everything outside the group stays exactly where it was placed.
+  const groupLift = $derived.by(() => {
+    if (app.editing || lift) return null;
+    const groups = new Map();
+    mainList.forEach((p, i) => { if (p.group && p.close) (groups.get(p.group) || groups.set(p.group, []).get(p.group)).push(i); });
+    const out = new Map();
+    const G = usualGap(mainList) || 12;
+    for (const [g, idx] of groups) {
+      const hid = idx.map((i) => cardHidden(app.config.cards[mainList[i].card]));
+      if (hid.some(Boolean)) out.set(g, freedBands(idx.map((i) => mainList[i]), hid, G));
+    }
+    return out.size ? out : null;
+  });
+  const groupUp = (p) => (groupLift && p.group ? upBy(groupLift.get(p.group) || [], p.y) : 0);
   const mainH = $derived(Math.max(vh / scale / mainZ, mainList.reduce((m, p) => Math.max(m, p.y + p.h), 0) - (lift?.total || 0) + (app.editing ? 400 : 20)));
   const sideH = $derived(Math.max(vh / scale / sideZ, sideList.reduce((m, p) => Math.max(m, p.y + p.h), 0) + 20));
 
@@ -486,7 +507,7 @@
     {@const main = name !== 'sidebar' && lift}
     {#if card && !(main && lift.hid[i])}
       <div class="place" class:sel={inSel(name, i)} class:primary={isPrimary(name, i) && sel.size === 1} class:grouped={app.editing && p.group}
-        style="left:{Math.round(p.x * k)}px;top:{main ? p.y - liftY(p.y) : p.y}px;width:{pw}px;height:{p.h}px;z-index:{(p.z || 0) + (op && inSel(name, i) ? 1000 : isPrimary(name, i) ? 500 : 0)}">
+        style="left:{Math.round(p.x * k)}px;top:{main ? p.y - liftY(p.y) : name !== 'sidebar' ? p.y - groupUp(p) : p.y}px;width:{pw}px;height:{p.h}px;z-index:{(p.z || 0) + (op && inSel(name, i) ? 1000 : isPrimary(name, i) ? 500 : 0)}">
         <CardFrame {card} w={pw} h={p.h} editing={app.editing} />
         {#if app.editing}
           <div class="grab" role="button" tabindex="-1" ondblclick={() => dbl(name, i)}

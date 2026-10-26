@@ -5,10 +5,10 @@
   import { cards, categories } from '../lib/registry.js';
   import {
     app, layout, DEVICES, DEFAULT_THEME, changed, addCard, selectedCard, selectedPlacement, removeSelected,
-    duplicateSelected, copyToView, copyLayout, importConfig, selectionSet, groupSelected, ungroupSelected, ensureEditable, setMode, MODES, DISPLAYS, zoneList, addView, removeView, setView, isPlacedAnywhere, placeExisting, zoneWidth, setMainWidth, screenHome, setScreenHome,
+    duplicateSelected, copyToView, copyLayout, importConfig, selectionSet, groupSelected, ungroupSelected, ensureEditable, setMode, MODES, DISPLAYS, zoneList, addView, removeView, setView, isPlacedAnywhere, placeExisting, zoneWidth, setMainWidth, screenHome, setScreenHome, screenDevice, setScreenDevice, groupCloses, setGroupCloses,
   } from '../lib/config.svelte.js';
   // Settings kept on this screen only (not in the shared layout).
-  const screenOpts = $state({ home: screenHome() });
+  const screenOpts = $state({ home: screenHome(), device: screenDevice() });
 
   import { fromFusion } from '../lib/fusion.js';
   import { toast } from '../lib/ha.svelte.js';
@@ -256,6 +256,9 @@
             {#if app.single}<button class="sm" onclick={() => (app.single = false)}>Whole group</button>{/if}
             <button class="sm" onclick={ungroupSelected}>Ungroup</button>
           </div>
+          <div class="fields">
+            <Field obj={{ close: groupCloses() }} f={{ key: 'close', label: 'Close gaps when a card in this group is hidden', type: 'bool', hint: 'Outside edit mode, the group\'s cards below a hidden one (Visible when) move up. Cards outside the group stay where they are.' }} onset={(v) => setGroupCloses(v)} />
+          </div>
         {/if}
         <div class="seg row">
           {#each [['content', 'Content'], ['style', 'Style'], ['actions', 'Actions'], ['position', 'Size']] as [k, l]}
@@ -324,6 +327,9 @@
       <p class="hint">This screen: {innerWidth}×{innerHeight}, showing <b>{DEVICES[app.device].label}</b>{param('device') ? ' (set by ?device= in the address)' : ''}.</p>
       <div class="row seg">
         {#each Object.entries(DEVICES) as [k, d]}<button class:on={app.device === k} onclick={() => { app.device = k; app.selected = null; app.multi = []; }}>{d.label}</button>{/each}
+      </div>
+      <div class="fields">
+        <Field obj={screenOpts} f={{ key: 'device', label: 'Layout on this screen', type: 'select', options: [{ value: '', label: 'Automatic' }, ...Object.entries(DEVICES).map(([value, d]) => ({ value, label: d.label }))], hint: 'Saved on this screen, e.g. a big tablet that shows the desktop layout. ?device= in the address does the same and wins.' }} onset={(v) => { screenOpts.device = v; setScreenDevice(v); }} />
       </div>
       {#if app.device === 'tablet'}
         <p class="hint">The <b>tablet layout</b> is the main one: phones and desktops show it too unless you give them their own. Pin a screen to a device with <code>?device=phone</code> / <code>desktop</code> in the URL.</p>

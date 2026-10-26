@@ -10,7 +10,7 @@
   import { GRID } from './lib/config.svelte.js';
   import { setKiosk } from './lib/kiosk.js';
   import { connectLive } from './lib/live.js';
-  import { param } from './lib/params.js';
+  import { param, setParentHash } from './lib/params.js';
   import { cards as cardTypes } from './lib/registry.js';
   import { reloadFromServer, startView } from './lib/config.svelte.js';
 
@@ -137,6 +137,9 @@
     const home = startView();
     if (home && app.view !== home) setView(home);
   }, 10e3);
+
+  // Keep the current view in Home Assistant's address bar (…/panalume#energy) for bookmarks and links.
+  $effect(() => { if (app.config) setParentHash(app.view); });
 
   // Live: reload the layout as soon as another screen saves, and the page after an add-on update.
   connectLive({ onConfig: reloadFromServer, canReload: () => !app.editing && !app.dirty });

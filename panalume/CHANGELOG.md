@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.36.0
+
+- **Football card.** For the Soccer Live integration: the match on now with the score and minute, or the next one with its kick-off, then the next fixtures and recent results with a win / draw / loss for your team. Teams show as short badges; tick **Team logos** to load their logos from ESPN.
+- **Propane tank card** (thanks, FORCEGC). A picture of the tank filled to its level, for Mopeka sensors or any fill % sensor, in every common size, with what's left in lb, kg or gallons.
+- **Close gaps in a group.** Tick **Close gaps when a card in this group is hidden** on a card group, and when one of its cards is hidden (Visible when), the cards below it in the group move up. Cards outside the group stay put.
+- **Button: corner badge.** Show another entity in the button's top-right corner, as a ring for percentages like a tablet's battery, or as its value.
+- **Graph: line styles.** Each line can be smooth, straight or stepped; stepped suits things that switch, like heating on / off.
+- **Layout on this screen.** Pick Tablet, Phone or Desktop for one screen, e.g. a big tablet that was showing the desktop layout.
+- **Links to views.** Home Assistant's address now shows the view you're on (…/panalume#energy), so you can bookmark it or open it straight from a kiosk app.
+- Pop-ups opened by a tap on phones no longer close straight away.
+
 ## 0.35.0
 
 - **Calendar: week and month views.** Choose **View → Week** or **Month** in the calendar card's settings. Arrows move through the weeks or months and **Today** jumps back; tap a day to see its events in full. The week starts on the right day for your language, or pick it yourself. There's also a **12-hour times** option.

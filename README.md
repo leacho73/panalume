@@ -109,7 +109,7 @@ Phones get an automatic single-column version of your tablet layout: navigation 
 
 ### All the cards
 
-Button / tile · Light · Hue light with scenes · Thermostat (draggable dial) · Climate group (several thermostats / AC units at once) · Door lock · 3D printer · Hot tub · Washing machine · Tumble dryer · Dishwasher · Air fryer · Robot vacuum · Lawn mower · Media player (artwork, volume, source, speaker grouping) · Cover / blind · Slider · Option picker · Entities list · Glance · Sensor with graph · Gauge · History graph · Weather · Calendar (upcoming events, week or month) · Clock · Sun & moon (sunrise / sunset, moon phase, moonrise / moonset) · Text / Markdown · Template lines · People · Photo frame (Immich and local albums) · Camera (tap for full-screen live view; plays the video stream for cameras whose pictures fail, e.g. Tapo) · Web page · Image · Navigation · Divider · Alarm panel · Updates & notifications · and the energy cards above.
+Button / tile · Light · Hue light with scenes · Thermostat (draggable dial) · Climate group (several thermostats / AC units at once) · Door lock · 3D printer · Hot tub · Washing machine · Tumble dryer · Dishwasher · Air fryer · Robot vacuum · Lawn mower · Media player (artwork, volume, source, speaker grouping) · Cover / blind · Slider · Option picker · Entities list · Glance · Sensor with graph · Gauge · History graph (smooth, straight or stepped lines) · Weather · Calendar (upcoming events, week or month) · Clock · Sun & moon (sunrise / sunset, moon phase, moonrise / moonset) · Text / Markdown · Template lines · People · Photo frame (Immich and local albums) · Camera (tap for full-screen live view; plays the video stream for cameras whose pictures fail, e.g. Tapo) · Web page · Image · Navigation · Divider · Alarm panel · Updates & notifications · Football (Soccer Live) · Propane tank (Mopeka) · and the energy cards above.
 
 ### Coming from ha-fusion?
 
@@ -127,7 +127,7 @@ Button / tile · Light · Hue light with scenes · Thermostat (draggable dial) �
 2. Install **Panalume**, start it and turn on **Show in sidebar**.
 3. Open **Panalume** from the sidebar and press **E** to start building.
 
-Wall tablet tips: set **Layout → Tablet → Sizing** to *Fit the whole view on screen* and tick *Hide Home Assistant's header bar*. **Home view** (for all tablets, or this screen only) and **Go back to the home view after … minutes** are in the Layout tab too. Or add options to the tablet's URL:
+Wall tablet tips: set **Layout → Tablet → Sizing** to *Fit the whole view on screen* and tick *Hide Home Assistant's header bar*. **Home view** (for all tablets, or this screen only) and **Go back to the home view after … minutes** are in the Layout tab too, and **Layout on this screen** picks the tablet layout for a screen that shows the wrong one. Or add options to the tablet's URL:
 
 | Option | Does |
 |---|---|
@@ -136,6 +136,7 @@ Wall tablet tips: set **Layout → Tablet → Sizing** to *Fit the whole view on
 | `?kiosk` | Hide Home Assistant's header bar |
 | `?view=Upstairs` | Open on this view (name or id) |
 | `?return=5` | Go back to that view after 5 minutes without a touch |
+| `…/panalume#Energy` | Opens that view. The address follows the view you're on, so you can bookmark it |
 | `?noedit` | Hide the edit pencil and the E shortcut |
 
 e.g. `…/panalume?view=Upstairs&return=5&noedit&fit=screen&kiosk`

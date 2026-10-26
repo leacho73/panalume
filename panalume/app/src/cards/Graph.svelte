@@ -7,6 +7,7 @@
       { key: 'title', label: 'Title', type: 'text' },
       { key: 'entities', label: 'Entities', type: 'entities' },
       { key: 'colors', label: 'Colours (comma separated)', type: 'text' },
+      { key: 'curves', label: 'Line styles (comma separated: smooth, straight or step)', type: 'text', placeholder: 'smooth, step', hint: 'One per entity, in the same order. Step suits things that switch, like heating on / off or a set temperature. Blank = smooth.' },
       { key: 'hours', label: 'Hours', type: 'number' },
       { key: 'min', label: 'Y min', type: 'text' },
       { key: 'max', label: 'Y max', type: 'text' },
@@ -27,7 +28,10 @@
   const hist = useHistory(() => ids, () => Number(props.hours) || 24);
   const colors = $derived((props.colors || '').split(',').map((s) => s.trim()).filter(Boolean));
   const color = (i) => colors[i] || PALETTE[i % PALETTE.length];
-  const series = $derived(ids.map((id, i) => ({ points: hist.series[id] || [], color: color(i) })));
+  // Line style per entity: smooth (default), straight (also "linear") or step.
+  const curves = $derived((props.curves || '').split(',').map((s) => s.trim().toLowerCase()));
+  const curve = (i) => ({ step: 'step', steps: 'step', straight: 'straight', linear: 'straight', line: 'straight' })[curves[i]] || 'smooth';
+  const series = $derived(ids.map((id, i) => ({ points: hist.series[id] || [], color: color(i), curve: curve(i) })));
 </script>
 
 <div class="g">

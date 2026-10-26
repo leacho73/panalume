@@ -1,5 +1,6 @@
 <script>
-  // Lightweight SVG line/area chart. series: [{ points: [[t, v]], color }]
+  // Lightweight SVG line/area chart. series: [{ points: [[t, v]], color, curve? }]
+  // curve: 'smooth' | 'straight' | 'step' (each series can differ; default from `smooth`).
   let { series = [], hours = 24, fill = true, smooth = true, showAxis = false, strokeWidth = 2.5, min: fixedMin, max: fixedMax } = $props();
   let w = $state(300), h = $state(100);
   const uid = Math.random().toString(36).slice(2, 8);
@@ -18,7 +19,7 @@
   const X = (t) => ((t - start) / (end - start)) * w;
   const Y = (v) => h - ((v - range[0]) / (range[1] - range[0])) * h;
 
-  function path(points) {
+  function path(points, curve) {
     // Step-hold then (optionally) smooth; downsample to ~1 point per 2px.
     const pts = [];
     let lastX = -Infinity;
@@ -34,8 +35,9 @@
     let d = `M${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
     for (let i = 1; i < pts.length; i++) {
       const [x, y] = pts[i];
-      if (smooth) {
-        const [px, py] = pts[i - 1];
+      const [px, py] = pts[i - 1];
+      if (curve === 'step') d += `L${x.toFixed(1)},${py.toFixed(1)}L${x.toFixed(1)},${y.toFixed(1)}`;
+      else if (curve === 'smooth') {
         const cx = (px + x) / 2;
         d += `C${cx.toFixed(1)},${py.toFixed(1)} ${cx.toFixed(1)},${y.toFixed(1)} ${x.toFixed(1)},${y.toFixed(1)}`;
       } else d += `L${x.toFixed(1)},${y.toFixed(1)}`;
@@ -55,7 +57,7 @@
       {/each}
     </defs>
     {#each series as s, i}
-      {@const d = path(s.points)}
+      {@const d = path(s.points, s.curve || (smooth ? 'smooth' : 'straight'))}
       {#if d}
         {#if fill}<path d="{d}L{w},{h}L0,{h}Z" fill="url(#g{uid}{i})" />{/if}
         <path {d} fill="none" style="stroke:{s.color}" stroke-width={strokeWidth} stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" />

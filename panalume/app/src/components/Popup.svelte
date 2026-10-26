@@ -7,9 +7,17 @@
   import Camera from '../cards/Camera.svelte';
   let vw = $state(0), vh = $state(0);
   const close = () => (app.popup = null);
+  // On phones the click from the tap that opened the pop-up arrives a moment later and lands
+  // on whatever is now under the finger (the backdrop, or a control inside the pop-up), which
+  // closed it straight away. Ignore clicks in the first moment after it opens.
+  let openedAt = 0;
+  $effect.pre(() => { if (app.popup) openedAt = performance.now(); });
+  const ghost = (e) => {
+    if (app.popup && performance.now() - openedAt < 400) { e.stopPropagation(); e.preventDefault(); }
+  };
 </script>
 
-<svelte:window onkeydown={(e) => e.key === 'Escape' && close()} />
+<svelte:window onkeydown={(e) => e.key === 'Escape' && close()} onclickcapture={ghost} />
 
 {#if app.popup?.camera}
   <div class="full" role="dialog" aria-modal="true" bind:clientWidth={vw} bind:clientHeight={vh}>
