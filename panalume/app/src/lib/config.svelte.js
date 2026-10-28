@@ -290,7 +290,9 @@ export function setView(id) {
 }
 
 export function zoneList(zone, l = layout()) {
-  return (l.zones[zone] ??= []);
+  // Read back after creating it: the stored list is the state's own copy, not the [] put in.
+  l.zones[zone] ??= [];
+  return l.zones[zone];
 }
 
 /** Stored layouts that hold their own placements (main + any custom ones). */
@@ -343,9 +345,15 @@ export function placeExisting(cardId, zone = app.view) {
   changed();
 }
 
+// The sidebar sits beside the views (left / right) or as a bar across the top of them.
+/** How much width the sidebar takes from the views: 0 when it's off or across the top. */
+export const sideWidth = (l) => (l.sidebar.enabled && l.sidebar.side !== 'top' ? Number(l.sidebar.width) || 0 : 0);
+/** How tall the bar across the top is (0 unless the sidebar is set to Top). */
+export const topHeight = (l) => (l.sidebar.enabled && l.sidebar.side === 'top' ? Math.max(40, Number(l.sidebar.height) || 100) : 0);
+
 export function zoneWidth(zone, l = layout()) {
-  const sb = l.sidebar.enabled ? l.sidebar.width : 0;
-  return zone === 'sidebar' ? sb : l.width - sb;
+  if (zone === 'sidebar') return l.sidebar.side === 'top' ? (l.sidebar.enabled ? l.width : 0) : (l.sidebar.enabled ? l.sidebar.width : 0);
+  return l.width - sideWidth(l);
 }
 
 /** Indices (in the selected zone) of everything that moves together. */
@@ -483,6 +491,38 @@ export function addView(name) {
   changed();
 }
 
+/** A new view filled with ready-made cards ([{ type, props, w, h }], e.g. from an area):
+ * each stored layout gets them in rows that fit its own width. */
+export function addFilledView(name, icon, items) {
+  ensureEditable();
+  const id = uid();
+  app.config.views.push({ id, name, icon: icon || 'mdi:view-dashboard' });
+  const ids = items.map((it) => { const c = uid(); app.config.cards[c] = normalise({ id: c, type: it.type, props: it.props }); return c; });
+  const gap = GRID * 2;
+  for (const l of new Set([layout(), ...storedLayouts()])) {
+    const W = zoneWidth(id, l), list = zoneList(id, l);
+    let x = gap, y = gap, rowH = 0;
+    items.forEach((it, i) => {
+      const w = Math.min(it.w, W - gap * 2);
+      if (x > gap && x + w > W - gap) { x = gap; y += rowH + gap; rowH = 0; }
+      list.push({ card: ids[i], x, y, w, h: it.h });
+      x += w + gap; rowH = Math.max(rowH, it.h);
+    });
+  }
+  setView(id);
+  changed();
+  return id;
+}
+
+/** Turn a card into another type (e.g. a button into a slider), keeping its entity,
+ * name, icon, style, actions and where it sits. */
+export function changeType(card, type, meta) {
+  const keep = Object.fromEntries(['entity', 'name', 'icon'].filter((k) => card.props[k] != null && card.props[k] !== '' && meta.fields?.some((f) => f.key === k)).map((k) => [k, card.props[k]]));
+  card.type = type;
+  card.props = { ...structuredClone(meta.defaults || {}), ...keep };
+  changed();
+}
+
 export function removeView(id) {
   if (app.config.views.length < 2) return;
   app.config.views = app.config.views.filter((v) => v.id !== id);
@@ -518,6 +558,45 @@ export function setMainWidth(apply) {
   for (const [z, list] of Object.entries(fitBase.zones)) {
     const from = fitBase[z === 'sidebar' ? 'sidebar' : 'main'], to = zw(z, l);
     if (l.zones[z] && from > 100 && to > 100) l.zones[z] = refit(list, from, to);
+  }
+  changed();
+}
+
+/** Move the sidebar to the left, right or top. Going to the top lays its cards out in a row
+ *  across the bar (cards that don't fit go to the bottom of this view); coming back stacks them
+ *  in a column again. The views are widened or narrowed to match, like changing the width. */
+export function setSidebarSide(side) {
+  const l = layout();
+  const was = l.sidebar.side || 'left';
+  if (side === was) return;
+  ensureEditable();
+  if (side !== 'top' && was !== 'top') { l.sidebar.side = side; changed(); return; }
+  const before = zoneWidth('main', l);
+  l.sidebar.side = side;
+  if (side === 'top') l.sidebar.height ??= 100;
+  const after = zoneWidth('main', l);
+  for (const v of app.config.views) if (l.zones[v.id]?.length && before > 100 && after > 100) l.zones[v.id] = refit(l.zones[v.id], before, after);
+  const G = GRID * 2;
+  const cards = [...(l.zones.sidebar || [])].sort((a, b) => a.y - b.y || a.x - b.x);
+  if (side === 'top') {
+    const h = topHeight(l) - G;
+    const keep = [], spill = [];
+    let x = G;
+    for (const p of cards) {
+      const w = Math.min(p.w, 360);
+      if (x + w <= l.width - G) { keep.push({ ...p, x, y: GRID, w, h }); x += w + G; } else spill.push(p);
+    }
+    l.zones.sidebar = keep;
+    if (spill.length) {
+      const dst = zoneList(app.view, l);
+      let y = dst.reduce((m, p) => Math.max(m, p.y + p.h), 0) + G;
+      for (const p of spill) { dst.push({ ...p, x: G, y }); y += p.h + G; }
+      toast(spill.length === 1 ? 'One sidebar card didn\'t fit the bar, so it\'s at the bottom of this view' : `${spill.length} sidebar cards didn't fit the bar, so they're at the bottom of this view`);
+    }
+  } else {
+    let y = GRID * 3;
+    const w = Math.max(GRID * 4, l.sidebar.width - G * 2);
+    l.zones.sidebar = cards.map((p) => { const q = { ...p, x: G, y, w, h: Math.max(p.h, GRID * 8) }; y += q.h + G; return q; });
   }
   changed();
 }
@@ -564,6 +643,10 @@ export function fitOverflow(l) {
     const right = list.reduce((m, p) => Math.max(m, p.x + p.w), 0);
     if (right <= w) continue;
     const k = w / (right + Math.max(0, Math.min(...list.map((p) => p.x)))); // right margin = left margin
+    // Only a nudge: cards a little past the edge come back inside. A big squeeze means something
+    // else is off (a card far out to the side, a sidebar nearly as wide as the screen…), and
+    // shrinking every card to a sliver would be worse than leaving them where they are.
+    if (k < 0.6) continue;
     for (const p of list) {
       const x = Math.round(p.x * k);
       p.w = Math.max(GRID * 4, Math.round((p.x + p.w) * k) - x);

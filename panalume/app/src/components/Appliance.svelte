@@ -20,7 +20,12 @@
   const delayed = $derived(/delay/.test(raw) || phaseRaw === 'delay_wash');
   const finished = $derived(/finish|end|done|complete/.test(raw) || phaseRaw === 'finish');
   const error = $derived(/error|fault|actionrequired/.test(raw));
-  const running = $derived(!paused && !finished && !error && !delayed && /^(on|run|running|active|true|wash|rinse|spin|drying|dry|cooling|aborting)$/.test(raw));
+  // A smart plug's own draw (or a machine left on) isn't running: with "Running only above",
+  // the power has to be over it too, and with no status entity the power alone decides.
+  const watts = $derived(Number(ent(props.power)?.state));
+  const minW = $derived(Number(props.running_above) || 0);
+  const overMin = $derived(!minW || !Number.isFinite(watts) || watts > minW);
+  const running = $derived(!paused && !finished && !error && !delayed && (se ? /^(on|run|running|active|true|wash|rinse|spin|drying|dry|cooling|aborting)$/.test(raw) && overMin : !!minW && Number.isFinite(watts) && watts > minW));
   const active = $derived(running || paused || delayed);
 
   const ms = (v) => (v == null ? NaN : typeof v === 'number' ? v * 1000 : Date.parse(v));
@@ -52,7 +57,7 @@
     if (!s || /^(unknown|unavailable|none|no program)$/i.test(s)) return '';
     return s.replace(/^.*program(me)?_/i, '').replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
   });
-  const status = $derived(error ? 'Needs attention' : paused ? 'Paused' : delayed ? 'Delayed start' : running ? (phase || 'Running') : finished ? 'Finished' : /ready/.test(raw) ? 'Ready' : raw === 'off' || raw === 'inactive' || raw === 'stop' ? 'Off' : se ? 'Idle' : '—');
+  const status = $derived(error ? 'Needs attention' : paused ? 'Paused' : delayed ? 'Delayed start' : running ? (phase || 'Running') : finished ? 'Finished' : /ready/.test(raw) ? 'Ready' : raw === 'off' || raw === 'inactive' || raw === 'stop' ? 'Off' : se || minW ? 'Idle' : '—');
 
   const devName = $derived(t(props.name) || K.name);
   const label = (id) => {
@@ -74,7 +79,6 @@
     ...(props.alerts || []).filter((id) => isOn(ent(id)?.state)).map((id) => [label(id).replace(/\s*nearly empty$/i, ' low'), 'mdi:alert-circle-outline']),
   ]);
   const leaking = $derived(ent(props.leak)?.state === 'on');
-  const watts = $derived(Number(ent(props.power)?.state));
 
   // Controls: a select with run / pause / stop options (SmartThings), or a stop button (Home Connect).
   const ctl = $derived(ent(props.control));

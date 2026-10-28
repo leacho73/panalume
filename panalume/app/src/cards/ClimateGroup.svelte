@@ -25,7 +25,7 @@
   import Icon from '../components/Icon.svelte';
   import { t } from '../lib/tpl.js';
   import { stateWord, attrWord } from '../lib/i18n.svelte.js';
-  import { name, formatNumber } from '../lib/entity.js';
+  import { name, formatNumber, targetTemp, targetData } from '../lib/entity.js';
   import { callService } from '../lib/ha.svelte.js';
   import { app } from '../lib/config.svelte.js';
   let { props, w = 440, h = 400 } = $props();
@@ -41,7 +41,7 @@
   const units = $derived((props.entities || []).map((id) => states.get(id)).filter(Boolean));
   const isOff = (e) => e.state === 'off' || e.state === 'unavailable';
   const on = $derived(units.filter((e) => !isOff(e)));
-  const tgt = (e) => e.attributes.temperature ?? e.attributes.target_temp_low;
+  const tgt = (e) => targetTemp(e);
   const step = $derived(Math.max(...units.map((e) => e.attributes.target_temp_step || 0.5), 0.5));
   const min = $derived(Math.max(...units.map((e) => e.attributes.min_temp ?? 7), 7));
   const max = $derived(Math.min(...units.map((e) => e.attributes.max_temp ?? 35), 35));
@@ -76,9 +76,7 @@
     for (const [id, v] of Object.entries(p || {})) {
       const e = states.get(id);
       if (!e) continue;
-      const a = e.attributes;
-      const data = a.temperature == null && a.target_temp_low != null ? { target_temp_low: v, target_temp_high: Math.max(v + 2, a.target_temp_high ?? v + 2) } : { temperature: v };
-      callService('climate', 'set_temperature', data, { entity_id: id });
+      callService('climate', 'set_temperature', targetData(e, v), { entity_id: id });
     }
     setTimeout(() => { if (pending === p) pending = null; }, 1500);
   }

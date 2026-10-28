@@ -26,9 +26,10 @@
     for (const [t, v] of points) {
       if (t < start) { pts[0] = [0, Y(v)]; continue; }
       const x = X(t);
+      // Points under 2px after the last one kept replace it; only a kept point moves lastX
+      // (else a sensor that updates often collapses into a single point: a flat line).
       if (x - lastX < 2 && pts.length) pts[pts.length - 1] = [x, Y(v)];
-      else pts.push([x, Y(v)]);
-      lastX = x;
+      else { pts.push([x, Y(v)]); lastX = x; }
     }
     if (pts.length === 1) pts.push([w, pts[0][1]]);
     if (!pts.length) return '';

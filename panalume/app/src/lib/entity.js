@@ -137,3 +137,22 @@ export function lightColor(e) {
   if (a.hs_color) return `hsl(${a.hs_color[0]} ${Math.max(a.hs_color[1], 30)}% 60%)`;
   return null;
 }
+
+// Thermostats that only take a heat and a cool setpoint (Elk M1 and others with just
+// "target temperature range"): the card's one target is the heat setpoint, or the cool
+// one in cool mode, and both are sent back together. null for a single-target thermostat.
+const rangeKey = (e) => {
+  const a = e?.attributes || {};
+  if (a.temperature != null || a.target_temp_low == null) return null;
+  return e.state === 'cool' && a.target_temp_high != null ? 'target_temp_high' : 'target_temp_low';
+};
+/** A thermostat's target temperature as the card shows it. */
+export const targetTemp = (e) => { const a = e?.attributes || {}; const k = rangeKey(e); return k ? a[k] : a.temperature ?? a.target_temp_high ?? a.target_temp_low; };
+/** set_temperature data for a new target, for single-target and heat / cool thermostats alike. */
+export function targetData(e, v) {
+  const k = rangeKey(e);
+  if (!k) return { temperature: v };
+  let lo = e.attributes.target_temp_low, hi = e.attributes.target_temp_high ?? lo + 2;
+  if (k === 'target_temp_low') { lo = v; if (hi <= lo) hi = lo + 1; } else { hi = v; if (lo >= hi) lo = hi - 1; }
+  return { target_temp_low: lo, target_temp_high: hi };
+}

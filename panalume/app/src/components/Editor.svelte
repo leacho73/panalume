@@ -5,8 +5,9 @@
   import { cards, categories } from '../lib/registry.js';
   import {
     app, layout, DEVICES, DEFAULT_THEME, changed, addCard, selectedCard, selectedPlacement, removeSelected,
-    duplicateSelected, copyToView, copyLayout, importConfig, selectionSet, groupSelected, ungroupSelected, ensureEditable, setMode, MODES, DISPLAYS, zoneList, addView, removeView, setView, isPlacedAnywhere, placeExisting, zoneWidth, setMainWidth, screenHome, setScreenHome, screenDevice, setScreenDevice, groupCloses, setGroupCloses,
+    duplicateSelected, copyToView, copyLayout, importConfig, selectionSet, groupSelected, ungroupSelected, ensureEditable, setMode, MODES, DISPLAYS, zoneList, addView, removeView, setView, isPlacedAnywhere, placeExisting, zoneWidth, setMainWidth, screenHome, setScreenHome, screenDevice, setScreenDevice, groupCloses, setGroupCloses, setSidebarSide, addFilledView, changeType,
   } from '../lib/config.svelte.js';
+  import { areas, areaCards } from '../lib/area.js';
   // Settings kept on this screen only (not in the shared layout).
   const screenOpts = $state({ home: screenHome(), device: screenDevice() });
 
@@ -35,6 +36,26 @@
   const card = $derived(selectedCard());
   const place = $derived(selectedPlacement());
   const def = $derived(card && cards[card.type]);
+  // Other card types that can show this card's entity (e.g. a button → a slider).
+  const swaps = $derived.by(() => {
+    const id = card?.props?.entity;
+    if (!id || typeof id !== 'string' || !id.includes('.')) return [];
+    const d = id.split('.')[0];
+    return Object.values(cards).map((c) => c.meta)
+      .filter((m) => m.type !== card.type && m.fields?.some((f) => f.key === 'entity' && f.type === 'entity' && (!f.domain || [].concat(f.domain).includes(d))))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  });
+  // Home Assistant's areas, for "Add a view for an area".
+  let areaList = $state(null);
+  $effect(() => { if (app.panel === 'views' && !areaList) areas().then((l) => (areaList = l)).catch(() => (areaList = [])); });
+  async function addAreaView(id) {
+    const a = areaList?.find((x) => x.area_id === id);
+    if (!a) return;
+    const items = await areaCards(id).catch(() => []);
+    if (!items.length) return toast(`Nothing in ${a.name} to add`);
+    addFilledView(a.name, a.icon, items);
+    toast(`Added ${a.name} with ${items.length} card${items.length > 1 ? 's' : ''}`);
+  }
   let addTo = $state('main');
   let section = $state('content');
 
@@ -266,6 +287,14 @@
           {/each}
         </div>
         {#if section === 'content'}
+          {#if swaps.length}
+            <label class="devsw"><span>Card type</span>
+              <select value="" onchange={(ev) => { const m = cards[ev.currentTarget.value]?.meta; ev.currentTarget.value = ''; if (!m) return; changeType(card, m.type, m); toast(`Changed to ${m.name}`); }}>
+                <option value="">{def?.meta.name} — change to…</option>
+                {#each swaps as m (m.type)}<option value={m.type}>{m.name}</option>{/each}
+              </select>
+            </label>
+          {/if}
           {#if sections.length}
             <div class="secs">
               <span class="lbl">Show</span>
@@ -354,8 +383,12 @@
         <div class="fields">
           <Field obj={layout().sidebar} f={{ key: 'enabled', label: 'Show sidebar', type: 'bool' }} onset={(v) => setMainWidth((l) => (l.sidebar.enabled = v))} />
           {#if !layout().sidebar.enabled}<p class="hint">Hidden: its cards are kept and come back when you show it again. Without it, views with no Navigation card get a small views menu in the top corner.</p>{/if}
-          <Field obj={layout().sidebar} f={{ key: 'side', label: 'Side', type: 'select', options: ['left', 'right'] }} />
-          <Field obj={layout().sidebar} f={{ key: 'width', label: 'Width', type: 'number' }} onset={(v) => setMainWidth((l) => (l.sidebar.width = v))} />
+          <Field obj={layout().sidebar} f={{ key: 'side', label: 'Side', type: 'select', options: [{ value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }, { value: 'top', label: 'Top (a bar across every view)' }] }} onset={(v) => setSidebarSide(v)} />
+          {#if layout().sidebar.side === 'top'}
+            <Field obj={layout().sidebar} f={{ key: 'height', label: 'Height', type: 'number', placeholder: '100', hint: 'Put a Navigation card set to Horizontal in it for a menu across the top. It stays in view while the page scrolls.' }} />
+          {:else}
+            <Field obj={layout().sidebar} f={{ key: 'width', label: 'Width', type: 'number' }} onset={(v) => setMainWidth((l) => (l.sidebar.width = v))} />
+          {/if}
           {#if app.config.layouts[app.device].display === 'screen'}
             <Field obj={layout().sidebar} f={{ key: 'scaling', label: 'When a view shrinks to fit the screen', type: 'select', options: [{ value: 'fixed', label: 'Sidebar keeps its size' }, { value: 'shared', label: 'Sidebar shrinks with it' }] }} />
           {/if}
@@ -388,6 +421,15 @@
         </div>
       {/each}
       <button class="sm" onclick={() => addView('New view')}><Icon icon="mdi:plus" size="1em" /> Add view</button>
+      {#if areaList?.length}
+        <label class="devsw"><span>Add a view for an area</span>
+          <select value="" onchange={(ev) => { const id = ev.currentTarget.value; ev.currentTarget.value = ''; addAreaView(id); }}>
+            <option value="">Pick an area…</option>
+            {#each areaList as a (a.area_id)}<option value={a.area_id}>{a.name}</option>{/each}
+          </select>
+        </label>
+        <p class="hint">Fills a new view with a card for each thing in the area (lights, switches, thermostats, media players, cameras…) and a list of its sensors. They're normal cards after that.</p>
+      {/if}
     {:else if app.panel === 'theme'}
       <div class="fields">{#each THEME as f (f.key)}<Field obj={app.config.theme} {f} />{/each}</div>
       <button class="sm" onclick={() => { app.config.theme = { ...DEFAULT_THEME }; changed(); }}>Reset theme</button>
