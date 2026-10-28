@@ -10,10 +10,12 @@
     fields: [
       { key: 'title', label: 'Title (blank = today’s date)', type: 'text' },
       { key: 'entities', label: 'Calendars', type: 'entities', domain: 'calendar' },
-      { key: 'view', label: 'View', type: 'select', options: [{ value: 'list', label: 'List of upcoming events' }, { value: 'week', label: 'Week' }, { value: 'month', label: 'Month' }] },
+      { key: 'view', label: 'View', type: 'select', options: [{ value: 'list', label: 'List of upcoming events' }, { value: 'week', label: 'Week' }, { value: 'timeline', label: 'Week with hours' }, { value: 'month', label: 'Month' }] },
       { key: 'days', label: 'Days ahead (list)', type: 'number' },
       { key: 'max', label: 'Most events shown (list)', type: 'number' },
       { key: 'week_start', label: 'Week starts on (week and month)', type: 'select', options: [{ value: '', label: 'Automatic (from the language)' }, { value: '1', label: 'Monday' }, { value: '0', label: 'Sunday' }, { value: '6', label: 'Saturday' }] },
+      { key: 'day_start', label: 'First hour shown (week with hours, 0–23)', type: 'number' },
+      { key: 'day_end', label: 'Last hour shown (week with hours, 1–24)', type: 'number' },
       { key: 'hour12', label: '12-hour times', type: 'bool' },
     ],
   };
@@ -34,7 +36,7 @@
 
   const cals = $derived((props.entities || []).filter((id) => id?.startsWith('calendar.')));
   const days = $derived(Math.min(31, Math.max(1, Number(props.days) || 7)));
-  const view = $derived(props.view === 'week' || props.view === 'month' ? props.view : 'list');
+  const view = $derived(props.view === 'week' || props.view === 'month' || props.view === 'timeline' ? props.view : 'list');
   // Weeks or months forward (or back) from the current one, and the day opened from the grid.
   let offset = $state(0);
   let sheet = $state(null);
@@ -113,7 +115,7 @@
   // The days on screen, as a "from|to" key so the calendars are only fetched again when it changes.
   const span = $derived.by(() => {
     const t0 = new Date(today);
-    if (view === 'week') { const from = addDays(weekOf(t0), 7 * offset); return { from, to: addDays(from, 7), weeks: 1 }; }
+    if (view === 'week' || view === 'timeline') { const from = addDays(weekOf(t0), 7 * offset); return { from, to: addDays(from, 7), weeks: 1 }; }
     if (view === 'month') {
       const first = new Date(t0.getFullYear(), t0.getMonth() + offset, 1);
       const from = weekOf(first);
@@ -142,6 +144,58 @@
   const cellH = $derived(span.weeks ? (h - (show('head') && !small ? 34 : 0) - 22 - (span.weeks - 1) * 3) / span.weeks : 0);
   const lines = $derived(w / 7 >= 58 ? Math.max(0, Math.floor((cellH - 22) / 17)) : 0);
   const openDay = (d, key = null) => { sheet = d.getTime(); open = key; };
+
+  // Week with hours: an hour scale down the side and a column per day, each
+  // timed event a block from its start to its end. All-day events (and timed
+  // ones covering the whole day) sit in a row above, as in Google Calendar.
+  const num = (v, def) => (v === '' || v == null || isNaN(Number(v)) ? def : Number(v));
+  // Hours on the clock face, so a day with a daylight-saving change still lines up.
+  const clockH = (t, d) => (t <= d ? 0 : t >= addDays(d, 1) ? 24 : t.getHours() + t.getMinutes() / 60);
+  const wholeDay = (e) => e.allDay || e.end - e.start >= 864e5;
+  // All-day bars, each stretching across the days it covers, stacked in lanes.
+  const allDayBars = $derived.by(() => {
+    if (view !== 'timeline') return [];
+    const col = (t) => Math.round((day0(t) - span.from) / 864e5);
+    const lanes = [], out = [];
+    for (const e of events) {
+      if (!wholeDay(e) || e.start >= span.to || e.end <= span.from) continue;
+      const a = Math.max(0, col(e.start));
+      // End is exclusive: an all-day event's end date, or the day after a timed one ends (unless at midnight).
+      const b = Math.max(a + 1, Math.min(7, col(e.end) + (!e.allDay && +e.end !== +day0(e.end) ? 1 : 0)));
+      let lane = lanes.findIndex((x) => x <= a);
+      if (lane < 0) { lane = lanes.length; lanes.push(b); } else lanes[lane] = b;
+      out.push({ e, a, b, lane });
+    }
+    return out;
+  });
+  // Timed events of a day, with side-by-side columns for ones that overlap.
+  const layout = (d) => {
+    const out = (byDay.get(d.getTime()) || []).filter((e) => !wholeDay(e))
+      .map((ev) => { const s = clockH(ev.start, d); return { ev, s, end: Math.max(clockH(ev.end, d), s) }; })
+      .sort((a, b) => a.s - b.s || b.end - a.end);
+    let cluster = [], cols = [], clusterEnd = -1;
+    const flush = () => { for (const p of cluster) p.n = cols.length; cluster = []; cols = []; };
+    for (const p of out) {
+      const end = Math.max(p.end, p.s + 0.5); // short events still get room for their title
+      if (p.s >= clusterEnd) { flush(); clusterEnd = -1; }
+      let c = cols.findIndex((x) => x <= p.s);
+      if (c < 0) { c = cols.length; cols.push(end); } else cols[c] = end;
+      p.col = c; cluster.push(p); clusterEnd = Math.max(clusterEnd, end);
+    }
+    flush();
+    return out;
+  };
+  const timedByDay = $derived(view === 'timeline' ? new Map(gridDays.map((d) => [d.getTime(), layout(d)])) : new Map());
+  // The hours shown: the card's setting, widened to fit the week's events so none are hidden.
+  const hourSpan = $derived.by(() => {
+    let a = Math.min(23, Math.max(0, Math.floor(num(props.day_start, 7))));
+    let b = Math.min(24, Math.max(a + 1, Math.ceil(num(props.day_end, 22))));
+    for (const ps of timedByDay.values()) for (const p of ps) { a = Math.min(a, Math.floor(p.s)); b = Math.max(b, Math.ceil(p.end)); }
+    return [a, Math.max(b, a + 1)];
+  });
+  const hourLabel = (hr) => new Date(2000, 0, 1, hr).toLocaleTimeString(lang, h12 ? { hour: 'numeric', hour12: true } : { hour: '2-digit', minute: '2-digit', hour12: false });
+  const nowH = $derived(new Date(now).getHours() + new Date(now).getMinutes() / 60);
+  const pct = (x) => `${((x - hourSpan[0]) / (hourSpan[1] - hourSpan[0])) * 100}%`;
 
   const lang = undefined;
   const dayName = (d) => {
@@ -204,6 +258,43 @@
           </div>
         </div>
       {/each}
+    </div>
+  {:else if view === 'timeline' && !sheet}
+    {@const [h0, h1] = hourSpan}
+    <div class="tl" class:narrow={w < 420} data-stop style="--hours:{h1 - h0}">
+      <div class="tl-row">
+        <span></span>
+        {#each gridDays as d (d.getTime())}
+          <button class="tl-dh" class:today={d.getTime() === today} class:gone={d.getTime() < today} onclick={() => openDay(d)}><span>{d.toLocaleDateString(lang, { weekday: w >= 420 ? 'short' : 'narrow' })}</span><b>{d.getDate()}</b></button>
+        {/each}
+      </div>
+      {#if allDayBars.length}
+        <div class="tl-row tl-all">
+          {#each allDayBars as { e, a, b, lane } (e.key)}
+            <button class="tl-allev" style="--c:{e.color};grid-column:{a + 2} / {b + 2};grid-row:{lane + 1}" onclick={() => openDay(addDays(span.from, a), e.key)} title={e.title}>{e.title}</button>
+          {/each}
+        </div>
+      {/if}
+      <div class="tl-body">
+        <div class="tl-grid">
+          <div class="tl-hours">
+            {#each Array.from({ length: h1 - h0 - 1 }, (_, i) => h0 + i + 1) as hr}<span style="top:{pct(hr)}">{hourLabel(hr)}</span>{/each}
+          </div>
+          {#each gridDays as d (d.getTime())}
+            <div class="tl-col" class:today={d.getTime() === today}>
+              {#each timedByDay.get(d.getTime()) || [] as p (p.ev.key)}
+                {@const e = p.ev}
+                <button class="tl-ev" class:past={past(e)} class:now={isNow(e)} style="--c:{e.color};top:{pct(p.s)};height:{((Math.max(p.end, p.s + 0.25) - p.s) / (h1 - h0)) * 100}%;left:calc({(p.col / p.n) * 100}% + 1px);width:calc({100 / p.n}% - 3px)" onclick={() => openDay(d, e.key)} title={e.title}>
+                  <span class="tl-ti">{e.title}</span>
+                  <span class="tl-tm">{hm(e.start)} – {hm(e.end)}</span>
+                  {#if e.location && show('location')}<span class="tl-loc">{e.location}</span>{/if}
+                </button>
+              {/each}
+              {#if d.getTime() === today && nowH >= h0 && nowH <= h1}<i class="tl-now" style="top:{pct(nowH)}"></i>{/if}
+            </div>
+          {/each}
+        </div>
+      </div>
     </div>
   {:else if view === 'month' && !sheet}
     <div class="month" data-stop style="--weeks:{span.weeks}">
@@ -306,6 +397,36 @@
   .week.rows .dh b { font-size: 1.2em; }
   .week.rows .chips { flex: 1; flex-direction: row; flex-wrap: wrap; padding-top: 2px; }
   .week.rows .chip { width: auto; max-width: 100%; flex-direction: row; gap: 5px; align-items: baseline; }
+  /* Week with hours: a time scale on the left, a column per day, events as blocks. */
+  .tl { flex: 1; min-height: 0; display: flex; flex-direction: column; --gut: 3.4em; }
+  .h12 .tl { --gut: 3.8em; }
+  .tl-row, .tl-grid { display: grid; grid-template-columns: var(--gut) repeat(7, minmax(0, 1fr)); }
+  .tl-dh { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 2px 0 6px; border: 0; background: none; color: var(--muted); font: inherit; font-size: .72em; text-transform: uppercase; letter-spacing: .06em; }
+  .tl-dh b { display: grid; place-items: center; min-width: 1.9em; height: 1.9em; border-radius: 50%; font-size: 1.6em; font-weight: 500; color: var(--text); letter-spacing: 0; }
+  .tl-dh.today { color: var(--accent); }
+  .tl-dh.today b { background: var(--accent); color: #0b1220; }
+  .tl-dh.gone b { color: var(--muted); }
+  .tl-all { row-gap: 2px; border-bottom: 1px solid rgba(255,255,255,.1); padding-bottom: 4px; }
+  .tl-allev { min-width: 0; margin: 0 2px; padding: 2px 8px; border: 0; border-radius: 5px; background: color-mix(in srgb, var(--c) 70%, #000); color: #fff; font: inherit; font-size: .74em; font-weight: 500; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tl-body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-top: 6px; }
+  .tl-grid { position: relative; height: max(100%, calc(var(--hours) * 32px)); background: repeating-linear-gradient(to bottom, rgba(255,255,255,.08) 0 1px, transparent 1px calc(100% / var(--hours))); }
+  .tl-hours { position: relative; }
+  .tl-hours span { position: absolute; right: 8px; transform: translateY(-50%); font-size: .66em; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .tl-col { position: relative; border-left: 1px solid rgba(255,255,255,.07); min-width: 0; }
+  .tl-col.today { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+  .tl-ev { position: absolute; display: flex; flex-direction: column; gap: 1px; min-height: 1.4em; overflow: hidden; padding: 3px 7px; border: 0; border-radius: 6px; background: color-mix(in srgb, var(--c) 72%, #000); color: #fff; font: inherit; font-size: .74em; line-height: 1.25; text-align: left; box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
+  .tl-ev.now { box-shadow: 0 0 0 2px var(--c); }
+  .tl-ev.past { opacity: .5; }
+  .tl-ti { font-weight: 600; }
+  .tl-tm, .tl-loc { opacity: .85; font-size: .92em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Phone-sized cards: just the titles, in tighter blocks. */
+  .tl.narrow { --gut: 2.6em; }
+  .tl.narrow .tl-ev { padding: 2px 3px; font-size: .64em; border-radius: 4px; }
+  .tl.narrow .tl-tm, .tl.narrow .tl-loc { display: none; }
+  .tl.narrow .tl-allev { padding: 1px 4px; font-size: .64em; }
+  .tl.narrow .tl-dh b { font-size: 1.25em; }
+  .tl-now { position: absolute; left: -1px; right: 0; height: 2px; background: #ff5b5b; z-index: 2; pointer-events: none; }
+  .tl-now::before { content: ''; position: absolute; left: -5px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: #ff5b5b; }
   /* Month: a grid of days with titles, or dots when the cells are small. */
   .month { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: auto repeat(var(--weeks), minmax(0, 1fr)); gap: 3px; }
   .wd { font-size: .68em; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); text-align: center; }
