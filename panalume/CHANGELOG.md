@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.37.0
+
+- **Sidebar across the top.** **Layout → Sidebar → Side: Top** turns the sidebar into a bar across the top that every view shares and that stays in view as you scroll. Put a Navigation card in it for a menu along the top, with a clock or anything else beside it. Its cards are laid out in a row when you switch, and any that don't fit move to the bottom of the view you're on.
+- **To-do list card.** Your Home Assistant lists (shopping list, Local to-do, Todoist and others): tick items off, add new ones and clear the ticked ones. Changes made anywhere show straight away.
+- **Humidifier card.** For humidifiers and dehumidifiers: a dial for the target humidity, the current humidity, on / off and the device's own modes (auto, sleep, low / high…).
+- **Home Assistant dashboards in the web page card.** Pick one of Home Assistant's own dashboards and a view on it, and the card shows just that view, without Home Assistant's header and sidebar. It loads from whatever address you're using, so it works away from home too.
+- **A view for an area.** **Views → Add a view for an area** makes a new view with a card for each thing in that area in Home Assistant (lights, switches, thermostats, media players, cameras…) and a list of its sensors. After that they're normal cards to move, resize or remove.
+- **Change a card's type.** **Card type** at the top of a card's settings turns it into another kind of card for the same thing, e.g. a button into a slider, keeping its name, style and place.
+- **Kettle card.** For smart kettles: the water temperature, the target with − / +, on / off, how much water is in it (from a weight sensor), presets such as green tea or baby bottle, and whether it's on its base. It finds the kettle's entities by itself.
+- **Calendar: week with hours** (thanks, jaycrafts). A Google Calendar-style week: hours down the side, each event a block from its start to its end, all-day events in a row on top, and a line for the time now. **First / last hour shown** set the hours.
+- **Washer, dryer and dishwasher: Running only above (W).** For machines on a smart plug: below this the card shows Idle even with the plug on, so the plug's own draw doesn't count as running (thanks, 8ctvfhjs59-ctrl).
+- **Upcoming media card** (thanks, mrclean5953). Upcoming episodes and films from the Upcoming Media integration (Sonarr, Radarr and others), as a list or as posters. Tap one to open it in Sonarr or Radarr.
+- **Media activity card** (thanks, mrclean5953). What's playing on your Plex server right now, from Tautulli: who's watching, how far in, and whether it's direct play or transcoding. Works with Emby too.
+- **Recently watched card** (thanks, mrclean5953). The latest plays from Tautulli: what, who, when and how much of it.
+- **Weather: more detail** (thanks, mrclean5953). Feels like, wind with its direction, gusts, UV index and today's rain, each with its own switch. They show in a row under the temperature, in place of the humidity and wind in the corner.
+- **Vacuum: large room buttons.** An option for bigger, easier-to-tap room buttons.
+- History graphs of sensors that update often (e.g. every minute) no longer draw a flat line over long periods (thanks, castleyt).
+- Thermostats that only take separate heat and cool setpoints (e.g. Elk M1) can now have their temperature changed from the thermostat and climate group cards.
+- The editor no longer shrinks every card on a view to a sliver when its cards run a long way past the edge.
+
 ## 0.36.0
 
 - **Football card.** For the Soccer Live integration: the match on now with the score and minute, or the next one with its kick-off, then the next fixtures and recent results with a win / draw / loss for your team. Teams show as short badges; tick **Team logos** to load their logos from ESPN.

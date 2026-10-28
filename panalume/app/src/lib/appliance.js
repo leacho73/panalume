@@ -89,6 +89,7 @@ export function applianceMeta(kind) {
       { key: 'remaining', label: 'Remaining time (minutes)', type: 'entity', domain: 'sensor', section: 'time' },
       { key: 'finish', label: 'Finish time (timestamp)', type: 'entity', domain: 'sensor', section: 'time' },
       { key: 'power', label: 'Power (W)', type: 'entity', domain: 'sensor', section: 'power' },
+      { key: 'running_above', label: 'Running only above (W)', type: 'number', section: 'power', hint: 'For smart plugs: below this the machine shows as idle, even with the plug on (e.g. 5 W, over what the plug itself uses). Blank = off. With no status entity, the power alone says when it\'s running.' },
       { key: 'door', label: 'Door', type: 'entity', section: 'alerts' },
       { key: 'paused', label: 'Paused', type: 'entity', domain: 'binary_sensor' },
       { key: 'options', label: 'Settings to show (spin, temperature…)', type: 'entities', section: 'options' },

@@ -41,6 +41,7 @@
     fields: [
       { key: 'entity', label: 'Vacuum', type: 'entity', domain: 'vacuum', hint: 'Rooms to clean appear on the card when the vacuum\'s rooms are matched to Home Assistant areas (in the vacuum\'s settings in Home Assistant), or come from the Dreame integration.' },
       { key: 'name', label: 'Name', type: 'text' },
+      { key: 'big_rooms', label: 'Large room buttons (easier to tap)', type: 'bool' },
       { key: 'battery', label: 'Battery (optional, uses the vacuum\'s own if it has one)', type: 'entity', domain: 'sensor', section: 'battery' },
       { key: 'area', label: 'Area cleaned (optional)', type: 'entity', domain: 'sensor', section: 'stats' },
       { key: 'time', label: 'Cleaning time (optional)', type: 'entity', domain: 'sensor', section: 'stats' },
@@ -224,7 +225,7 @@
       {:else if stats.length}<div class="sub">{stats.map((x) => stateText(x)).join(' · ')}</div>{/if}
     </div>
     {#if rooms.length}
-      <div class="rooms" class:more={roomsMore} bind:this={roomsEl} onscroll={roomsFade} data-stop role="group" aria-label="Rooms">
+      <div class="rooms" class:large={props.big_rooms} class:more={roomsMore && !props.big_rooms} bind:this={roomsEl} onscroll={roomsFade} data-stop role="group" aria-label="Rooms">
         {#each rooms as r (r.id)}
           {@const n = chosen.indexOf(r.id)}
           <button class:on={n >= 0} onclick={() => pick(r.id)} aria-pressed={n >= 0} disabled={cleaning || st === 'returning'}>{#if n >= 0 && chosen.length > 1}<b>{n + 1}</b>{/if}{r.name}</button>
@@ -288,6 +289,9 @@
   .rooms::-webkit-scrollbar { display: none; }
   .rooms.more { -webkit-mask-image: linear-gradient(90deg, #000 80%, transparent); mask-image: linear-gradient(90deg, #000 80%, transparent); }
   .rooms button:disabled { opacity: .45; }
+  /* Large: finger-sized buttons, wrapped onto more rows rather than scrolled. */
+  .rooms.large { flex-wrap: wrap; gap: 8px; overflow: visible; }
+  .rooms.large button { min-height: 44px; padding: 10px 18px; font-size: .95em; }
   .rooms button { flex: none; display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; border-radius: 99px; border: 0; background: rgba(255,255,255,.06); color: var(--muted); font: inherit; font-size: .8em; white-space: nowrap; }
   .rooms button.on { background: color-mix(in srgb, var(--c) 26%, transparent); color: var(--text); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c) 60%, transparent); }
   .rooms b { display: inline-grid; place-items: center; min-width: 1.4em; height: 1.4em; border-radius: 50%; background: var(--c); color: #0b0f17; font-size: .85em; }

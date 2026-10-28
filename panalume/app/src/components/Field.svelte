@@ -3,6 +3,7 @@
   import EntityPicker from './EntityPicker.svelte';
   import IconPicker from './IconPicker.svelte';
   import MediaFolderPicker from './MediaFolderPicker.svelte';
+  import HaViewPicker from './HaViewPicker.svelte';
   import Icon from './Icon.svelte';
   import { states } from '../lib/ha.svelte.js';
   import { changed, app } from '../lib/config.svelte.js';
@@ -20,6 +21,8 @@
     {#if ontoggle}<button type="button" class="eye" class:off={hide} title={hide ? 'Hidden on the card — click to show' : 'Shown on the card — click to hide'} onclick={ontoggle}><Icon icon={hide ? 'mdi:eye-off-outline' : 'mdi:eye'} size="15px" /></button>{/if}</label>{/if}
   {#if f.type === 'media-folder'}
     <MediaFolderPicker value={obj[f.key] || ''} title={obj[f.key + '_title'] || ''} onpick={(id, title) => { obj[f.key + '_title'] = title; set(id); }} />
+  {:else if f.type === 'ha-view'}
+    <HaViewPicker value={obj[f.key] || ''} onpick={set} />
   {:else if f.type === 'entity'}
     <EntityPicker bind:value={() => obj[f.key] || '', set} domain={f.domain} />
   {:else if f.type === 'entities'}

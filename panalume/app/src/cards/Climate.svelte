@@ -21,7 +21,7 @@
   import Icon from '../components/Icon.svelte';
   import { t, ent } from '../lib/tpl.js';
   import { stateWord, attrWord } from '../lib/i18n.svelte.js';
-  import { name, domain, formatNumber } from '../lib/entity.js';
+  import { name, domain, formatNumber, targetTemp, targetData } from '../lib/entity.js';
   import { callService } from '../lib/ha.svelte.js';
   let { props, w = 300, h = 340 } = $props();
   const show = (k) => !props.hide?.[k] && (k !== 'modes' || props.show_modes !== false);
@@ -32,7 +32,7 @@
   const step = $derived(a.target_temp_step || (unit === '°F' ? 1 : 0.5));
   const min = $derived(a.min_temp ?? 7);
   const max = $derived(a.max_temp ?? 35);
-  const target = $derived(a.temperature ?? a.target_temp_high ?? a.target_temp_low);
+  const target = $derived(targetTemp(e));
   const cur = $derived(a.current_temperature);
   const off = $derived(!e || e.state === 'off' || e.state === 'unavailable');
   const mode = $derived(d === 'water_heater' ? a.operation_mode || e?.state : e?.state);
@@ -65,8 +65,7 @@
   function send() {
     if (pending == null || !e) return;
     const v = pending;
-    const data = a.temperature == null && a.target_temp_low != null ? { target_temp_low: v, target_temp_high: Math.max(v + 2, a.target_temp_high ?? v + 2) } : { temperature: v };
-    callService(d, 'set_temperature', data, { entity_id: e.entity_id }).finally(() => setTimeout(() => (pending = null), 1500));
+    callService(d, 'set_temperature', targetData(e, v), { entity_id: e.entity_id }).finally(() => setTimeout(() => (pending = null), 1500));
   }
   function setMode(m) {
     if (d === 'water_heater') callService(d, 'set_operation_mode', { operation_mode: m }, { entity_id: e.entity_id });
