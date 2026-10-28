@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.37.1
+
+- **Weather card:** the new details (feels like, gusts, UV, rain) now sit in the space beside the temperature, where humidity and wind always were, instead of a new row underneath that pushed the forecast down on existing dashboards. What doesn't fit beside it is left off, so the card keeps its layout at any size.
+
 ## 0.37.0
 
 - **Sidebar across the top.** **Layout → Sidebar → Side: Top** turns the sidebar into a bar across the top that every view shares and that stays in view as you scroll. Put a Navigation card in it for a menu along the top, with a clock or anything else beside it. Its cards are laid out in a row when you switch, and any that don't fit move to the bottom of the view you're on.
