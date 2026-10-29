@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.38.0
+
+- **Fan card.** For fans and air purifiers: on / off, a speed slider, the fan's modes (auto, sleep, turbo…), and oscillate and direction when it has them. Add a **light** for a ceiling fan's light (on / off and brightness on the same card), or **sensors** such as PM2.5, humidity or filter life for an air purifier.
+- **Light cards: Simple when off.** When the light's off, the card shows just its name and icon (tap to turn it on); the brightness, colours and the rest appear once it's on.
+- **Button: Active only above (W).** Pick the smart plug's power sensor and a number, and the button only lights up (and says Running) above that power, so a plug on with the machine idle shows as Idle.
+- **Building separate phone and desktop layouts is easier.** **Copy to layout…** puts a card on another device's layout too, and in Layout you can choose whether new cards go on every layout or only the one you're editing. **Unplace** is now called **Remove from this layout**, which says what it does.
+- **Alarm card: codes are respected.** If your alarm needs a code to disarm, the card now asks for one and won't disarm without it (it used to disarm with nothing typed in), and it only asks for a code to arm when the alarm does. A new option, **Always ask for a code to disarm**, covers alarms that don't say (thanks, DaveCBr).
+
 ## 0.37.1
 
 - **Weather card:** the new details (feels like, gusts, UV, rain) now sit in the space beside the temperature, where humidity and wind always were, instead of a new row underneath that pushed the forecast down on existing dashboards. What doesn't fit beside it is left off, so the card keeps its layout at any size.

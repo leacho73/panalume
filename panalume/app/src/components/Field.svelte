@@ -51,7 +51,7 @@
     <label class="chk"><input type="checkbox" checked={!!obj[f.key]} onchange={(e) => set(e.currentTarget.checked)} /> {f.label}</label>
   {:else if f.type === 'select'}
     <select id={f.key} value={obj[f.key] ?? ''} onchange={(e) => set(e.currentTarget.value)}>
-      {#if !f.options.includes(obj[f.key] ?? '')}<option value="">—</option>{/if}
+      {#if !f.options.some((o) => (typeof o === 'string' ? o : o.value) === (obj[f.key] ?? ''))}<option value="">—</option>{/if}
       {#each f.options as o}<option value={typeof o === 'string' ? o : o.value}>{typeof o === 'string' ? o : o.label}</option>{/each}
     </select>
   {:else if f.type === 'number'}

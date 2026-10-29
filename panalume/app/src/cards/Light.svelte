@@ -11,6 +11,7 @@
       { key: 'entity', label: 'Light', type: 'entity', domain: 'light' },
       { key: 'name', label: 'Name', type: 'text' },
       { key: 'icon', label: 'Icon', type: 'icon' },
+      { key: 'simple_off', label: 'Simple when off', type: 'bool', hint: "When the light's off the card shows just its name and icon (tap to turn it on); the rest appears once it's on." },
       { key: 'colours', label: 'Colour buttons (pick up to 6, or type colours)', type: 'swatches', section: 'colours', placeholder: '#ff4d4d, #ffc861, #5bd88f, #4fb4ff, #b48cff' },
     ],
   };
@@ -27,7 +28,9 @@
   import { name, entityIcon, lightColor, toggle } from '../lib/entity.js';
   import { callService, states } from '../lib/ha.svelte.js';
   let { props, h = 170 } = $props();
-  const show = (k) => !props.hide?.[k];
+  // "Simple when off": these parts only show while the light is on.
+  const OFF_HIDE = new Set(['brightness', 'temp', 'colours', 'state', 'members']);
+  const show = (k) => !props.hide?.[k] && !(props.simple_off && !on && OFF_HIDE.has(k));
   const e = $derived(ent(props.entity));
   const a = $derived(e?.attributes || {});
   const on = $derived(e?.state === 'on');
@@ -51,7 +54,7 @@
   const compact = $derived(h < 150);
 </script>
 
-<div class="light" class:on class:compact style="--lc:{color}">
+<div class="light" class:simple={props.simple_off && !on} class:on class:compact style="--lc:{color}">
   {#if show('glow')}<div class="glow" style="opacity:{on ? 0.25 + (pct / 100) * 0.75 : 0}"></div>{/if}
   <div class="top">
     <button class="ic" data-stop onclick={() => e && toggle(e)} aria-label="Toggle">
@@ -95,6 +98,7 @@
 
 <style>
   .light { position: relative; height: 100%; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; isolation: isolate; }
+  .simple { justify-content: center; }
   .glow { position: absolute; inset: calc(var(--pad) * -1); z-index: -1; pointer-events: none; transition: opacity .5s, background .5s;
     background: radial-gradient(90% 120% at 12% 10%, color-mix(in srgb, var(--lc) 45%, transparent), transparent 65%); }
   .top { display: flex; align-items: center; gap: 12px; min-width: 0; }

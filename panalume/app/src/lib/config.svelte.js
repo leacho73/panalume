@@ -309,11 +309,12 @@ export function selectedCard() {
   return p ? app.config.cards[p.card] : null;
 }
 
-// New cards go on every stored layout (at the bottom), so they show on all devices.
+// New cards go on every stored layout (at the bottom), so they show on all devices,
+// unless the Layout tab says "only the layout you're editing".
 function placeEverywhere(cardId, zone, size) {
   ensureEditable();
   const here = layout();
-  for (const l of new Set([here, ...storedLayouts()])) {
+  for (const l of app.config.new_cards === 'this' ? [here] : new Set([here, ...storedLayouts()])) {
     const z = zone === 'sidebar' && !l.sidebar.enabled ? app.view : zone;
     const list = zoneList(z, l);
     const y = list.reduce((m, p) => Math.max(m, p.y + p.h), 0) + GRID * 2;
@@ -433,6 +434,41 @@ export function duplicateSelected() {
 
 /** Copy the selected card(s) to another view, on every layout they're on:
  *  at the same spot if it's free there, otherwise below what's already there. */
+/** Devices with their own stored layout, other than the one being edited (for "Copy to layout"). */
+export function otherLayouts() {
+  const here = editTarget();
+  return Object.keys(app.config.layouts).filter((d) => d !== here && (d === 'tablet' || app.config.layouts[d].mode === 'custom'));
+}
+
+/** Put the selected card(s) on another device's layout too, in the same view, in about the
+ * same place (scaled to that layout's width), or below its cards if that spot is taken. */
+export function copyToLayout(dev) {
+  const zone = app.selected?.zone;
+  const dst = app.config.layouts[dev];
+  if (!zone || !dst) return;
+  const src = zoneList(zone);
+  const list = zoneList(zone, dst);
+  const ps = selectionSet().map((i) => src[i]).filter((p) => !list.some((q) => q.card === p.card));
+  if (!ps.length) return toast(`Already on the ${DEVICES[dev].label.toLowerCase()} layout`);
+  const k = zoneWidth(zone, dst) / (zoneWidth(zone) || 1);
+  const W = zoneWidth(zone, dst);
+  const copies = ps.map((p) => {
+    const w = Math.min(Math.max(GRID * 4, Math.round((p.w * k) / GRID) * GRID), W - GRID * 4);
+    return { ...$state.snapshot(p), x: Math.max(GRID * 2, Math.min(Math.round((p.x * k) / GRID) * GRID, W - w - GRID * 2)), w };
+  });
+  const group = ps.length > 1 ? uid() : null;
+  for (const q of copies) { if (group) q.group = group; else delete q.group; }
+  const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  if (copies.some((q) => list.some((r) => hit(q, r)))) {
+    const x0 = Math.min(...copies.map((q) => q.x)), y0 = Math.min(...copies.map((q) => q.y));
+    const bottom = list.reduce((m, r) => Math.max(m, r.y + r.h), 0);
+    for (const q of copies) { q.x = q.x - x0 + GRID * 2; q.y = q.y - y0 + bottom + GRID * 2; }
+  }
+  list.push(...copies);
+  changed();
+  toast(`Copied ${copies.length > 1 ? copies.length + ' cards' : 'the card'} to the ${DEVICES[dev].label.toLowerCase()} layout`);
+}
+
 export function copyToView(view) {
   ensureEditable();
   const zone = app.selected?.zone;

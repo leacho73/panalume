@@ -5,7 +5,7 @@
   import { cards, categories } from '../lib/registry.js';
   import {
     app, layout, DEVICES, DEFAULT_THEME, changed, addCard, selectedCard, selectedPlacement, removeSelected,
-    duplicateSelected, copyToView, copyLayout, importConfig, selectionSet, groupSelected, ungroupSelected, ensureEditable, setMode, MODES, DISPLAYS, zoneList, addView, removeView, setView, isPlacedAnywhere, placeExisting, zoneWidth, setMainWidth, screenHome, setScreenHome, screenDevice, setScreenDevice, groupCloses, setGroupCloses, setSidebarSide, addFilledView, changeType,
+    duplicateSelected, copyToView, copyLayout, importConfig, selectionSet, groupSelected, ungroupSelected, ensureEditable, setMode, MODES, DISPLAYS, zoneList, addView, removeView, setView, isPlacedAnywhere, placeExisting, zoneWidth, setMainWidth, screenHome, setScreenHome, screenDevice, setScreenDevice, groupCloses, setGroupCloses, setSidebarSide, addFilledView, changeType, otherLayouts, copyToLayout,
   } from '../lib/config.svelte.js';
   import { areas, areaCards } from '../lib/area.js';
   // Settings kept on this screen only (not in the shared layout).
@@ -263,7 +263,8 @@
         <p class="hint">Drag any selected card to move them all. Shift/Ctrl-click to add or remove cards; drag a box on empty space to select.</p>
         <div class="row danger">
           <select class="sm" value="" onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ''; if (v) copyToView(v); }} title="Copy to another view"><option value="">Copy to view…</option>{#each app.config.views as v (v.id)}<option value={v.id}>{v.name}{v.id === app.view ? ' (this view)' : ''}</option>{/each}</select>
-          <button class="sm" onclick={() => removeSelected(false)}><Icon icon="mdi:eye-off-outline" size="1em" /> Unplace</button>
+          {#if otherLayouts().length}<select class="sm" value="" onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ''; if (v) copyToLayout(v); }} title="Put it on another device's layout too"><option value="">Copy to layout…</option>{#each otherLayouts() as d (d)}<option value={d}>{DEVICES[d].label}</option>{/each}</select>{/if}
+          <button class="sm" onclick={() => removeSelected(false)} title="Takes them off this device's layout only. They stay on other layouts and in pop-ups."><Icon icon="mdi:eye-off-outline" size="1em" /> Remove from this layout</button>
           <button class="sm red" onclick={() => confirm(`Delete ${multiCount} cards from every layout?`) && removeSelected(true)}><Icon icon="mdi:delete-outline" size="1em" /> Delete</button>
         </div>
       {:else if !card}
@@ -347,7 +348,8 @@
         <div class="row danger">
           <button class="sm" onclick={duplicateSelected}><Icon icon="mdi:content-copy" size="1em" /> Duplicate</button>
           <select class="sm" value="" onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ''; if (v) copyToView(v); }} title="Copy to another view"><option value="">Copy to view…</option>{#each app.config.views as v (v.id)}<option value={v.id}>{v.name}{v.id === app.view ? ' (this view)' : ''}</option>{/each}</select>
-          <button class="sm" onclick={() => removeSelected(false)} title="Remove from this layout (keeps the card for pop-ups / other devices)"><Icon icon="mdi:eye-off-outline" size="1em" /> Unplace{multiCount > 1 ? ' group' : ''}</button>
+          {#if otherLayouts().length}<select class="sm" value="" onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ''; if (v) copyToLayout(v); }} title="Put it on another device's layout too"><option value="">Copy to layout…</option>{#each otherLayouts() as d (d)}<option value={d}>{DEVICES[d].label}</option>{/each}</select>{/if}
+          <button class="sm" onclick={() => removeSelected(false)} title="Takes it off this device's layout only. It stays on other layouts and in pop-ups."><Icon icon="mdi:eye-off-outline" size="1em" /> Remove from this layout</button>
           <button class="sm red" onclick={() => (multiCount < 2 || confirm(`Delete all ${multiCount} cards in this group?`)) && removeSelected(true)}><Icon icon="mdi:delete-outline" size="1em" /> Delete{multiCount > 1 ? ` group (${multiCount})` : ''}</button>
         </div>
       {/if}
@@ -378,6 +380,7 @@
       {#if app.device === 'tablet' || app.config.layouts[app.device].mode === 'custom'}
         <div class="fields">
           <Field obj={layout()} f={{ key: 'width', label: 'Design width (px) — scaled to fit the screen', type: 'number' }} onset={(v) => setMainWidth((l) => (l.width = v))} />
+          <Field obj={app.config} f={{ key: 'new_cards', label: 'New cards go on', type: 'select', options: [{ value: '', label: 'Every layout (tablet, phone and desktop)' }, { value: 'this', label: 'Only the layout you\'re editing' }], hint: 'With "only this layout", use Copy to layout… on a card to put it on another device too.' }} />
         </div>
         <h4>Sidebar</h4>
         <div class="fields">
