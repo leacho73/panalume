@@ -775,8 +775,7 @@
 
   /* Hide the hairline gaps some screens show between map tiles. */
   .map-wrap :global(img.leaflet-tile) {
-    width: 256.5px !important;
-    height: 256.5px !important;
+    outline: 1px solid transparent;
   }
 
   :global(.leaflet-tooltip.pnl-map-label) {
