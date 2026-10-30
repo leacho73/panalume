@@ -53,7 +53,7 @@
           { value: 'grayscale', label: 'Grayscale' },
         ],
       },
-      { key: 'tile_url', label: 'Map tile URL', type: 'text' },
+      { key: 'tile_url', label: 'Map tile URL', type: 'text', hint: 'The map pictures load from the internet (OpenStreetMap by default), so the map server sees which area you are looking at.' },
       { key: 'tile_attribution', label: 'Map tile attribution', type: 'text' },
     ],
 
@@ -155,9 +155,22 @@
     })
   );
 
-  const located = $derived(
-    entities.filter((e) => e.hasLocation)
-  );
+  // People in the same place (everyone at home, or within a few metres) sit side by
+  // side rather than on top of each other, with one label for the group.
+  const spot = (e) => (e.home ? 'home' : `${e.lat.toFixed(4)},${e.lon.toFixed(4)}`);
+  const located = $derived.by(() => {
+    const list = entities.filter((e) => e.hasLocation);
+    const groups = new Map();
+    for (const e of list) {
+      if (!groups.has(spot(e))) groups.set(spot(e), []);
+      groups.get(spot(e)).push(e);
+    }
+    return list.map((e) => {
+      const g = groups.get(spot(e));
+      const i = g.indexOf(e);
+      return { ...e, dx: Math.round((i - (g.length - 1) / 2) * 40), lead: i === 0, group: g.length > 1 ? g.map((x) => x.name).join(', ') : '' };
+    });
+  });
 
   const withoutLocation = $derived(
     entities.filter((e) => !e.hasLocation)
@@ -214,7 +227,7 @@
       html: root,
       className: 'pnl-map-div-icon',
       iconSize: [48, 48],
-      iconAnchor: [24, 24],
+      iconAnchor: [24 - (item.dx || 0), 24],
     });
   }
 
@@ -232,9 +245,9 @@
 
     label.textContent =
       showName && showStatus
-        ? `${item.name} · ${item.status}`
+        ? `${item.group || item.name} · ${item.status}`
         : showName
-          ? item.name
+          ? item.group || item.name
           : showStatus
             ? item.status
             : '';
@@ -393,8 +406,8 @@
       // Name and status labels.
 
       if (
-        props.show_names !== false ||
-        props.show_status !== false
+        (props.show_names !== false ||
+        props.show_status !== false) && item.lead
       ) {
         if (marker.getTooltip()) {
           marker.setTooltipContent(makeTooltip(item));
@@ -759,6 +772,12 @@
   /* --------------------------------------------------
      TOOLTIPS
   -------------------------------------------------- */
+
+  /* Hide the hairline gaps some screens show between map tiles. */
+  .map-wrap :global(img.leaflet-tile) {
+    width: 256.5px !important;
+    height: 256.5px !important;
+  }
 
   :global(.leaflet-tooltip.pnl-map-label) {
     padding: 4px 7px;
