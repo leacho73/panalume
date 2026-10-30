@@ -12,6 +12,8 @@
       { key: 'wrap', label: 'Wrap long names onto two lines', type: 'bool' },
       { key: 'layout', label: 'Layout', type: 'select', options: ['vertical', 'horizontal', 'icon'] },
       { key: 'active', label: 'Active (template, overrides)', type: 'text' },
+      { key: 'power', label: 'Power sensor (optional, for smart plugs)', type: 'entity', domain: 'sensor' },
+      { key: 'active_above', label: 'Active only above (W)', type: 'number', hint: 'With a power sensor: the button only lights up (and says Running) above this, so a plug\'s own draw or a machine on standby doesn\'t count. E.g. 5.' },
       { key: 'active_color', label: 'Active colour', type: 'color' },
       { key: 'icon_color', label: 'Icon colour (always, template ok)', type: 'color' },
       { key: 'badge', label: 'Corner badge (optional, another entity, e.g. a battery)', type: 'entity', hint: 'Shown in the top-right corner: a ring for percentages, otherwise its value.' },
@@ -27,7 +29,12 @@
   let { props } = $props();
   const e = $derived(ent(props.entity));
   const v = $derived({ entity_id: props.entity });
-  const on = $derived(props.active ? truthy(t(props.active, v)) : isActive(e));
+  // Smart plugs: with a power sensor and "Active only above", it's only active above that
+  // power (the plug on with the machine idle stays dim, and its state says Idle).
+  const watts = $derived(Number(ent(props.power)?.state));
+  const minW = $derived(props.power ? Number(props.active_above) || 0 : 0);
+  const idle = $derived(!!minW && (!e || isActive(e)) && !(watts > minW));
+  const on = $derived(props.active ? truthy(t(props.active, v)) : minW ? (!e || isActive(e)) && watts > minW : isActive(e));
   const iconColor = $derived(String(t(props.icon_color, v) || '').trim());
   const color = $derived(iconColor || t(props.active_color, v) || lightColor(e) || 'var(--on)');
 
@@ -55,7 +62,7 @@
   {#if props.layout !== 'icon'}
     <div class="txt">
       <div class="name">{String(t(props.name, v) || '').trim() || name(e)}</div>
-      {#if props.show_state !== false}<div class="state">{String(t(props.state, v) || '').trim() || stateText(e)}</div>{/if}
+      {#if props.show_state !== false}<div class="state">{String(t(props.state, v) || '').trim() || (minW && !props.active ? (on ? 'Running' : idle ? 'Idle' : stateText(e)) : stateText(e))}</div>{/if}
     </div>
   {/if}
 </div>

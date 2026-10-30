@@ -20,6 +20,7 @@
       { key: 'entity', label: 'Hue room / zone light', type: 'entity', domain: 'light' },
       { key: 'name', label: 'Name', type: 'text' },
       { key: 'icon', label: 'Icon', type: 'icon' },
+      { key: 'simple_off', label: 'Simple when off', type: 'bool', hint: "When the light's off the card shows just its name, icon and scenes (tap to turn it on); the rest appears once it's on." },
       { key: 'dynamic', label: 'Play dynamic scenes animated', type: 'bool' },
       { key: 'sceneList', label: 'Scenes to show, in this order (leave empty to show all of the room\'s scenes)', type: 'entities', domain: 'scene', section: 'scenes' },
       { key: 'group', label: 'Hue room / zone name for the scenes (blank = the light\'s own name)', type: 'text', section: 'scenes' },
@@ -40,7 +41,9 @@
   import { name, entityIcon, lightColor, toggle } from '../lib/entity.js';
   import { callService, states } from '../lib/ha.svelte.js';
   let { props, h = 170 } = $props();
-  const show = (k) => !props.hide?.[k];
+  // "Simple when off": these parts only show while the light is on.
+  const OFF_HIDE = new Set(['brightness', 'temp', 'state', 'members']);
+  const show = (k) => !props.hide?.[k] && !(props.simple_off && !on && OFF_HIDE.has(k));
   const e = $derived(ent(props.entity));
   const a = $derived(e?.attributes || {});
   const on = $derived(e?.state === 'on');
@@ -127,7 +130,7 @@
   }
 </script>
 
-<div class="light" class:on class:compact style="--lc:{color}">
+<div class="light" class:simple={props.simple_off && !on} class:on class:compact style="--lc:{color}">
   {#if show('glow')}<div class="glow" style="opacity:{on ? 0.25 + (pct / 100) * 0.75 : 0}"></div>{/if}
   <div class="top">
     <button class="ic" data-stop onclick={() => e && toggle(e)} aria-label="Toggle">
@@ -178,6 +181,7 @@
 
 <style>
   .light { position: relative; height: 100%; width: 100%; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; isolation: isolate; }
+  .simple { justify-content: center; }
   .glow { position: absolute; inset: calc(var(--pad) * -1); z-index: -1; pointer-events: none; transition: opacity .5s, background .5s;
     background: radial-gradient(90% 120% at 12% 10%, color-mix(in srgb, var(--lc) 45%, transparent), transparent 65%); }
   .top { display: flex; align-items: center; gap: 12px; min-width: 0; }
