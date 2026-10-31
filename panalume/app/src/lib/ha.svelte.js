@@ -5,7 +5,7 @@ import { SvelteMap } from 'svelte/reactivity';
 
 export const states = new SvelteMap();
 export const templates = new SvelteMap();
-export const conn = $state({ connected: false, haVersion: '' });
+export const conn = $state({ connected: false, haVersion: '', problem: '' });
 
 let ws;
 let nextId = 1;
@@ -36,8 +36,11 @@ function connect() {
 }
 
 function handle(msg) {
+  // Why it can't connect (wrong token, Home Assistant unreachable), for the banner.
+  if (msg.type === 'auth_invalid' || msg.type === 'unreachable') return void (conn.problem = msg.message || 'Home Assistant refused the connection');
   if (msg.type === 'auth_ok') {
     conn.connected = true;
+    conn.problem = '';
     conn.haVersion = msg.ha_version;
     backoff = 500;
     for (const s of subs.values()) startSub(s);

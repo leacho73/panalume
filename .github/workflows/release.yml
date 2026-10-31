@@ -2,6 +2,8 @@
 # version (panalume/config.yaml) is one that hasn't been released yet, tags it
 # and publishes a GitHub release with that version's CHANGELOG section.
 # Home Assistant itself updates from config.yaml; releases are the human record.
+# Each release also publishes the standalone Docker image (docker/Dockerfile) to
+# ghcr.io/<owner>/panalume, for Home Assistant installs without the app store.
 name: Build and release
 
 on:
@@ -11,6 +13,7 @@ on:
 
 permissions:
   contents: write
+  packages: write
 
 jobs:
   build:
@@ -26,6 +29,32 @@ jobs:
         working-directory: panalume/app
       - run: npm run build
         working-directory: panalume/app
+      # Check the standalone Docker image still builds for every platform it's
+      # published for (not published here), then start it and check it serves
+      # the dashboard and explains a missing token.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: false
+          cache-to: type=gha,mode=max
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          load: true
+          tags: panalume:test
+          cache-from: type=gha
+      - name: Start the image
+        run: |
+          docker run -d --name pan -p 8099:8099 panalume:test
+          for i in $(seq 1 20); do curl -fs -o /dev/null http://localhost:8099/ && break; sleep 1; done
+          curl -fs http://localhost:8099/ | grep -qi '<script'
+          docker logs pan 2>&1 | tee /dev/stderr | grep -q 'No Home Assistant token'
+          docker rm -f pan
 
   release:
     needs: build
@@ -34,12 +63,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Release the version in config.yaml if it's new
+        id: rel
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           V=$(sed -n 's/^version: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' panalume/config.yaml)
           if [ -z "$V" ]; then echo "No version found"; exit 1; fi
           if gh release view "v$V" >/dev/null 2>&1; then echo "v$V is already released"; exit 0; fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
           # This version's section of the changelog, without its heading.
           awk -v v="## $V" '$0 == v { f = 1; next } /^## / && f { exit } f' panalume/CHANGELOG.md > notes.md
           if [ ! -s notes.md ]; then echo "- See CHANGELOG.md" > notes.md; fi
@@ -47,3 +78,24 @@ jobs:
           # Until 1.0, every release is a beta (pre-release).
           case "$V" in 0.*) PRE=--prerelease; TITLE="Panalume $V (beta)" ;; *) PRE=--latest; TITLE="Panalume $V" ;; esac
           gh release create "v$V" --target "$GITHUB_SHA" --title "$TITLE" --notes-file notes.md $PRE
+      # Publish the standalone image for the new release: amd64 and 64-bit / 32-bit ARM.
+      - if: steps.rel.outputs.version
+        uses: docker/setup-qemu-action@v3
+      - if: steps.rel.outputs.version
+        uses: docker/setup-buildx-action@v3
+      - if: steps.rel.outputs.version
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - if: steps.rel.outputs.version
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/panalume:${{ steps.rel.outputs.version }}
+            ghcr.io/${{ github.repository_owner }}/panalume:latest
