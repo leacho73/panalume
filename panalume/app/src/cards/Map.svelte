@@ -157,20 +157,9 @@
 
   // People in the same place (everyone at home, or within a few metres) sit side by
   // side rather than on top of each other, with one label for the group.
-  const spot = (e) => (e.home ? 'home' : `${e.lat.toFixed(4)},${e.lon.toFixed(4)}`);
-  const located = $derived.by(() => {
-    const list = entities.filter((e) => e.hasLocation);
-    const groups = new Map();
-    for (const e of list) {
-      if (!groups.has(spot(e))) groups.set(spot(e), []);
-      groups.get(spot(e)).push(e);
-    }
-    return list.map((e) => {
-      const g = groups.get(spot(e));
-      const i = g.indexOf(e);
-      return { ...e, dx: Math.round((i - (g.length - 1) / 2) * 40), lead: i === 0, group: g.length > 1 ? g.map((x) => x.name).join(', ') : '' };
-    });
-  });
+  const located = $derived(
+    entities.filter((e) => e.hasLocation)
+  );
 
   const withoutLocation = $derived(
     entities.filter((e) => !e.hasLocation)
@@ -231,6 +220,20 @@
     });
   }
 
+  function makeClusterIcon(count) {
+    const root = document.createElement('div');
+
+    root.className = 'pnl-map-cluster';
+    root.textContent = String(count);
+
+    return leaflet.divIcon({
+      html: root,
+      className: 'pnl-map-div-icon',
+      iconSize: [48, 48],
+      iconAnchor: [24, 24],
+    });
+  }
+
   // --------------------------------------------------
   // MARKER TOOLTIP
   // --------------------------------------------------
@@ -253,6 +256,159 @@
             : '';
 
     return label;
+  }
+
+  function updateMarkers(items) {
+    if (!map || !leaflet) return;
+
+    const points = items.map((item) => ({
+      item,
+      point: map.latLngToContainerPoint([item.lat, item.lon]),
+    }));
+
+    // Find connected groups of overlapping markers.
+    const parents = points.map((_, i) => i);
+
+    function find(i) {
+      if (parents[i] !== i) {
+        parents[i] = find(parents[i]);
+      }
+
+      return parents[i];
+    }
+
+    function join(a, b) {
+      const rootA = find(a);
+      const rootB = find(b);
+
+      if (rootA !== rootB) {
+        parents[rootB] = rootA;
+      }
+    }
+
+    // Marker circles are approximately 50px across.
+    const overlapDistance = 50;
+
+    for (let i = 0; i < points.length; i++) {
+      for (let j = i + 1; j < points.length; j++) {
+        const dx = points[i].point.x - points[j].point.x;
+        const dy = points[i].point.y - points[j].point.y;
+
+        if (Math.hypot(dx, dy) < overlapDistance) {
+          join(i, j);
+        }
+      }
+    }
+
+    // Build the resulting clusters.
+    const grouped = new Map();
+
+    points.forEach((entry, i) => {
+      const root = find(i);
+
+      if (!grouped.has(root)) {
+        grouped.set(root, []);
+      }
+
+      grouped.get(root).push(entry);
+    });
+
+    const clusters = [...grouped.values()].map((group) => {
+      const x =
+        group.reduce((sum, entry) => sum + entry.point.x, 0) /
+        group.length;
+
+      const y =
+        group.reduce((sum, entry) => sum + entry.point.y, 0) /
+        group.length;
+
+      const centre = map.containerPointToLatLng([x, y]);
+
+      return {
+        items: group.map((entry) => entry.item),
+        position: [centre.lat, centre.lng],
+      };
+    });
+
+    const activeKeys = new Set();
+
+    // Render one marker per cluster.
+    for (const cluster of clusters) {
+      const members = cluster.items;
+      const first = members[0];
+      const isCluster = members.length > 1;
+
+      const key = members
+        .map((item) => item.id)
+        .sort()
+        .join('|');
+
+      activeKeys.add(key);
+
+      const names = members.map((item) => item.name).join(', ');
+
+      const displayItem = isCluster
+        ? {
+            ...first,
+            name: names,
+            group: names,
+            status: `${members.length} together`,
+          }
+        : first;
+
+      const icon = isCluster
+        ? makeClusterIcon(members.length)
+        : makeMarkerIcon(first);
+
+      let marker = markers.get(key);
+
+      if (!marker) {
+        marker = leaflet.marker(cluster.position, {
+          icon,
+          keyboard: true,
+          title: names,
+        }).addTo(map);
+
+        marker.on('click', () => {
+          app.popup = { entity: first.id };
+        });
+
+        markers.set(key, marker);
+      } else {
+        marker.setLatLng(cluster.position);
+        marker.setIcon(icon);
+        marker.options.title = names;
+      }
+
+      if (
+        props.show_names !== false ||
+        props.show_status !== false
+      ) {
+        const tooltip = makeTooltip(displayItem);
+
+        if (marker.getTooltip()) {
+          marker.setTooltipContent(tooltip);
+        } else {
+          marker.bindTooltip(tooltip, {
+            permanent: true,
+            direction: 'bottom',
+            offset: [0, 22],
+            opacity: 1,
+            className: 'pnl-map-label',
+          });
+        }
+      } else if (marker.getTooltip()) {
+        marker.unbindTooltip();
+      }
+    }
+
+    // Remove markers which are no longer required.
+    for (const [key, marker] of markers) {
+      if (!activeKeys.has(key)) {
+        map.removeLayer(marker);
+        markers.delete(key);
+      }
+    }
   }
 
   // --------------------------------------------------
@@ -280,6 +436,10 @@
           doubleClickZoom: true,
           attributionControl: true,
         }).setView([20, 0], 2);
+
+        map.on('zoomend', () => {
+          updateMarkers(located);
+        });
 
         leaflet.control.zoom({ position: 'topright' }).addTo(map);
 
@@ -374,67 +534,7 @@
 
     const activeIds = new Set();
 
-    for (const item of items) {
-      activeIds.add(item.id);
-
-      let marker = markers.get(item.id);
-
-      if (!marker) {
-        marker = leaflet.marker(
-          [item.lat, item.lon],
-          {
-            icon: makeMarkerIcon(item),
-            keyboard: true,
-            title: item.name,
-          }
-        ).addTo(map);
-
-        marker.on('click', () => {
-          app.popup = { entity: item.id };
-        });
-
-        markers.set(item.id, marker);
-
-      } else {
-        marker.setLatLng([item.lat, item.lon]);
-
-        marker.setIcon(makeMarkerIcon(item));
-
-        marker.options.title = item.name;
-      }
-
-      // Name and status labels.
-
-      if (
-        (props.show_names !== false ||
-        props.show_status !== false) && item.lead
-      ) {
-        if (marker.getTooltip()) {
-          marker.setTooltipContent(makeTooltip(item));
-        } else {
-          marker.bindTooltip(makeTooltip(item), {
-            permanent: true,
-            direction: 'bottom',
-            offset: [0, 22],
-            opacity: 1,
-            className: 'pnl-map-label',
-          });
-        }
-
-      } else if (marker.getTooltip()) {
-        marker.unbindTooltip();
-      }
-    }
-
-    // Remove markers for entities no longer selected
-    // or entities that no longer have GPS coordinates.
-
-    for (const [id, marker] of markers) {
-      if (!activeIds.has(id)) {
-        map.removeLayer(marker);
-        markers.delete(id);
-      }
-    }
+    updateMarkers(items);
 
     // Draw Home Assistant's home-zone radius.
 
@@ -767,6 +867,24 @@
     width: 100%;
     height: 100%;
     object-fit: cover;
+  }
+
+  :global(.pnl-map-cluster) {
+    width: 44px;
+    height: 44px;
+    display: grid;
+    place-items: center;
+
+    border: 3px solid rgba(255,255,255,.85);
+    border-radius: 50%;
+
+    background: rgba(35, 48, 68, .95);
+    color: #fff;
+
+    font-size: 17px;
+    font-weight: 750;
+
+    box-shadow: 0 2px 10px rgba(0,0,0,.5);
   }
 
   /* --------------------------------------------------
