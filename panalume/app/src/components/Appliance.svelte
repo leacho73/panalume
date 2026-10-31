@@ -17,23 +17,40 @@
   const raw = $derived(String(se?.state ?? '').toLowerCase());
   const phaseRaw = $derived(String(ent(props.phase)?.state ?? '').toLowerCase());
   const paused = $derived(raw === 'pause' || raw === 'paused' || ent(props.paused)?.state === 'on' && raw !== 'off');
-  const delayed = $derived(/delay/.test(raw) || phaseRaw === 'delay_wash');
+  const delayed = $derived(/delay|reserved/.test(raw) || phaseRaw === 'delay_wash');
   const finished = $derived(/finish|end|done|complete/.test(raw) || phaseRaw === 'finish');
-  const error = $derived(/error|fault|actionrequired/.test(raw));
+  const error = $derived(/error|fault|actionrequired|power_fail/.test(raw));
   // A smart plug's own draw (or a machine left on) isn't running: with "Running only above",
   // the power has to be over it too, and with no status entity the power alone decides.
   const watts = $derived(Number(ent(props.power)?.state));
   const minW = $derived(Number(props.running_above) || 0);
   const overMin = $derived(!minW || !Number.isFinite(watts) || watts > minW);
-  const running = $derived(!paused && !finished && !error && !delayed && (se ? /^(on|run|running|active|true|wash|rinse|spin|drying|dry|cooling|aborting)$/.test(raw) && overMin : !!minW && Number.isFinite(watts) && watts > minW));
+  const running = $derived(!paused && !finished && !error && !delayed && (se ? /^(on|run|running|active|true|wash|rinsing|rinse|spin|drying|night_dry|dry|cooling|aborting)$/.test(raw) && overMin : !!minW && Number.isFinite(watts) && watts > minW));
   const active = $derived(running || paused || delayed);
 
   const ms = (v) => (v == null ? NaN : typeof v === 'number' ? v * 1000 : Date.parse(v));
+  // Time left arrives two ways: some integrations report minutes, others report the
+  // clock time the programme ends (LG ThinQ's remaining time, Home Connect's finish
+  // time). Both fill the same row.
+  const remState = $derived(ent(props.remaining)?.state);
+  const remIsClock = $derived(
+    /^\d{4}-\d\d-\d\d/.test(String(remState ?? '')) || ent(props.remaining)?.attributes?.device_class === 'timestamp',
+  );
+  const remMin = $derived.by(() => {
+    if (!active || remIsClock) return NaN;
+    const v = Number(remState);
+    return Number.isFinite(v) && v > 0 ? v : NaN;
+  });
   const finishAt = $derived.by(() => {
-    const rem = Number(ent(props.remaining)?.state);
-    if (active && Number.isFinite(rem) && rem > 0) return now + rem * 60e3;
-    const f = ms(ent(props.finish)?.state);
+    if (Number.isFinite(remMin)) return now + remMin * 60e3;
+    const f = ms(remIsClock ? remState : ent(props.finish)?.state);
     return Number.isFinite(f) ? f : NaN;
+  });
+  const totalMin = $derived(Number(ent(props.total)?.state));
+  const totalText = $derived.by(() => {
+    if (!Number.isFinite(totalMin) || totalMin <= 0) return '';
+    const m = Math.round(totalMin);
+    return m >= 60 ? `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m` : `${m} min`;
   });
   const startedAt = $derived(ms(se?.last_changed));
   const progress = $derived.by(() => {
@@ -57,8 +74,11 @@
     if (!s || /^(unknown|unavailable|none|no program)$/i.test(s)) return '';
     return s.replace(/^.*program(me)?_/i, '').replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
   });
-  const status = $derived(error ? 'Needs attention' : paused ? 'Paused' : delayed ? 'Delayed start' : running ? (phase || 'Running') : finished ? 'Finished' : /ready/.test(raw) ? 'Ready' : raw === 'off' || raw === 'inactive' || raw === 'stop' ? 'Off' : se || minW ? 'Idle' : '—');
+  const status = $derived(error ? 'Needs attention' : paused ? 'Paused' : delayed ? 'Delayed start' : running ? (phase || 'Running') : finished ? 'Finished' : /ready/.test(raw) ? 'Ready' : /^(power_off|off|inactive|stop|standby)$/.test(raw) ? 'Off' : se || minW ? 'Idle' : '—');
 
+  // A short card keeps only the consumable that is running out, without the bars;
+  // the full salt and rinse aid row needs the height.
+  const compact = $derived(h < 175);
   const devName = $derived(t(props.name) || K.name);
   const label = (id) => {
     const f = ent(id)?.attributes.friendly_name || id;
@@ -74,8 +94,34 @@
   };
   const isOn = (s) => /^(on|true|present|confirmed|open|detected|problem|low)$/i.test(String(s ?? ''));
   const doorOpen = $derived(/^(on|open)$/i.test(String(ent(props.door)?.state ?? '')));
+  // The dishwasher's indicator light says the load inside is clean, which lasts
+  // longer than the cycle and is the reason to look at the card.
+  const clean = $derived(/^(on|true)$/i.test(String(ent(props.clean)?.state ?? '')));
+  // Salt and rinse aid turn up as a level (rinselevel_0 … 4), a percentage, or a
+  // "needs filling" switch. One bar reads all three.
+  const levelPct = (id) => {
+    const e = ent(id);
+    const s = String(e?.state ?? '').toLowerCase();
+    if (!e || !s || /^(unknown|unavailable|none)$/.test(s)) return null;
+    const lvl = s.match(/^(?:rinse|salt)?_?level_?(\d)$/) || s.match(/^(\d)$/);
+    // An enum level of 0 is "no reading" rather than "empty"; those integrations
+    // carry a refill switch for empty, which shows up in the alerts row.
+    if (lvl) return Number(lvl[1]) ? Math.min(100, (Number(lvl[1]) / 4) * 100) : null;
+    if (/^(on|true|low|empty|needs)/.test(s)) return 0;
+    if (/^(off|false|full|ok)$/.test(s)) return 100;
+    const n = Number(s);
+    return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : null;
+  };
+  const levels = $derived(
+    [
+      { name: 'Salt', pct: props.salt ? levelPct(props.salt) : null },
+      { name: 'Rinse aid', pct: props.rinse ? levelPct(props.rinse) : null },
+    ].filter((l) => l.pct != null),
+  );
+  // The dishwasher shows its door all the time (open, closed); the washer and dryer
+  // keep theirs as a warning while a cycle is on, as before.
   const alerts = $derived([
-    ...(active && doorOpen ? [['Door open', 'mdi:door-open']] : []),
+    ...(kind !== 'dishwasher' && active && doorOpen ? [['Door open', 'mdi:door-open']] : []),
     ...(props.alerts || []).filter((id) => isOn(ent(id)?.state)).map((id) => [label(id).replace(/\s*nearly empty$/i, ' low'), 'mdi:alert-circle-outline']),
   ]);
   const leaking = $derived(ent(props.leak)?.state === 'on');
@@ -109,7 +155,9 @@
   // Ring
   const R = 46, C = 2 * Math.PI * R;
   const uid = Math.random().toString(36).slice(2, 8);
-  const size = $derived(Math.max(80, Math.min(h - 40, w * 0.4, 170)));
+  // The picture gives up a little width on a narrow card so the device name and the
+  // status chip beside it keep their room.
+  const size = $derived(Math.max(80, Math.min(h - 40, w * (w < 430 ? 0.33 : 0.4), 170)));
 </script>
 
 <div class="ap {kind}" class:running class:active style="--k:{K.color}">
@@ -139,14 +187,18 @@
 
   <div class="info">
     <div class="top">
-      <span class="name"><Icon icon={K.icon} size="1.1em" />{devName}</span>
-      <span class="chip" class:on={running} class:warn={paused || delayed} class:bad={error} class:ok={finished}>{status}</span>
+      <span class="name"><Icon icon={K.icon} size="1.1em" /><span class="nm">{devName}</span></span>
+      {#if clean && !active}
+        <span class="chip ok"><Icon icon="mdi:silverware-clean" size="1em" />Clean</span>
+      {:else}
+        <span class="chip" class:on={running} class:warn={paused || delayed} class:bad={error} class:ok={finished}>{status}</span>
+      {/if}
     </div>
     {#if show('program') && (program || (phase && !running))}<div class="prog">{program}{program && phase && !running ? ' · ' : ''}{!running ? phase : ''}</div>{/if}
 
     {#if show('time')}
       {#if left}
-        <div class="left"><b>{left}</b><span>left · done {day(finishAt, now) === 'Today' ? '' : day(finishAt, now) + ' '}{hm(finishAt)}</span></div>
+        <div class="left"><b>{left}</b><span>left{totalText ? ` of ${totalText}` : ''} · done {day(finishAt, now) === 'Today' ? '' : day(finishAt, now) + ' '}{hm(finishAt)}</span></div>
       {:else if finished && Number.isFinite(finishAt)}
         <div class="left dim"><span>Finished {day(finishAt, now) === 'Today' ? '' : day(finishAt, now) + ' '}{hm(finishAt)}</span></div>
       {:else if !active && Number.isFinite(finishAt) && finishAt < now && now - finishAt < 7 * 864e5}
@@ -159,6 +211,18 @@
       <div class="chips">
         {#if show('options')}{#each (props.options || []).filter((id) => optVal(id)) as id}<span><small>{label(id)}</small>{optVal(id)}</span>{/each}{/if}
         {#if show('power') && running && Number.isFinite(watts) && watts > 0}<span><Icon icon="mdi:flash" size="1em" />{watts >= 1000 ? (watts / 1000).toFixed(1) + ' kW' : Math.round(watts) + ' W'}</span>{/if}
+        {#if kind === 'dishwasher' && props.door}<span class="door" class:open={doorOpen}><Icon icon={doorOpen ? 'mdi:door-open' : 'mdi:door-closed'} size="1em" />{doorOpen ? 'Door open' : 'Door closed'}</span>{/if}
+
+      </div>
+    {/if}
+
+    {#if show('consumables') && levels.length && (!compact || levels.some((l) => l.pct <= 25))}
+      <div class="lvls">
+        {#each compact ? levels.filter((l) => l.pct <= 25) : levels as l}
+          <span class="lvl" class:low={l.pct <= 25} title="{Math.round(l.pct)}% left">
+            <small>{l.name}</small>{#if !compact}<i><b style="width:{l.pct}%"></b></i>{/if}<em>{Math.round(l.pct)}%</em>
+          </span>
+        {/each}
       </div>
     {/if}
 
@@ -206,7 +270,10 @@
   .tick { fill: none; stroke: #0b0f16; stroke-width: 3.5; stroke-linecap: round; stroke-linejoin: round; }
   .info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
   .top { display: flex; align-items: center; gap: 8px; }
-  .name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .name { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; font-weight: 600; }
+  /* The device name sits in its own box so a narrow card ellipsises it rather than
+     cutting a letter in half beside the status chip. */
+  .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .name :global(svg) { color: var(--k); flex: none; }
   .chip { flex: none; font-size: .75em; font-weight: 600; padding: 3px 9px; border-radius: 10px; background: rgba(255,255,255,.07); color: var(--muted); }
   .chip.on { background: color-mix(in srgb, var(--k) 20%, transparent); color: var(--k); }
@@ -223,6 +290,15 @@
   .chips, .alerts { display: flex; flex-wrap: wrap; gap: 5px; margin-left: -8px; } /* chip text lines up with the text above */
   .chips span { display: inline-flex; align-items: center; gap: 4px; font-size: .75em; padding: 3px 8px; border-radius: 9px; background: rgba(255,255,255,.06); }
   .chips small { color: var(--muted); font-size: 1em; }
+  .chips .door.open { background: rgba(255,200,97,.16); color: #ffc861; }
+  .lvls { display: flex; flex-wrap: wrap; gap: 10px; margin-left: -8px; }
+  .lvls .lvl { display: inline-flex; align-items: center; gap: 5px; font-size: .75em; }
+  .lvls small { color: var(--muted); }
+  .lvls em { font-style: normal; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .lvls i { display: block; width: 38px; height: 5px; border-radius: 3px; background: rgba(255,255,255,.12); overflow: hidden; }
+  .lvls b { display: block; height: 100%; border-radius: 3px; background: var(--k); transition: width .4s; }
+  .lvls .lvl.low small, .lvls .lvl.low em { color: #ff7a90; }
+  .lvls .lvl.low b { background: #ff7a90; }
   .alerts span { display: inline-flex; align-items: center; gap: 4px; font-size: .75em; font-weight: 600; padding: 3px 8px; border-radius: 9px; background: rgba(255,200,97,.14); color: #ffc861; }
   .alerts .leak { background: rgba(255,90,110,.22); color: #ff7a90; animation: pulse 1.4s infinite; }
   @keyframes pulse { 50% { opacity: .55; } }
