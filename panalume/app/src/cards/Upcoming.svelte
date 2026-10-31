@@ -4,7 +4,7 @@
   export const meta = {
     type: 'upcoming', name: 'Upcoming media', icon: 'mdi:movie-open-star', category: 'Media',
     size: { w: 520, h: 360 }, tap: 'none',
-    defaults: { title: '', entities: [], layout: 'list', days: 30, max: 6, show_source: true, show_rating: true },
+    defaults: { title: '', entities: [], layout: 'list', days: 30, max: 6, show_source: true, show_rating: true, release: true },
     // Sensors from the Upcoming Media integration: their items live in the data attribute.
     autofill: () => ({
       entities: [...states.keys()]
@@ -20,6 +20,7 @@
       { key: 'max', label: 'Most items shown', type: 'number' },
       { key: 'show_source', label: 'Where it comes from (Sonarr / Radarr)', type: 'bool' },
       { key: 'show_rating', label: 'Rating', type: 'bool' },
+      { key: 'release', label: 'How it is released (in cinemas, online, on disc)', type: 'bool', hint: 'Uses the release text the integration publishes: “Available Online”, “In Cinemas”, or the air day and time.' },
     ],
   };
 </script>
@@ -82,6 +83,7 @@
           episode: String(raw.episode || ''),
           number: String(raw.number || ''),
           date: when(raw.airdate, dateOnly),
+          release: String(raw.release || ''),
           poster: String(raw.poster || ''),
           rating: String(raw.rating || ''),
           runtime: Number(raw.runtime) || 0,
@@ -112,6 +114,26 @@
   }
   const timeLabel = (d) => (d && (d.getHours() || d.getMinutes()) ? d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '');
   const whenLabel = (it) => [dayLabel(it.date), timeLabel(it.date)].filter(Boolean).join(' · ');
+  // The integration publishes the release line as a template: "$day, $date" for
+  // a film's release, "$day, $time" for an episode. Fill it in from the air date,
+  // so the card says how it arrives as well as when.
+  function releaseLine(it) {
+    if (!it.release || !it.date) return '';
+    // How it arrives is the words around the placeholders: a film's "Available
+    // Online $day, $date" says something the date does not, an episode's plain
+    // "$day, $time" says nothing, and that keeps the day-and-time label.
+    if (!String(it.release).replace(/\$(day|date|time)\b/g, '').replace(/[^A-Za-z]/g, '')) return '';
+    const day = it.date.toLocaleDateString(undefined, { weekday: 'short' });
+    const date = it.date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+    const time = timeLabel(it.date);
+    return String(it.release)
+      .replace(/\$day\b/g, day)
+      .replace(/\$date\b/g, date)
+      .replace(/\$time\b/g, time)
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  const dateLine = (it) => (props.release !== false ? releaseLine(it) || whenLabel(it) : whenLabel(it));
   const subLabel = (it) => [it.number, it.episode].filter(Boolean).join(' · ');
   const extraLabel = (it) =>
     [it.runtime ? `${it.runtime} min` : '', it.genres.split(',')[0], props.show_rating !== false ? it.rating : '']
@@ -152,7 +174,7 @@
             <div class="t">{it.title}</div>
             {#if subLabel(it)}<div class="s">{subLabel(it)}</div>{/if}
             {#if layout === 'list' || !tight}
-              <div class="d">{whenLabel(it)}{#if layout === 'list' && extraLabel(it)} · {extraLabel(it)}{/if}</div>
+              <div class="d">{dateLine(it)}{#if layout === 'list' && extraLabel(it)} · {extraLabel(it)}{/if}</div>
             {/if}
           </div>
         </a>
@@ -181,6 +203,9 @@
   .posters .txt { position: relative; padding: 26px 9px 8px; background: linear-gradient(180deg, transparent, rgba(6,8,14,.55) 34%, rgba(6,8,14,.92)); }
   .posters .t { font-weight: 600; font-size: .92em; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; text-shadow: 0 1px 2px rgba(0,0,0,.55); }
   .posters .s, .posters .d { color: rgba(255,255,255,.8); font-size: .78em; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* The release line ("Available Online Tue, Nov 17") is longer than a date, so
+     in a poster tile it wraps to a second line instead of losing the point. */
+  .posters .d { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
   .posters .d { opacity: .8; }
 
   /* List: a small poster on the left, one row per item. */
