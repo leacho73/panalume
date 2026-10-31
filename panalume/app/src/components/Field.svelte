@@ -3,6 +3,7 @@
   import EntityPicker from './EntityPicker.svelte';
   import IconPicker from './IconPicker.svelte';
   import MediaFolderPicker from './MediaFolderPicker.svelte';
+  import PeopleEditor from './PeopleEditor.svelte';
   import HaViewPicker from './HaViewPicker.svelte';
   import Icon from './Icon.svelte';
   import { states } from '../lib/ha.svelte.js';
@@ -16,7 +17,7 @@
   const hex = (v) => (/^#[0-9a-f]{6}$/i.test(v || '') ? v : '#7aa2ff');
 </script>
 
-<div class="field" class:wide={f.type === 'textarea' || f.type === 'entities' || f.type === 'cards'}>
+<div class="field" class:wide={f.type === 'textarea' || f.type === 'entities' || f.type === 'cards' || f.type === 'people'}>
   {#if f.type !== 'bool'}<label for={f.key}>{f.label}{#if isTpl(obj[f.key])}<span class="tpl">template</span>{/if}
     {#if ontoggle}<button type="button" class="eye" class:off={hide} title={hide ? 'Hidden on the card — click to show' : 'Shown on the card — click to hide'} onclick={ontoggle}><Icon icon={hide ? 'mdi:eye-off-outline' : 'mdi:eye'} size="15px" /></button>{/if}</label>{/if}
   {#if f.type === 'media-folder'}
@@ -47,6 +48,8 @@
         {#each Object.values(app.config.cards) as c}<option value={c.id}>{c.type} · {c.props?.name || c.props?.entity || c.props?.title || c.id}</option>{/each}
       </select>
     </div>
+  {:else if f.type === 'people'}
+    <PeopleEditor values={obj[f.key] || []} onupdate={set} />
   {:else if f.type === 'bool'}
     <label class="chk"><input type="checkbox" checked={!!obj[f.key]} onchange={(e) => set(e.currentTarget.checked)} /> {f.label}</label>
   {:else if f.type === 'select'}
