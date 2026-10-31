@@ -37,8 +37,28 @@ export const AUTOFILL = {
       leak: leak(/wash/),
     };
   },
+  // LG ThinQ dishwasher: "<x>_current_status" + "<x>_current_cycle", the time left
+  // as the clock time it ends, a clean indicator light and a rinse aid level.
+  dishLG() {
+    const p = keys().map((k) => k.match(/^sensor\.(.+)_current_status$/)?.[1]).find((x) => x && states.has(`sensor.${x}_current_cycle`));
+    if (!p) return {};
+    return {
+      name: device(`sensor.${p}_current_status`, /current status$/i),
+      ...siblings(p, {
+        state: 'sensor.*_current_status', program: ['sensor.*_current_cycle', 'select.*_active_program'],
+        total: 'sensor.*_total_time', remaining: 'sensor.*_remaining_time', power: 'sensor.*_power',
+        door: ['binary_sensor.*_door', 'sensor.*_door'],
+        clean: 'binary_sensor.*_clean_indicator_light',
+        rinse: 'sensor.*_rinse_aid_dispenser_level', salt: 'sensor.*_salt_level',
+      }),
+      alerts: [`binary_sensor.${p}_machine_clean_reminder`, `binary_sensor.${p}_rinse_refill_needed`, `binary_sensor.${p}_salt_refill_needed`].filter(has),
+      leak: leak(/dish/),
+    };
+  },
   // Home Connect (Bosch / Neff / Siemens) dishwasher.
   dishwasher() {
+    const lg = AUTOFILL.dishLG();
+    if (lg.state) return lg;
     const p = keys().map((k) => k.match(/^sensor\.(.+)_operation_state$/)?.[1]).find((x) => x && (states.has(`sensor.${x}_program_progress`) || /dish/.test(x)));
     if (!p) return {};
     return {
@@ -69,8 +89,21 @@ export const AUTOFILL = {
   },
 };
 
+// A dishwasher has two things the other two do not: a salt and rinse aid level,
+// and a light that stays on after the cycle because the load inside is clean.
+const DISH_ONLY = {
+  sections: [{ key: 'consumables', label: 'Salt & rinse aid' }],
+  fields: [
+    { key: 'total', label: 'Cycle length (minutes)', type: 'entity', domain: 'sensor', section: 'time', hint: 'The full programme, so the card can say "of 1h 45m" beside the time left.' },
+    { key: 'clean', label: 'Clean indicator (on when the load is clean)', type: 'entity', domain: 'binary_sensor', section: 'alerts' },
+    { key: 'salt', label: 'Salt level (level, %, or "needs salt")', type: 'entity', section: 'consumables' },
+    { key: 'rinse', label: 'Rinse aid level (level, %, or "needs rinse aid")', type: 'entity', section: 'consumables' },
+  ],
+};
+
 export function applianceMeta(kind) {
   const k = KINDS[kind];
+  const dish = kind === 'dishwasher';
   return {
     type: kind, name: k.name, icon: k.icon, category: 'Controls',
     size: { w: 420, h: 220 }, tap: 'none', hold: 'none',
@@ -79,6 +112,7 @@ export function applianceMeta(kind) {
     sections: [
       { key: 'picture', label: 'Picture & progress' }, { key: 'program', label: 'Programme' }, { key: 'time', label: 'Time left' },
       { key: 'options', label: 'Settings' }, { key: 'power', label: 'Power' }, { key: 'alerts', label: 'Alerts' }, { key: 'controls', label: 'Start / pause / stop' },
+      ...(dish ? DISH_ONLY.sections : []),
     ],
     fields: [
       { key: 'name', label: 'Name', type: 'text' },
@@ -97,6 +131,7 @@ export function applianceMeta(kind) {
       { key: 'leak', label: 'Leak sensor', type: 'entity', domain: 'binary_sensor', section: 'alerts' },
       { key: 'control', label: 'Control select (run / pause / stop options)', type: 'entity', domain: 'select', section: 'controls' },
       { key: 'stop', label: 'Stop button', type: 'entity', domain: 'button', section: 'controls' },
+      ...(dish ? DISH_ONLY.fields : []),
     ],
   };
 }
