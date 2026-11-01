@@ -4,16 +4,17 @@
   export const meta = {
     type: 'media-activity', name: 'Media activity', icon: 'mdi:play-circle-outline', category: 'Media',
     size: { w: 480, h: 220 }, tap: 'none',
-    defaults: { title: 'Watching now', entity: '', show_progress: true, show_quality: true },
+    defaults: { title: 'Watching now', entities: [], entity: '', poster: 'art', show_progress: true, show_quality: true },
     // Any sensor that carries the sessions in a `sessions` attribute (Tautulli via REST, or a template sensor built on it).
     autofill: () => ({
-      entity: [...states.keys()].find((id) => Array.isArray(states.get(id)?.attributes?.sessions)) || '',
+      entities: [...states.keys()].filter((id) => Array.isArray(states.get(id)?.attributes?.sessions)).sort().slice(0, 4),
     }),
     fields: [
-      { key: 'entity', label: 'Sensor', type: 'entity', domain: 'sensor', hint: 'A sensor whose `sessions` attribute lists what is playing — Tautulli\'s `get_activity` answer (raw or trimmed), one row per stream.' },
+      { key: 'entities', label: 'Sensors', type: 'entities', domain: 'sensor', hint: 'One or more sensors whose `sessions` attribute lists what is playing — Tautulli\'s `get_activity` answer (raw or trimmed) from each server. Streams seen by more than one sensor are shown once. The poster is whatever image URL a row carries; a server that reports a bare path needs a template sensor in Home Assistant to complete it, not a key in this card.' },
       { key: 'title', label: 'Title (blank = hidden)', type: 'text' },
       { key: 'show_progress', label: 'Progress and time left', type: 'bool' },
       { key: 'show_quality', label: 'Direct play / transcode and resolution', type: 'bool' },
+      { key: 'poster', label: 'Poster', type: 'select', options: [{ value: 'art', label: 'Poster beside each row' }, { value: 'none', label: 'Icon only' }] },
     ],
   };
 </script>
@@ -25,6 +26,7 @@
   // sensor in front of them.
   import Icon from '../components/Icon.svelte';
   import { t, ent } from '../lib/tpl.js';
+  import { haImage } from '../lib/ha.svelte.js';
   let { props, h = 220 } = $props();
 
   const pad = (n) => String(Number(n) || 0).padStart(2, '0');
@@ -35,7 +37,7 @@
   function norm(s) {
     const mt = s.media_type || 'movie';
     if (s.progress != null && s.progress_percent == null) {
-      return { ...s, progress: num(s.progress), duration: num(s.duration), offset: num(s.offset) };
+      return { ...s, poster: s.poster || s.grandparent_thumb || s.parent_thumb || s.thumb || '', progress: num(s.progress), duration: num(s.duration), offset: num(s.offset) };
     }
     const title = mt === 'episode' ? (s.grandparent_title || s.title) : s.title;
     let sub = '';
@@ -51,6 +53,7 @@
       progress: num(s.progress_percent),
       duration: Math.round(num(s.duration) / 1000),
       offset: Math.round(num(s.view_offset) / 1000),
+      poster: s.grandparent_thumb || s.parent_thumb || s.thumb || '',
       player: s.player || '',
       product: s.product || '',
       platform: s.platform || '',
@@ -60,10 +63,40 @@
     };
   }
 
-  const e = $derived(ent(props.entity));
-  const sessions = $derived((Array.isArray(e?.attributes?.sessions) ? e.attributes.sessions : []).map(norm));
-  const waiting = $derived(!props.entity || !e || e.state === 'unavailable');
+  // One sensor or several: two Plex servers, Tautulli and the Plex integration side by side.
+  const ids = $derived(
+    [...(Array.isArray(props.entities) ? props.entities : []), props.entity]
+      .map((v) => String(t(v) || '').trim())
+      .filter(Boolean)
+      .filter((v, i, a) => a.indexOf(v) === i)
+  );
+  const sessions = $derived.by(() => {
+    const seen = new Set();
+    const out = [];
+    for (const id of ids) {
+      const e = ent(id);
+      if (!e || e.state === 'unavailable') continue;
+      for (const s of Array.isArray(e.attributes?.sessions) ? e.attributes.sessions : []) {
+        const row = norm(s);
+        // The same stream reaching the card from two sensors is one row.
+        const key = `${row.title}|${row.subtitle}|${row.user}|${row.player}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push(row);
+      }
+    }
+    return out;
+  });
+  const waiting = $derived(!ids.length);
   const icon = (s) => (s.media_type === 'track' ? 'mdi:music' : s.media_type === 'episode' ? 'mdi:television-classic' : 'mdi:movie-open');
+  // The picture the row carries, or none. The sensor publishes a URL the browser can fetch:
+  // HA serves it under /api, or an integration may give a full URL. A bare server path is not
+  // resolvable here, and the card does not ask for a token to make one - no keys in settings.
+  const art = (path) => {
+    const p = String(path || '').trim();
+    if (!p || props.poster === 'none') return '';
+    return p.startsWith('http') || p.startsWith('/api/') ? haImage(p) : '';
+  };
   const pct = (s) => Math.max(0, Math.min(100, s.progress));
   const left = (s) => {
     const m = Math.max(0, Math.round((s.duration - s.offset) / 60));
@@ -94,7 +127,11 @@
     <div class="rows" class:single={sessions.length === 1}>
       {#each sessions as s, i (i + s.user + s.title)}
         <div class="row" class:paused={s.state === 'paused'}>
-          <div class="ic"><Icon icon={icon(s)} size="1.35em" /></div>
+          {#if art(s.poster)}
+            <img class="art" src={art(s.poster)} alt="" loading="lazy" decoding="async" />
+          {:else}
+            <div class="ic"><Icon icon={icon(s)} size="1.35em" /></div>
+          {/if}
           <div class="main">
             <div class="line">
               <span class="t">{s.title}</span>
@@ -131,6 +168,8 @@
   .row { display: flex; gap: 12px; align-items: center; min-width: 0; }
   .row + .row { border-top: 1px solid rgba(255,255,255,.08); padding-top: 10px; }
   .ic { flex: none; width: 2.4em; height: 2.4em; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.08); color: var(--accent); }
+  .art { flex: none; width: 2.4em; height: 3.5em; object-fit: cover; border-radius: 6px; background: rgba(255,255,255,.06); }
+  .single .art { width: 3.4em; height: 5em; }
   .paused .ic { color: var(--muted); }
   .main { flex: 1; min-width: 0; }
   .line { display: flex; align-items: baseline; gap: 8px; }
