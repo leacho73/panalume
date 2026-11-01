@@ -17,8 +17,9 @@
   const src = $derived(haImage(t(props.url)));
 </script>
 
-{#if src}<img {src} alt="" style="object-fit:{props.fit}" />{/if}
+{#if src}<img {src} alt="" style="object-fit:{props.fit}" />{:else}<div class="hint">Give an image address in the card's settings.</div>{/if}
 
 <style>
+  .hint { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 0 1em; text-align: center; color: var(--muted); font-size: .82em; }
   img { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: inherit; }
 </style>
