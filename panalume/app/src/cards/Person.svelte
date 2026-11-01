@@ -20,6 +20,9 @@
 </script>
 
 <div class="ppl">
+  {#if !(props.entities || []).length}
+    <div class="hint">Pick the people in the card's settings.</div>
+  {/if}
   {#each props.entities || [] as id}
     {@const e = states.get(id)}
     {@const home = e?.state === 'home'}
@@ -34,6 +37,7 @@
 </div>
 
 <style>
+  .hint { color: var(--muted); font-size: .82em; margin: auto; }
   /* People line up along the top (avatars level even when a status wraps); the row sits in the middle of the card. */
   .ppl { height: 100%; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); align-content: center; align-items: start; gap: 4px; }
   .p { display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: 0; color: inherit; font: inherit; min-width: 0; flex: 1; }

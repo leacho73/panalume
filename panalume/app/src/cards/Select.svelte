@@ -21,6 +21,9 @@
 </script>
 
 <div class="sel">
+  {#if !e}
+    <div class="hint">Pick an input in the card's settings.</div>
+  {:else}
   <div class="n">{t(props.name) || name(e)}</div>
   {#if props.style === 'dropdown'}
     <select data-stop value={e?.state} onchange={(ev) => set(ev.currentTarget.value)}>
@@ -31,9 +34,11 @@
       {#each e?.attributes.options || [] as o}<button class:on={o === e.state} onclick={() => set(o)}>{o}</button>{/each}
     </div>
   {/if}
+  {/if}
 </div>
 
 <style>
+  .hint { color: var(--muted); font-size: .82em; }
   .sel { height: 100%; display: flex; flex-direction: column; gap: 8px; }
   .n { font-weight: 600; }
   .opts { display: flex; flex-wrap: wrap; gap: 6px; overflow: auto; }

@@ -52,7 +52,9 @@
   });
 </script>
 
-{#if props.ha_view && !haOk}
+{#if !props.url && !props.ha_view}
+  <div class="msg">Give a web address in the card's settings.</div>
+{:else if props.ha_view && !haOk}
   <div class="msg">Home Assistant's dashboards show here when Panalume is opened from Home Assistant's sidebar.</div>
 {:else}
   <iframe bind:this={frame} {src} title="" style:pointer-events={editing ? 'none' : 'auto'} loading="lazy"></iframe>
