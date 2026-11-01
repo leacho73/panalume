@@ -2,11 +2,13 @@
   export const meta = {
     type: 'radar', name: 'Weather radar', icon: 'mdi:radar', category: 'Info',
     size: { w: 420, h: 300 }, tap: 'none',
-    defaults: { zoom: 6, base: 'satellite', network: false, marker: true, color: '2', smooth: true, snow: true, credit: true },
+    defaults: { source: 'tiles', image: '', zoom: 6, base: 'satellite', network: false, marker: true, color: '2', smooth: true, snow: true, credit: true },
     sections: [{ key: 'label', label: 'Title' }, { key: 'base', label: 'Base map' }, { key: 'time', label: 'Time' }, { key: 'marker', label: 'Home marker' }, { key: 'credit', label: 'Map credits' }],
     watch: () => ['zone.home'],
     fields: [
       { key: 'name', label: 'Title', type: 'text' },
+      { key: 'source', label: 'Radar', type: 'select', options: [{ value: 'tiles', label: 'Tiles from RainViewer' }, { value: 'image', label: 'A radar image from a camera' }], hint: 'A camera that already carries the map and the loop — Environment Canada publishes one per weather station, with a nowcast up to 72 minutes ahead, at any radius. The settings below apply to the RainViewer choice only.' },
+      { key: 'image', label: 'Radar camera', type: 'entity', domain: 'camera', hint: 'For example camera.beaverlodge_radar from the Environment Canada integration. The card draws what the camera publishes; nothing is fetched from outside Home Assistant and no key is needed.' },
       { key: 'network', label: 'Load radar tiles from RainViewer (this card stays empty until it is ticked)', type: 'bool', hint: 'Tiles and the frame list come from api.rainviewer.com. Nothing is fetched while this is off.' },
       { key: 'zoom', label: 'Zoom (5 = province, 7 = closest RainViewer allows)', type: 'number', hint: 'The public tile endpoint answers up to 7; anything higher returns its “zoom not supported” image, so the card holds at 7.' },
       { key: 'base', label: 'Base map under the radar', type: 'select', section: 'base', options: [{ value: 'satellite', label: 'Satellite (aerial)' }, { value: 'streets', label: 'Streets' }, { value: 'off', label: 'None (plain grid)' }], hint: 'Aerial tiles come from Esri World Imagery, streets from OpenStreetMap. Both load only while the network switch above is on.' },
@@ -26,7 +28,7 @@
   // network until the setting is ticked: a dashboard in an offline house still paints.
   import Icon from '../components/Icon.svelte';
   import { t } from '../lib/tpl.js';
-  import { states } from '../lib/ha.svelte.js';
+  import { states, haImage } from '../lib/ha.svelte.js';
   let { props, w = 420, h = 300 } = $props();
   const show = (k) => !props.hide?.[k];
   const TILE = 256;
@@ -57,6 +59,19 @@
   let mh = $state(0);
   const box = $derived({ w: mw || w, h: mh || h });
   const on = $derived(!!props.network);
+  // Image mode: a camera that publishes the map and the radar loop already composed.
+  // Its picture URL carries an access token that is only valid while the entity lives,
+  // so read it from the entity and re-request when the image updates.
+  const imgMode = $derived(props.source === 'image');
+  const cam = $derived(props.image ? states.get(String(props.image)) : undefined);
+  const shot = $derived.by(() => {
+    const pic = cam?.attributes?.entity_picture;
+    if (!pic) return '';
+    const url = haImage(pic);
+    const v = cam?.last_updated || '';
+    return v ? `${url}${url.includes('?') ? '&' : '?'}v=${encodeURIComponent(v)}` : url;
+  });
+  const shotAt = $derived(cam?.last_updated ? new Date(cam.last_updated).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '');
 
   $effect(() => {
     if (!on) {
@@ -142,7 +157,23 @@
 </script>
 
 <div class="radar" bind:clientWidth={mw} bind:clientHeight={mh}>
-  {#if !on}
+  {#if imgMode}
+    {#if shot}
+      <img class="shot" src={shot} alt="" />
+      {#if show('time') && shotAt}
+        <div class="when"><Icon icon="mdi:clock-outline" size=".9em" />{shotAt}</div>
+      {/if}
+      {#if props.credit !== false}
+        <div class="credit pill"><a href="https://weather.gc.ca/" target="_blank" rel="noreferrer">Environment Canada</a></div>
+      {/if}
+    {:else}
+      <div class="off">
+        <Icon icon="mdi:camera-off-outline" size="1.7em" />
+        <span>Pick a radar camera</span>
+        <small>Choose a camera that publishes a radar image, such as the Environment Canada radar for your station.</small>
+      </div>
+    {/if}
+  {:else if !on}
     <div class="off">
       <Icon icon="mdi:radar" size="1.7em" />
       <span>Radar is off</span>
@@ -198,6 +229,10 @@
   .base img { position: absolute; width: 256px; height: 256px; filter: saturate(.95) brightness(.95) contrast(1.03); }
   /* A wash over the aerial so the radar colours and the white marker still read on a bright photo. */
   .base::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8,12,20,.24), rgba(8,12,20,0) 42%, rgba(8,12,20,.34)); }
+  /* contain, not cover: the radar image carries its own labels and legend, and cropping a
+     map cuts place names in half. A square card fits it exactly. */
+  .shot { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #0b1220; }
+  .pill { background: rgba(8,12,20,.62); padding: 2px 7px; border-radius: 7px; backdrop-filter: blur(4px); }
   .tiles { position: absolute; inset: 0; }
   .tiles img { position: absolute; width: 256px; height: 256px; opacity: .92; mix-blend-mode: screen; }
   /* The dot sits on the centre pixel; the label hangs off it so it cannot drag the mark off-centre. */
