@@ -1,8 +1,15 @@
 <script module>
+  import { states } from '../lib/ha.svelte.js';
   export const meta = {
     type: 'weather-alerts', name: 'Weather alerts', icon: 'mdi:alert-outline', category: 'Info',
     size: { w: 520, h: 240 }, tap: 'none',
     defaults: { entities: [], entity: '', title: '', show_empty: true, calm: true },
+    autofill: () => {
+      // One sensor each for warnings, watches, advisories, statements and endings.
+      const re = /(warnings|watches|advisories|statements|endings)$/i;
+      const ids = [...states.keys()].filter((id) => id.startsWith('sensor.') && re.test(id)).sort();
+      return ids.length ? { entities: ids } : {};
+    },
     sections: [{ key: 'head', label: 'Title' }, { key: 'calm', label: 'When there is nothing' }],
     fields: [
       { key: 'entities', label: 'Alert sensors', type: 'entities', domain: 'sensor', hint: 'Sensors whose state is how many alerts are in effect and whose attributes carry `alert_1`, `alert_2` … with each title. Environment Canada publishes warnings, watches, advisories, statements and endings as one sensor each; pick all five. Rows are grouped by which sensor raised them.' },

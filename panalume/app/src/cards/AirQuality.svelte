@@ -1,8 +1,17 @@
 <script module>
+  import { states } from '../lib/ha.svelte.js';
   export const meta = {
     type: 'air-quality', name: 'Air quality', icon: 'mdi:air-filter', category: 'Info',
     size: { w: 380, h: 220 }, tap: 'more-info',
     defaults: { entity: '', extra: '', extra2: '', scale: 'aqhi', show_band: true },
+    autofill: () => {
+      // A sensor that says it is an air quality index, else one that is named like one.
+      const ids = [...states.keys()].filter((id) => id.startsWith('sensor.'));
+      const pick = ids.find((id) => states.get(id)?.attributes?.device_class === 'aqi')
+        || ids.find((id) => /aqhi|air_quality|air_quality_index/i.test(id)) || '';
+      const pm = ids.find((id) => /pm2_?5|pm_2_5/i.test(id)) || '';
+      return pick ? { entity: pick, extra: pm } : {};
+    },
     sections: [{ key: 'band', label: 'Risk band' }, { key: 'extra', label: 'Second reading' },
       { key: 'extra2', label: 'Third reading' }],
     fields: [

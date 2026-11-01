@@ -1,8 +1,15 @@
 <script module>
+  import { states } from '../lib/ha.svelte.js';
   export const meta = {
     type: 'weather-daily', name: 'Weather: daily', icon: 'mdi:calendar-week', category: 'Info',
     size: { w: 540, h: 330 }, tap: 'more-info',
     defaults: { entity: '', days: 7, bar: true, precip: true, wind: false },
+    autofill: () => {
+      // Daily forecast is feature bit 1.
+      const ids = [...states.keys()].filter((id) => id.startsWith('weather.'));
+      const daily = ids.find((id) => (Number(states.get(id)?.attributes?.supported_features || 0) & 1)) || ids[0] || '';
+      return daily ? { entity: daily } : {};
+    },
     sections: [{ key: 'icon', label: 'Conditions' }, { key: 'bar', label: 'Temperature range' },
       { key: 'precip', label: 'Chance of precipitation' }, { key: 'wind', label: 'Wind' },
       { key: 'uv', label: 'UV index' }],

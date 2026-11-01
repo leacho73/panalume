@@ -1,8 +1,15 @@
 <script module>
+  import { states } from '../lib/ha.svelte.js';
   export const meta = {
     type: 'weather-hourly', name: 'Weather: hourly', icon: 'mdi:clock-outline', category: 'Info',
     size: { w: 700, h: 300 }, tap: 'more-info',
     defaults: { entity: '', hours: 24, feels: false, wind: true, precip: true },
+    autofill: () => {
+      // Hourly forecast is feature bit 2.
+      const ids = [...states.keys()].filter((id) => id.startsWith('weather.'));
+      const hourly = ids.find((id) => (Number(states.get(id)?.attributes?.supported_features || 0) & 2)) || ids[0] || '';
+      return hourly ? { entity: hourly } : {};
+    },
     sections: [{ key: 'icon', label: 'Conditions' }, { key: 'feels', label: 'Feels like' },
       { key: 'precip', label: 'Chance of precipitation' }, { key: 'wind', label: 'Wind' }],
     fields: [

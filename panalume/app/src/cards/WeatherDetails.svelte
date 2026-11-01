@@ -1,8 +1,16 @@
 <script module>
+  import { states } from '../lib/ha.svelte.js';
   export const meta = {
     type: 'weather-details', name: 'Weather details', icon: 'mdi:weather-windy-variant', category: 'Info',
     size: { w: 460, h: 260 }, tap: 'more-info',
     defaults: { entity: '', extra: '', columns: 3 },
+    autofill: () => {
+      // The entity that carries the most of what this card shows.
+      const ids = [...states.keys()].filter((id) => id.startsWith('weather.'));
+      const score = (id) => Object.keys(states.get(id)?.attributes || {}).length;
+      const best = ids.sort((a, b) => score(b) - score(a))[0] || '';
+      return best ? { entity: best } : {};
+    },
     sections: [{ key: 'feels', label: 'Feels like' }, { key: 'dew', label: 'Dew point' },
       { key: 'humidity', label: 'Humidity' }, { key: 'pressure', label: 'Pressure' },
       { key: 'wind', label: 'Wind' }, { key: 'gust', label: 'Gusts' },
