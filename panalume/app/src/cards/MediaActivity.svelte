@@ -53,7 +53,7 @@
       progress: num(s.progress_percent),
       duration: Math.round(num(s.duration) / 1000),
       offset: Math.round(num(s.view_offset) / 1000),
-      poster: s.grandparent_thumb || s.parent_thumb || s.thumb || '',
+      poster: s.poster || s.grandparent_thumb || s.parent_thumb || s.thumb || '',
       player: s.player || '',
       product: s.product || '',
       platform: s.platform || '',

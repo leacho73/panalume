@@ -66,7 +66,7 @@
       watched: num(x.date),
       percent: num(x.percent_complete),
       duration: num(x.duration),
-      poster: x.grandparent_thumb || x.parent_thumb || x.thumb || '',
+      poster: x.poster || x.grandparent_thumb || x.parent_thumb || x.thumb || '',
       player: x.player || '',
       media_type: mt,
     };
