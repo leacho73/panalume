@@ -25,6 +25,9 @@
 <div class="gl">
   {#if props.title}<div class="title">{t(props.title)}</div>{/if}
   <div class="items">
+    {#if !(props.entities || []).length}
+      <div class="hint">Pick what to glance at in the card's settings.</div>
+    {/if}
     {#each props.entities || [] as id}
       {@const e = states.get(id)}
       <button class="it" data-stop onclick={() => (props.tap === 'toggle' && e ? toggle(e) : (app.popup = { entity: id }))}>
@@ -37,6 +40,7 @@
 </div>
 
 <style>
+  .hint { color: var(--muted); font-size: .82em; }
   .gl { height: 100%; display: flex; flex-direction: column; }
   .title { font-weight: 600; margin-bottom: 4px; }
   .items { flex: 1; display: flex; justify-content: space-around; align-items: center; gap: 4px; min-height: 0; }

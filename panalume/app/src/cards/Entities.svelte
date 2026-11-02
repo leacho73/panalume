@@ -24,6 +24,9 @@
 <div class="ents">
   {#if props.title}<div class="title">{t(props.title)}</div>{/if}
   <div class="rows">
+    {#if !(props.entities || []).length}
+      <div class="hint">Pick the entities to list in the card's settings.</div>
+    {/if}
     {#each props.entities || [] as id}
       {@const e = states.get(id)}
       <div class="row" role="button" tabindex="0" data-stop onclick={() => (app.popup = { entity: id })} onkeydown={() => {}}>
@@ -42,6 +45,7 @@
 </div>
 
 <style>
+  .hint { color: var(--muted); font-size: .82em; padding: 2px 2px 6px; }
   .ents { height: 100%; display: flex; flex-direction: column; }
   .title { font-weight: 600; font-size: 1.1em; margin-bottom: 6px; }
   .rows { overflow: auto; flex: 1; margin: 0 -6px; }
