@@ -419,6 +419,7 @@
           <div class="fields">
             <Field obj={v} f={{ key: 'name', label: 'Name', type: 'text' }} />
             <Field obj={v} f={{ key: 'icon', label: 'Icon', type: 'icon' }} />
+            <Field obj={v} f={{ key: 'image', label: 'Image (URL or path — shown instead of the icon)', type: 'text' }} />
             <Field obj={v} f={{ key: 'background', label: 'Background (overrides theme)', type: 'text' }} />
           </div>
         </div>
