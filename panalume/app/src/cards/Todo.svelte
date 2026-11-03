@@ -8,13 +8,14 @@
   export const meta = {
     type: 'todo', name: 'To-do list', icon: 'mdi:clipboard-check-outline', category: 'Info',
     size: { w: 320, h: 360 }, tap: 'none',
-    defaults: { entity: '', add: true, done: true },
+    defaults: { entity: '', add: true, done: true, staples: '' },
     autofill,
-    sections: [{ key: 'head', label: 'Title' }],
+    sections: [{ key: 'head', label: 'Title' }, { key: 'add', label: 'Adding items' }],
     fields: [
       { key: 'entity', label: 'List', type: 'entity', domain: 'todo', hint: 'Home Assistant\'s shopping list, a Local to-do list, Todoist, Google Tasks…' },
       { key: 'name', label: 'Title (blank = the list\'s name)', type: 'text' },
       { key: 'add', label: 'Add items from the card', type: 'bool' },
+      { key: 'staples', label: 'Quick-add items', type: 'text', hint: 'Comma separated, shown as one-tap chips: Milk, Eggs, Bread' },
       { key: 'done', label: 'Show ticked items (under "Done")', type: 'bool' },
     ],
   };
@@ -58,14 +59,39 @@
     call('update_item', { item: item.uid || item.summary, status });
   }
   let text = $state('');
-  function add(ev) {
-    ev?.preventDefault();
-    const s = text.trim();
+  // Duplicates are the list's job to show, not the card's to add again.
+  const same = (a, b) => String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
+  function add(want) {
+    const s = String(want ?? '').trim();
     if (!s || !canAdd) return;
+    if (items.some((i) => same(i.summary, s))) return;
     call('add_item', { item: s });
+  }
+  function submit(ev) {
+    ev?.preventDefault();
+    add(text);
     text = '';
   }
   const clearDone = () => call('remove_completed_items', {});
+
+  // "2 x milk" and "milk x2" both mean two of them; anything else keeps its name whole.
+  function split(item) {
+    const s = item.summary || '';
+    const m = s.match(/^(\d+(?:[.,]\d+)?)\s*[x×]\s*(.+)$/i) || s.match(/^(.+?)\s*[x×]\s*(\d+(?:[.,]\d+)?)$/i);
+    if (!m) return { qty: '', label: s };
+    const [qty, label] = /^\d/.test(m[1]) ? [m[1], m[2]] : [m[2], m[1]];
+    return { qty: `×${qty}`, label: label.trim() };
+  }
+
+  // A regular already on the list is not a chip; "2 x Milk" counts as Milk.
+  const staples = $derived.by(() => {
+    const have = new Set(open.flatMap((i) => [i.summary.trim().toLowerCase(), split(i).label.toLowerCase()]));
+    return String(props.staples || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .filter((s) => !have.has(s.toLowerCase()));
+  });
 
   const today = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
   function due(item) {
@@ -96,17 +122,27 @@
     <div class="msg">List not found</div>
   {:else}
     {#if props.add !== false && canAdd && !small}
-      <form class="add" onsubmit={add} data-stop>
-        <input bind:value={text} placeholder="Add an item" enterkeyhint="done" />
-        <button type="submit" disabled={!text.trim()} aria-label="Add"><Icon icon="mdi:plus" size="1.2em" /></button>
-      </form>
+      {#if show('add') && staples.length}
+        <div class="chips" data-stop>
+          {#each staples as s (s)}
+            <button class="chip" onclick={() => add(s)}>{s}</button>
+          {/each}
+        </div>
+      {/if}
+      {#if show('add')}
+        <form class="add" onsubmit={submit} data-stop>
+          <input bind:value={text} placeholder="Add an item" enterkeyhint="done" />
+          <button type="submit" disabled={!text.trim()} aria-label="Add"><Icon icon="mdi:plus" size="1.2em" /></button>
+        </form>
+      {/if}
     {/if}
     <div class="list" data-stop>
       {#each open as item (item.uid || item.summary)}
         {@const d = due(item)}
+        {@const q = split(item)}
         <button class="it" onclick={() => tick(item)} disabled={!canTick}>
           <span class="box"></span>
-          <span class="tx">{item.summary}{#if d}<small class:late={d.late}>{d.label}</small>{/if}</span>
+          <span class="tx"><span class="nm"><span class="l">{q.label}</span>{#if q.qty}<span class="qty">{q.qty}</span>{/if}</span>{#if d}<small class:late={d.late}>{d.label}</small>{/if}</span>
         </button>
       {:else}
         {#if loaded}<div class="empty"><Icon icon="mdi:check-all" size="1.3em" />All done</div>{/if}
@@ -137,6 +173,9 @@
   .n { flex: none; min-width: 1.6em; height: 1.6em; padding: 0 .45em; border-radius: 1em; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 25%, transparent); font-size: .78em; }
   .msg { flex: 1; display: grid; place-items: center; text-align: center; color: var(--muted); font-size: .85em; }
   .add { display: flex; gap: 6px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 99px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text); font: inherit; font-size: .82em; padding: 5px 11px; cursor: pointer; }
+  .chip:active { background: color-mix(in srgb, var(--accent) 28%, transparent); }
   .add input { flex: 1; min-width: 0; padding: 8px 11px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.05); color: inherit; font: inherit; font-size: .9em; }
   .add input:focus { outline: none; border-color: var(--accent); }
   .add button { flex: none; width: 2.4em; border: 0; border-radius: 10px; background: color-mix(in srgb, var(--accent) 30%, transparent); color: var(--text); display: grid; place-items: center; }
@@ -148,6 +187,9 @@
   .box { flex: none; width: 1.25em; height: 1.25em; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); display: grid; place-items: center; color: #0b0f17; }
   .done .box { background: var(--accent); border-color: var(--accent); }
   .tx { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: .92em; overflow-wrap: anywhere; }
+  .nm { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .l { min-width: 0; overflow-wrap: anywhere; }
+  .qty { flex: none; font-size: .8em; font-weight: 600; padding: 1px 6px; border-radius: 99px; background: color-mix(in srgb, var(--accent) 26%, transparent); }
   .tx small { font-size: .75em; color: var(--muted); }
   .tx small.late { color: #ff8a8a; }
   .done .tx { color: var(--muted); text-decoration: line-through; }
