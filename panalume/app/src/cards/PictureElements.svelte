@@ -4,7 +4,7 @@
   // a photo with a door sensor on it, a site plan with gates.
   export const meta = {
     type: 'picture-elements', name: 'Picture elements', icon: 'mdi:image-filter-center-focus', category: 'Controls',
-    size: { w: 480, h: 320 }, tap: 'none',
+    size: { w: 480, h: 320 }, tap: 'none', ownsDrag: true,
     defaults: { url: '', fit: 'contain' },
     fields: [
       { key: 'url', label: 'Picture (URL, /local/… — template ok)', type: 'text' },
@@ -23,8 +23,8 @@
   import { t, ent } from '../lib/tpl.js';
   import { name as eName, stateText, entityIcon, isActive, lightColor, canToggle, toggle, domain, unavailable } from '../lib/entity.js';
   import { haImage } from '../lib/ha.svelte.js';
-  import { app } from '../lib/config.svelte.js';
-  let { props, w = 480, h = 320, editing = false } = $props();
+  import { app, changed } from '../lib/config.svelte.js';
+  let { props, card, w = 480, h = 320, editing = false } = $props();
 
   const src = $derived(String(haImage(String(t(props.url) ?? '').trim()) || ''));
   // Natural size of the picture, so markers land on the picture and not on the
@@ -82,6 +82,53 @@
     }
     app.popup = { entity: id };
   }
+
+  // Drag on the card itself, in edit mode. The picture is the surface: an element
+  // is picked up where it sits and dropped where it is let go, and the X/Y it is
+  // written to are the same percentages the settings panel shows, so the two agree
+  // and the boxes stay for fine-tuning. One `changed()` per drag, on release, so a
+  // drag is one save and one step back in the undo stack rather than thirty.
+  let drag = $state(null);
+  let hud = $state('');
+  const clamp = (v) => Math.min(100, Math.max(0, Math.round(v * 10) / 10));
+
+  function grab(ev, i) {
+    if (!editing || (ev.pointerType === 'mouse' && ev.button !== 0)) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    const host = ev.currentTarget.closest('.pe')?.getBoundingClientRect();
+    if (!host) return;
+    // The pointer is in visual pixels and the card is often scaled by the board, so
+    // measure the picture where it is actually drawn rather than trusting the box used
+    // for layout: percentages taken against that box drift by the board's scale.
+    const fit = props.fit || 'contain';
+    let vis = { x: host.x, y: host.y, w: host.width, h: host.height };
+    if (nat.w && nat.h && fit !== 'fill') {
+      const s = fit === 'cover' ? Math.max(host.width / nat.w, host.height / nat.h) : Math.min(host.width / nat.w, host.height / nat.h);
+      const dw = nat.w * s, dh = nat.h * s;
+      vis = { x: host.x + (host.width - dw) / 2, y: host.y + (host.height - dh) / 2, w: dw, h: dh };
+    }
+    drag = { i, vis, x0: ev.clientX, y0: ev.clientY, moved: false };
+    ev.currentTarget.setPointerCapture?.(ev.pointerId);
+  }
+  function move(ev) {
+    if (!drag) return;
+    const list = card?.props?.markers;
+    if (!Array.isArray(list) || !list[drag.i] || !drag.vis.w || !drag.vis.h) return;
+    const m = list[drag.i];
+    if (Math.abs(ev.clientX - drag.x0) + Math.abs(ev.clientY - drag.y0) > 2) drag.moved = true;
+    m.x = clamp(((ev.clientX - drag.vis.x) / drag.vis.w) * 100);
+    m.y = clamp(((ev.clientY - drag.vis.y) / drag.vis.h) * 100);
+    hud = `${m.x}% · ${m.y}%`;
+  }
+  function drop(ev) {
+    if (!drag) return;
+    const { moved } = drag;
+    drag = null;
+    hud = '';
+    ev?.currentTarget?.releasePointerCapture?.(ev.pointerId);
+    if (moved) changed();
+  }
 </script>
 
 <div class="pe" class:editing bind:clientWidth={cw0} bind:clientHeight={ch0}>
@@ -102,14 +149,17 @@
         {@const lb = labelOf(m, e)}
         {@const sz = size(m)}
         <button type="button" class="mk" class:on={live && isActive(e)} class:dead={!!id && !live}
-          class:blank={!id} class:edit={editing} disabled={editing && !id}
+          class:blank={!id} class:edit={editing}
           style="left:{box.x + (pct(m.x, 50) / 100) * box.w}px; top:{box.y + (pct(m.y, 50) / 100) * box.h}px; --mc:{colourOf(m, e)}; --sz:{sz}px"
-          title={said(m, e)} aria-label={said(m, e)} onclick={() => fire(m)}>
+          title={said(m, e)} aria-label={said(m, e)} onclick={() => fire(m)}
+          onpointerdown={(ev) => grab(ev, i)} onpointermove={(ev) => move(ev)}
+          onpointerup={(ev) => drop(ev)} onpointercancel={(ev) => drop(ev)}>
           <span class="ic"><Icon icon={ic} size="calc(var(--sz) * 0.62)" /></span>
           {#if lb}<span class="lb">{lb}</span>{/if}
         </button>
       {/each}
     </div>
+    {#if hud}<div class="hud">{hud}</div>{/if}
   {/if}
 </div>
 
@@ -148,6 +198,15 @@
   .blank { display: none; }
   .blank.edit { display: flex; opacity: .75; }
   .blank.edit .ic { border-style: dashed; }
+  /* In edit mode an element is a thing you pick up, and the readout says where it is. */
+  .mk.edit { cursor: grab; touch-action: none; }
+  .mk.edit:active { cursor: grabbing; }
+  .hud {
+    position: absolute; right: 8px; bottom: 8px; z-index: 2; pointer-events: none;
+    font-size: .72em; font-variant-numeric: tabular-nums; color: var(--text);
+    background: rgba(9, 13, 19, .72); border: 1px solid rgba(255, 255, 255, .18);
+    border-radius: 99px; padding: 2px 8px;
+  }
   /* A short card keeps the tiles and drops the words. */
   @container (max-height: 140px) { .lb { display: none; } }
 </style>
