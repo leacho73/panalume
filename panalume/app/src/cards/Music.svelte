@@ -44,28 +44,48 @@
   // Speakers from the card's list, remembered per device. Ones Music Assistant
   // can't play are shown greyed out rather than hidden.
   const allChips = $derived(speakerChips(props.players || [], (id) => states.get(id)));
-  const chips = $derived(allChips.filter((c) => c.usable).map((c) => c.id));
+  // Offered speakers stay chosen while switched off, so they're back once they return.
+  const offered = $derived(allChips.map((c) => c.id));
   let selected = $state(null);
   $effect(() => {
-    if (selected !== null || !chips.length) return;
-    const last = (loadLast(card.id) || []).filter((id) => chips.includes(id));
-    selected = last.length ? last : (props.default_players || []).filter((id) => chips.includes(id));
+    if (selected !== null || !offered.length) return;
+    const last = (loadLast(card.id) || []).filter((id) => offered.includes(id));
+    selected = last.length ? last : (props.default_players || []).filter((id) => offered.includes(id));
   });
   function toggle(id) {
     selected = selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id];
     saveLast(card.id, selected);
   }
 
+  // Try again every 30 s while Music Assistant isn't ready (e.g. just after
+  // Home Assistant restarts), and refresh the shelf every 10 minutes.
+  let tick = $state(0);
+  $effect(() => {
+    const timer = setInterval(() => tick++, entry === '' || shelfError ? 30e3 : 600e3);
+    return () => clearInterval(timer);
+  });
+
   // Find Music Assistant, then load the shelf (favourites, or most / recently played).
   $effect(() => {
     if (!conn.connected) return;
+    void tick;
     const wanted = t(props.config_entry);
     const types = SHELF_TYPES.filter((ty) => props[`show_${ty}`] !== false);
     (async () => {
       let id = wanted;
       if (!id) {
-        const list = await send({ type: 'config_entries/get', domain: 'music_assistant' }).catch(() => []);
+        let list;
+        try {
+          list = await send({ type: 'config_entries/get', domain: 'music_assistant' });
+        } catch {
+          shelfError = 'Could not reach Home Assistant';
+          return;
+        }
         id = list.find((e) => e.state === 'loaded')?.entry_id || '';
+        if (!id && list.length) {
+          shelfError = 'Music Assistant is starting…';
+          return;
+        }
       }
       entry = id;
       if (!id) return;
@@ -92,6 +112,7 @@
   $effect(() => {
     const q = query.trim();
     if (q.length < 2 || !entry) {
+      latest.next(); // a search still on its way back must not reappear
       results = null;
       searching = false;
       return;
@@ -109,12 +130,17 @@
 
   // Tap: add to the queue of whatever is playing, or start it if nothing is.
   async function play(tile) {
-    const plan = planPlay(selected || [], (id) => states.get(id));
+    const plan = planPlay(selected || [], (id) => states.get(id), offered);
     if (!plan) return toast('Pick a speaker');
+    // callService shows its own error toast and resolves undefined when a call fails.
+    for (const id of plan.unjoin) await callService('media_player', 'unjoin', {}, { entity_id: id });
     if (plan.join.length) await callService('media_player', 'join', { group_members: plan.join }, { entity_id: plan.leader });
+    let ok = 0;
     for (const p of plan.plays) {
-      await callService('music_assistant', 'play_media', { media_id: tile.uri, media_type: tile.type, enqueue: p.enqueue }, { entity_id: p.entity_id });
+      const r = await callService('music_assistant', 'play_media', { media_id: tile.uri, media_type: tile.type, enqueue: p.enqueue }, { entity_id: p.entity_id });
+      if (r !== undefined) ok++;
     }
+    if (!ok) return;
     let msg = plan.plays[0].enqueue === 'add' ? `Added to queue: ${tile.name}` : `Playing ${tile.name}`;
     if (plan.plays.length > 1) msg += ' · Tip: a Music Assistant group keeps these speakers in sync';
     toast(msg);
@@ -137,6 +163,8 @@
       {#each allChips as c (c.id)}
         {#if c.usable}
           <button class="chip" class:on={selected?.includes(c.id)} onclick={() => toggle(c.id)}>{name(states.get(c.id)) || c.id}</button>
+        {:else if c.reason === 'unavailable'}
+          <button class="chip off" class:on={selected?.includes(c.id)} disabled title="{c.id} is switched off or unreachable">{name(states.get(c.id)) || c.id} · off</button>
         {:else}
           <button class="chip off" disabled title="{c.id} isn't a Music Assistant player: pick its Music Assistant version in the card settings">{name(states.get(c.id)) || c.id} · not in Music Assistant</button>
         {/if}

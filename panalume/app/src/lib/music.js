@@ -28,7 +28,12 @@ export const canJoin = (st) => isMaPlayer(st) && !isGroupPlayer(st) && ((st.attr
  * pick in the settings is easy to spot.
  */
 export function speakerChips(players, getState) {
-  return [...new Set(players)].map((id) => ({ id, usable: isMaPlayer(getState(id)) }));
+  return [...new Set(players)].map((id) => {
+    const st = getState(id);
+    // A switched-off speaker loses its Music Assistant attributes, so check that first.
+    const reason = !st ? 'missing' : st.state === 'unavailable' ? 'unavailable' : !isMaPlayer(st) ? 'not_ma' : '';
+    return { id, usable: !reason, reason };
+  });
 }
 
 /** A Music Assistant item as a tile: name, subtitle, picture and what to play. */
@@ -59,27 +64,34 @@ export function pickShelf({ favorites = [], mostPlayed = [], lastPlayed = [] }) 
 
 /**
  * How to play a tapped item on the chosen speakers: which speaker leads, which
- * join it, and which play_media calls to make. null when no chosen speaker can
- * be used (gone, unavailable or not a Music Assistant player).
+ * join or leave it, and which play_media calls to make. null when no chosen
+ * speaker can be used (gone, unavailable or not a Music Assistant player).
+ * `offered` is every speaker on the card: one that is grouped with the leader
+ * but no longer chosen is taken out of the group.
  */
-export function planPlay(selected, getState) {
+export function planPlay(selected, getState, offered = []) {
   const usable = [...new Set(selected)].filter((id) => {
     const st = getState(id);
     return st && isMaPlayer(st) && st.state !== 'unavailable' && st.state !== 'unknown';
   });
   if (!usable.length) return null;
   const playing = (id) => getState(id).state === 'playing';
-  const leader = usable.find(playing) ?? usable[0];
+  const members = (id) => getState(id).attributes.group_members || [];
+  const together = (a, b) => members(a).includes(b) || members(b).includes(a);
+  // Something playing leads; otherwise a chosen group, so it plays to all its speakers.
+  const leader = usable.find(playing) ?? usable.find((id) => isGroupPlayer(getState(id))) ?? usable[0];
   const lead = getState(leader);
-  const grouped = lead.attributes.group_members || [];
   const join = [];
   const plays = [{ entity_id: leader, enqueue: playing(leader) ? 'add' : 'play' }];
   for (const id of usable) {
-    if (id === leader || grouped.includes(id)) continue;
-    if (canJoin(lead) && canJoin(getState(id))) join.push(id);
-    else plays.push({ entity_id: id, enqueue: playing(id) ? 'add' : 'play' });
+    if (id === leader || together(leader, id)) continue;
+    // A speaker playing something else keeps it: queue there rather than join and cut it off.
+    if (playing(id)) plays.push({ entity_id: id, enqueue: 'add' });
+    else if (canJoin(lead) && canJoin(getState(id))) join.push(id);
+    else plays.push({ entity_id: id, enqueue: 'play' });
   }
-  return { leader, join, plays };
+  const unjoin = members(leader).filter((id) => id !== leader && offered.includes(id) && !selected.includes(id));
+  return { leader, join, unjoin, plays };
 }
 
 /** Numbers requests so a slow earlier answer can't overwrite a newer one. */
