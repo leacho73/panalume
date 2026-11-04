@@ -18,6 +18,7 @@
       { key: 'speed', label: 'Speed test' },
       { key: 'clients', label: 'Clients offline' },
       { key: 'when', label: 'Since when' },
+      { key: 'stale', label: 'Not reporting' },
     ],
     autofill: () => {
       const ids = [...states.keys()];
@@ -38,7 +39,7 @@
       { key: 'download', label: 'Download', type: 'entity', domain: 'sensor', section: 'speed' },
       { key: 'upload', label: 'Upload', type: 'entity', domain: 'sensor', section: 'speed' },
       { key: 'ping', label: 'Ping', type: 'entity', domain: 'sensor', section: 'speed' },
-      { key: 'clients', label: 'Clients (blank = every device tracker)', type: 'entities', domain: 'device_tracker', section: 'clients' },
+      { key: 'clients', label: 'Clients (blank = every network device tracker)', type: 'entities', domain: 'device_tracker', section: 'clients' },
       { key: 'count', label: 'Connected client count (optional)', type: 'entity', domain: 'sensor', section: 'clients' },
       { key: 'max', label: 'Most clients listed', type: 'number', section: 'clients' },
     ],
@@ -79,9 +80,11 @@
     return formatNumber(n, d);
   };
 
+  // With no list, every tracker the network sees; phones' GPS trackers say where someone is,
+  // not whether the device is on the network, so they're left out.
   const all = $derived((props.clients?.length ? props.clients : String(renderTemplate(TRACKERS) || '').split(',').map((s) => s.trim()).filter(Boolean))
     .map((id) => states.get(id))
-    .filter(Boolean));
+    .filter((e) => e && (props.clients?.length || e.attributes?.source_type !== 'gps')));
   const offline = $derived(all.filter((e) => !STALE.includes(String(e.state).toLowerCase()) && e.state !== 'home').sort(byName));
   const stale = $derived(all.filter((e) => STALE.includes(String(e.state).toLowerCase()) && e.state !== '').sort(byName));
   function byName(a, b) { return String(name(a)).localeCompare(String(name(b))); }
