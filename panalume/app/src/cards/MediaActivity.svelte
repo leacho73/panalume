@@ -4,7 +4,7 @@
   export const meta = {
     type: 'media-activity', name: 'Media activity', icon: 'mdi:play-circle-outline', category: 'Media',
     size: { w: 480, h: 220 }, tap: 'none',
-    defaults: { title: 'Watching now', entities: [], entity: '', poster: 'art', show_progress: true, show_quality: true },
+    defaults: { title: 'Watching now', entities: [], entity: '', poster: 'none', show_progress: true, show_quality: true },
     // Any sensor that carries the sessions in a `sessions` attribute (Tautulli via REST, or a template sensor built on it).
     autofill: () => ({
       entities: [...states.keys()].filter((id) => Array.isArray(states.get(id)?.attributes?.sessions)).sort().slice(0, 4),
@@ -14,7 +14,7 @@
       { key: 'title', label: 'Title (blank = hidden)', type: 'text' },
       { key: 'show_progress', label: 'Progress and time left', type: 'bool' },
       { key: 'show_quality', label: 'Direct play / transcode and resolution', type: 'bool' },
-      { key: 'poster', label: 'Poster', type: 'select', options: [{ value: 'art', label: 'Poster beside each row' }, { value: 'none', label: 'Icon only' }] },
+      { key: 'poster', label: 'Poster', type: 'select', options: [{ value: 'art', label: 'Poster beside each row (loads from the address the sensor gives)' }, { value: 'none', label: 'Icon only' }] },
     ],
   };
 </script>
@@ -27,7 +27,18 @@
   import Icon from '../components/Icon.svelte';
   import { t, ent } from '../lib/tpl.js';
   import { haImage } from '../lib/ha.svelte.js';
+  import { SvelteSet } from 'svelte/reactivity';
   let { props, h = 220 } = $props();
+  // Cards from before 0.40 have one sensor in `entity`; move it into the Sensors list so
+  // the editor shows it (it's still read either way).
+  $effect(() => {
+    if (!props.entity) return;
+    const list = Array.isArray(props.entities) ? props.entities : [];
+    props.entities = list.includes(props.entity) ? list : [props.entity, ...list];
+    props.entity = '';
+  });
+  // A poster that doesn't load (gone, or blocked) falls back to the icon.
+  const broken = new SvelteSet();
 
   const pad = (n) => String(Number(n) || 0).padStart(2, '0');
   const num = (v) => (Number(v) || 0);
@@ -127,8 +138,8 @@
     <div class="rows" class:single={sessions.length === 1}>
       {#each sessions as s, i (i + s.user + s.title)}
         <div class="row" class:paused={s.state === 'paused'}>
-          {#if art(s.poster)}
-            <img class="art" src={art(s.poster)} alt="" loading="lazy" decoding="async" />
+          {#if art(s.poster) && !broken.has(art(s.poster))}
+            <img class="art" src={art(s.poster)} alt="" loading="lazy" decoding="async" onerror={() => broken.add(art(s.poster))} />
           {:else}
             <div class="ic"><Icon icon={icon(s)} size="1.35em" /></div>
           {/if}

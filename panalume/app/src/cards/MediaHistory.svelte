@@ -4,7 +4,7 @@
   export const meta = {
     type: 'media-history', name: 'Recently watched', icon: 'mdi:history', category: 'Media',
     size: { w: 480, h: 300 }, tap: 'none',
-    defaults: { title: 'Recently watched', entities: [], entity: '', max: 8, poster: 'art', show_user: true, show_player: true },
+    defaults: { title: 'Recently watched', entities: [], entity: '', max: 8, poster: 'none', show_user: true, show_player: true },
     // Any sensor that carries recent plays in an `items` or `data` attribute (Tautulli history).
     autofill: () => ({
       // Only lists that look like plays (a title plus who / when / how much), so other sensors
@@ -22,7 +22,7 @@
       { key: 'max', label: 'Most rows shown', type: 'number' },
       { key: 'show_user', label: 'Who watched', type: 'bool' },
       { key: 'show_player', label: 'Player', type: 'bool' },
-      { key: 'poster', label: 'Poster', type: 'select', options: [{ value: 'art', label: 'Poster beside each row' }, { value: 'none', label: 'Icon only' }] },
+      { key: 'poster', label: 'Poster', type: 'select', options: [{ value: 'art', label: 'Poster beside each row (loads from the address the sensor gives)' }, { value: 'none', label: 'Icon only' }] },
     ],
   };
 </script>
@@ -34,7 +34,18 @@
   import Icon from '../components/Icon.svelte';
   import { t, ent } from '../lib/tpl.js';
   import { haImage } from '../lib/ha.svelte.js';
+  import { SvelteSet } from 'svelte/reactivity';
   let { props, h = 300 } = $props();
+  // Cards from before 0.40 have one sensor in `entity`; move it into the Sensors list so
+  // the editor shows it (it's still read either way).
+  $effect(() => {
+    if (!props.entity) return;
+    const list = Array.isArray(props.entities) ? props.entities : [];
+    props.entities = list.includes(props.entity) ? list : [props.entity, ...list];
+    props.entity = '';
+  });
+  // A poster that doesn't load (gone, or blocked) falls back to the icon.
+  const broken = new SvelteSet();
 
   const pad = (n) => String(Number(n) || 0).padStart(2, '0');
   const num = (v) => Number(v) || 0;
@@ -135,8 +146,8 @@
     <div class="rows">
       {#each rows as r, i (r.watched + r.title + i)}
         <div class="row">
-          {#if art(r.poster)}
-            <img class="art" src={art(r.poster)} alt="" loading="lazy" decoding="async" />
+          {#if art(r.poster) && !broken.has(art(r.poster))}
+            <img class="art" src={art(r.poster)} alt="" loading="lazy" decoding="async" onerror={() => broken.add(art(r.poster))} />
           {:else}
             <div class="ic"><Icon icon={icon(r)} size="1.15em" /></div>
           {/if}
