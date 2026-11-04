@@ -36,6 +36,14 @@ export function speakerChips(players, getState) {
   });
 }
 
+/** Every available Music Assistant player (and group), by name: what a new card offers. */
+export function maSpeakers(states) {
+  const name = (id) => states.get(id).attributes.friendly_name || id;
+  return [...states.keys()]
+    .filter((id) => id.startsWith('media_player.') && isMaPlayer(states.get(id)) && states.get(id).state !== 'unavailable')
+    .sort((a, b) => name(a).localeCompare(name(b)));
+}
+
 /** A Music Assistant item as a tile: name, subtitle, picture and what to play. */
 export function toTile(item) {
   const type = item.media_type;

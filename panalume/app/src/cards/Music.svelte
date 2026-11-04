@@ -1,4 +1,7 @@
 <script module>
+  import { states } from '../lib/ha.svelte.js';
+  import { maSpeakers } from '../lib/music.js';
+
   export const meta = {
     type: 'music', name: 'Music', icon: 'mdi:music-box-multiple', category: 'Media',
     size: { w: 640, h: 520 }, tap: 'none',
@@ -12,6 +15,11 @@
       { key: 'show_radio', label: 'Show favourite radio stations', type: 'bool' },
       { key: 'config_entry', label: 'Music Assistant entry id (only if you have more than one)', type: 'text' },
     ],
+    // Start with every Music Assistant speaker that's there, rather than an empty card.
+    autofill: () => {
+      const ids = maSpeakers(states);
+      return ids.length ? { players: ids } : {};
+    },
   };
 </script>
 
@@ -19,7 +27,7 @@
   import Icon from '../components/Icon.svelte';
   import { t } from '../lib/tpl.js';
   import { name } from '../lib/entity.js';
-  import { send, callService, states, conn, haImage, toast } from '../lib/ha.svelte.js';
+  import { send, callService, conn, haImage, toast } from '../lib/ha.svelte.js';
   import { TYPES, GROUP_LABEL, speakerChips, groupSearch, toTile, pickShelf, planPlay, latestOnly, loadLast, saveLast } from '../lib/music.js';
 
   let { props, card } = $props();
@@ -169,7 +177,7 @@
           <button class="chip off" disabled title="{c.id} isn't a Music Assistant player: pick its Music Assistant version in the card settings">{name(states.get(c.id)) || c.id} · not in Music Assistant</button>
         {/if}
       {:else}
-        <span class="hint">Choose the speakers to offer in this card's settings.</span>
+        <span class="hint">Pick the speakers to offer in the card's settings.</span>
       {/each}
     </div>
     <div class="rows" data-stop>
