@@ -376,6 +376,12 @@
         <Field obj={app.config.layouts[app.device]} f={{ key: 'home_view', label: `Home view on ${app.device === 'tablet' ? 'tablets' : DEVICES[app.device].label.toLowerCase() + 's'}`, type: 'select', options: [{ value: '', label: 'The first view' }, ...app.config.views.map((v) => ({ value: v.id, label: v.name }))], hint: 'The view this device opens on and goes back to. ?view= in the address does the same and wins.' }} />
         <Field obj={screenOpts} f={{ key: 'home', label: 'Home view on this screen only', type: 'select', options: [{ value: '', label: 'Same as above' }, ...app.config.views.map((v) => ({ value: v.id, label: v.name }))], hint: 'Saved on this screen, e.g. the kitchen tablet going to Kitchen and the living-room one to Living room, even in kiosk apps that can\'t change the address.' }} onset={(v) => { screenOpts.home = v; setScreenHome(v); }} />
         <Field obj={app.config.layouts[app.device]} f={{ key: 'return_mins', label: 'Go back to the home view after (minutes without a touch, blank = never)', type: 'number', hint: 'For wall tablets left on another page. ?return=5 in the address does the same and wins.' }} />
+        <Field obj={app.config.layouts[app.device]} f={{ key: 'popup_secs', label: 'Close pop-ups after (seconds without a touch, blank = never)', type: 'number', hint: 'Each touch inside the pop-up starts the count again.' }} />
+        <Field obj={app.config.layouts[app.device]} f={{ key: 'saver_mins', label: 'Screensaver after (minutes without a touch, blank = never)', type: 'number', hint: 'A dim clock, or your photos, until the screen is tapped. ?saver=10 in the address does the same.' }} />
+        {#if Number(app.config.layouts[app.device].saver_mins) > 0}
+          <Field obj={app.config.layouts[app.device]} f={{ key: 'saver_photos', label: 'Screensaver photos (optional)', type: 'media-folder', hint: 'A folder or album from Home Assistant\'s media. Blank for just the clock.' }} />
+          {#if app.config.layouts[app.device].saver_photos}<Field obj={app.config.layouts[app.device]} f={{ key: 'saver_no_clock', label: 'Photos only (no clock over them)', type: 'bool' }} />{/if}
+        {/if}
       </div>
       {#if app.device === 'tablet' || app.config.layouts[app.device].mode === 'custom'}
         <div class="fields">

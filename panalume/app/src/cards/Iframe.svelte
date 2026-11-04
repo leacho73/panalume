@@ -44,11 +44,12 @@
     add(ms.querySelector('ha-panel-lovelace')?.shadowRoot?.querySelector('hui-root')?.shadowRoot, CSS.root);
   }
   $effect(() => {
-    if (!props.hide_ha || !frame) return;
+    const f = frame;   // bind:this is cleared before this cleanup runs
+    if (!props.hide_ha || !f) return;
     const id = setInterval(tidy, 500);
     const load = () => { tidy(); setTimeout(tidy, 300); };
-    frame.addEventListener('load', load);
-    return () => { clearInterval(id); frame.removeEventListener('load', load); };
+    f.addEventListener('load', load);
+    return () => { clearInterval(id); f.removeEventListener('load', load); };
   });
 </script>
 

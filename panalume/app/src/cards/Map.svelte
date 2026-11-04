@@ -574,7 +574,8 @@
         }).addTo(map);
       }
 
-      if (!items.length && !centeredOnHome) {
+      // Nobody located, or fitting turned off: start on home at the chosen zoom.
+      if ((!items.length || props.auto_fit === false) && !centeredOnHome) {
         map.setView(
           centre,
           Math.max(3, Number(props.zoom) || 13)
@@ -627,10 +628,17 @@
       fittedEntityKey = '';
     }
   });
+  // The theme class is set here rather than in the markup: Leaflet adds its own
+  // classes to this element, and Svelte would overwrite them on a theme change.
+  $effect(() => {
+    const el = mapEl, cls = `theme-${props.theme || 'app'}`;
+    el?.classList.add(cls);
+    return () => el?.classList.remove(cls);
+  });
 </script>
 
 <div
-  class="map-wrap theme-{props.theme || 'app'}"
+  class="map-wrap"
   data-stop
   bind:this={mapEl}
 >
