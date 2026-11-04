@@ -8,11 +8,11 @@
     fields: [
       { key: 'name', label: 'Title', type: 'text' },
       { key: 'source', label: 'Radar', type: 'select', options: [{ value: 'tiles', label: 'Tiles from RainViewer' }, { value: 'image', label: 'A radar image from a camera' }], hint: 'A camera that already carries the map and the loop — Environment Canada publishes one per weather station, with a nowcast up to 72 minutes ahead, at any radius. The settings below apply to the RainViewer choice only.' },
-      { key: 'image', label: 'Radar camera', type: 'entity', domain: 'camera', hint: 'For example camera.beaverlodge_radar from the Environment Canada integration. The card draws what the camera publishes; nothing is fetched from outside Home Assistant and no key is needed.' },
+      { key: 'image', label: 'Radar camera', type: 'entity', domain: 'camera', hint: 'For example the radar camera the Environment Canada integration adds for your station. The card draws what the camera publishes; nothing is fetched from outside Home Assistant and no key is needed.' },
       { key: 'network', label: 'Load radar tiles from RainViewer (this card stays empty until it is ticked)', type: 'bool', hint: 'Tiles and the frame list come from api.rainviewer.com. Nothing is fetched while this is off.' },
       { key: 'zoom', label: 'Zoom (5 = province, 7 = closest RainViewer allows)', type: 'number', hint: 'The public tile endpoint answers up to 7; anything higher returns its “zoom not supported” image, so the card holds at 7.' },
       { key: 'base', label: 'Base map under the radar', type: 'select', section: 'base', options: [{ value: 'satellite', label: 'Satellite (aerial)' }, { value: 'streets', label: 'Streets' }, { value: 'off', label: 'None (plain grid)' }], hint: 'Aerial tiles come from Esri World Imagery, streets from OpenStreetMap. Both load only while the network switch above is on.' },
-      { key: 'center', label: 'Centre: latitude, longitude (blank = home)', type: 'text', placeholder: 'e.g. 55.15, -119.13' },
+      { key: 'center', label: 'Centre: latitude, longitude (blank = home)', type: 'text', placeholder: 'e.g. 51.5, -0.12' },
       { key: 'marker', label: 'Home marker', type: 'bool', section: 'marker' },
       { key: 'label', label: 'Marker label (blank = Home)', type: 'text', section: 'marker' },
       { key: 'color', label: 'Colour scheme', type: 'select', options: [{ value: '2', label: 'Universal blue' }, { value: '4', label: 'The Weather Channel' }, { value: '6', label: 'NEXRAD' }, { value: '8', label: 'Dark Sky' }, { value: '0', label: 'Black and white' }] },
@@ -21,17 +21,6 @@
       { key: 'credit', label: 'RainViewer credit', type: 'bool', section: 'credit' },
     ],
   };
-</script>
-
-<script>
-  // Live radar over the house, drawn from RainViewer's tiles. Nothing touches the
-  // network until the setting is ticked: a dashboard in an offline house still paints.
-  import Icon from '../components/Icon.svelte';
-  import { t } from '../lib/tpl.js';
-  import { states, haImage } from '../lib/ha.svelte.js';
-  let { props, w = 420, h = 300 } = $props();
-  const show = (k) => !props.hide?.[k];
-  const TILE = 256;
 
   // One frame list for every radar card on the dashboard, refreshed with the frames.
   let cache = { at: 0, data: null, promise: null };
@@ -51,6 +40,17 @@
     }
     return cache.promise;
   }
+</script>
+
+<script>
+  // Live radar over the house, drawn from RainViewer's tiles. Nothing touches the
+  // network until the setting is ticked: a dashboard in an offline house still paints.
+  import Icon from '../components/Icon.svelte';
+  import { t } from '../lib/tpl.js';
+  import { states, haImage } from '../lib/ha.svelte.js';
+  let { props, w = 420, h = 300 } = $props();
+  const show = (k) => !props.hide?.[k];
+  const TILE = 256;
 
   let map = $state(null);
   let failed = $state(false);
@@ -63,6 +63,8 @@
   // Its picture URL carries an access token that is only valid while the entity lives,
   // so read it from the entity and re-request when the image updates.
   const imgMode = $derived(props.source === 'image');
+  // Credit whoever the camera says the picture is from, rather than assuming one source.
+  const camCredit = $derived(String(states.get(props.image)?.attributes?.attribution || '').replace(/^Data provided by /i, ''));
   const cam = $derived(props.image ? states.get(String(props.image)) : undefined);
   const shot = $derived.by(() => {
     const pic = cam?.attributes?.entity_picture;
@@ -74,7 +76,8 @@
   const shotAt = $derived(cam?.last_updated ? new Date(cam.last_updated).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : '');
 
   $effect(() => {
-    if (!on) {
+    // Off, or showing a camera instead: nothing is fetched from RainViewer.
+    if (!on || imgMode) {
       map = null;
       failed = false;
       return;
@@ -163,8 +166,8 @@
       {#if show('time') && shotAt}
         <div class="when"><Icon icon="mdi:clock-outline" size=".9em" />{shotAt}</div>
       {/if}
-      {#if props.credit !== false}
-        <div class="credit pill"><a href="https://weather.gc.ca/" target="_blank" rel="noreferrer">Environment Canada</a></div>
+      {#if props.credit !== false && camCredit}
+        <div class="credit pill">{camCredit}</div>
       {/if}
     {:else}
       <div class="off">
