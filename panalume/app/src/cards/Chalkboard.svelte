@@ -59,25 +59,29 @@
   }
   // Writing is explicitly called after every change: an effect that both read and
   // wrote the same state would re-enter and Svelte would abort the whole card.
+  function write() {
+    saveTimer = null;
+    try {
+      if (strokes.length) localStorage.setItem(key, JSON.stringify({ v: 1, s: strokes }));
+      else localStorage.removeItem(key);
+    } catch {
+      /* a full or blocked localStorage leaves the drawing on screen, unsaved */
+    }
+  }
   function save() {
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      try {
-        if (strokes.length) localStorage.setItem(key, JSON.stringify({ v: 1, s: strokes }));
-        else localStorage.removeItem(key);
-      } catch {
-        /* a full or blocked localStorage leaves the drawing on screen, unsaved */
-      }
-    }, 500);
+    saveTimer = setTimeout(write, 500);
   }
   onMount(() => {
     strokes = load();
     paint();
-    const ro = new ResizeObserver(() => paint());
+    // A resize (drag, rotation, layout change) needs the canvas buffer resized too, not just repainted.
+    const ro = new ResizeObserver(() => fit());
     if (canvas?.parentElement) ro.observe(canvas.parentElement);
     return () => {
       ro.disconnect();
-      clearTimeout(saveTimer);
+      // Leaving the view straight after a stroke: save it now rather than drop it.
+      if (saveTimer) { clearTimeout(saveTimer); write(); }
     };
   });
 
