@@ -57,7 +57,14 @@
     return d.getTime();
   });
 
-  const grid = $derived((prefs?.energy_sources || []).find((x) => x.type === 'grid'));
+  // The grid's import meter and price, in either shape HA stores them (flat, or under flow_from).
+  const grid = $derived.by(() => {
+    const g = (prefs?.energy_sources || []).find((x) => x.type === 'grid');
+    return g ? { ...(g.flow_from?.[0] || {}), ...Object.fromEntries(Object.entries(g).filter(([, v]) => v != null && v !== '')) } : null;
+  });
+  // HA keeps a cost statistic beside the import meter when a price is set; with it the
+  // card prices each window at the average rate actually paid (right for time-of-use tariffs).
+  const costId = $derived(grid?.stat_energy_from && (grid.stat_cost || grid.entity_energy_price || grid.number_energy_price != null) ? grid.stat_cost || `${grid.stat_energy_from}_cost` : '');
   const houseId = $derived((props.house ? String(t(props.house)).trim() : '') || grid?.stat_energy_from || '');
   const circuits = $derived.by(() => {
     const own = (props.entities || []).filter((x) => x && typeof x === 'string').map((x) => String(t(x)).trim()).filter(Boolean);
@@ -75,8 +82,10 @@
     let v = (stats[id] || []).reduce((a, r) => a + Math.max(0, r.change || 0), 0);
     if (period === 'day') {
       const e = ent(id), live = Number(e?.state);
-      // A daily meter (state_class "total") is exact to the minute; statistics lag ~5 min.
-      if (Number.isFinite(live) && e?.attributes?.state_class === 'total' && live > v) v = live;
+      // A daily meter (state_class "total", reset today) is exact to the minute; statistics
+      // lag ~5 min. A lifetime counter is also "total" but has no recent reset: leave it be.
+      const reset = Date.parse(e?.attributes?.last_reset || '');
+      if (Number.isFinite(live) && e?.attributes?.state_class === 'total' && reset >= start && live > v) v = live;
     }
     return v;
   }
@@ -85,7 +94,7 @@
     if (!conn.connected) return;
     try {
       prefs ??= await send({ type: 'energy/get_prefs' });
-      const ids = [houseId, ...circuits].filter(Boolean);
+      const ids = [houseId, costId, ...circuits].filter(Boolean);
       if (!circuits.length) { stats = {}; return void (error = 'No circuits yet: add them in Settings → Dashboards → Energy, or pick entities here.'); }
       stats = (await send({
         type: 'recorder/statistics_during_period',
@@ -118,7 +127,15 @@
     const n = Number(grid?.number_energy_price);
     return Number.isFinite(n) && n > 0 ? n : null;
   });
-  const money = (kwh) => (tariff == null ? null : kwh * tariff);
+  // Average rate paid over the window (cost ÷ kWh imported), when HA records the cost.
+  const avgRate = $derived.by(() => {
+    if (!costId || !grid?.stat_energy_from) return null;
+    const sum = (id) => (stats[id] || []).reduce((a, r) => a + Math.max(0, r.change || 0), 0);
+    const kwh = sum(grid.stat_energy_from), cost = sum(costId);
+    return kwh > 0.05 && cost > 0 ? cost / kwh : null;
+  });
+  const rate = $derived(props.price ? tariff : avgRate ?? tariff);
+  const money = (kwh) => (rate == null ? null : kwh * rate);
 
   // "Washing Machine Energy Today" inside a card that is entirely energy → "Washing Machine".
   const METER = /\s+(?:energy\s+)?(?:this\s+(?:month|year|week)|today|yesterday|total|usage)$/i;
@@ -177,7 +194,7 @@
       {#if show('tariff') && money(house || metered) != null}
         <div class="t money">
           <b>{fmtMoney(money(house || metered))}</b>
-          <span>at {fmtRate(tariff)}/kWh</span>
+          <span>at {fmtRate(rate)}/kWh{avgRate != null && !props.price ? ' average' : ''}</span>
         </div>
       {/if}
     </div>
@@ -198,8 +215,8 @@
     </div>
   {/if}
 
-  {#if show('tariff') && tariff != null}
-    <div class="foot">{label} · priced at {fmtRate(tariff)}/kWh from your Energy settings; delivery and fixed charges are extra</div>
+  {#if show('tariff') && rate != null}
+    <div class="foot">{label} · priced at {avgRate != null && !props.price ? `an average ${fmtRate(rate)}/kWh, what you paid over this period` : `${fmtRate(rate)}/kWh from your Energy settings`}; delivery and fixed charges are extra</div>
   {/if}
 </div>
 
