@@ -20,7 +20,7 @@
   import { t } from '../lib/tpl.js';
   import { name } from '../lib/entity.js';
   import { send, callService, states, conn, haImage, toast } from '../lib/ha.svelte.js';
-  import { TYPES, GROUP_LABEL, isMaPlayer, groupSearch, toTile, pickShelf, planPlay, latestOnly, loadLast, saveLast } from '../lib/music.js';
+  import { TYPES, GROUP_LABEL, speakerChips, groupSearch, toTile, pickShelf, planPlay, latestOnly, loadLast, saveLast } from '../lib/music.js';
 
   let { props, card } = $props();
 
@@ -41,8 +41,10 @@
   const ma = (service, data) =>
     send({ type: 'call_service', domain: 'music_assistant', service, service_data: { config_entry_id: entry, ...data }, return_response: true }).then((r) => r?.response);
 
-  // Speakers: only Music Assistant players from the card's list, remembered per device.
-  const chips = $derived((props.players || []).filter((id) => isMaPlayer(states.get(id))));
+  // Speakers from the card's list, remembered per device. Ones Music Assistant
+  // can't play are shown greyed out rather than hidden.
+  const allChips = $derived(speakerChips(props.players || [], (id) => states.get(id)));
+  const chips = $derived(allChips.filter((c) => c.usable).map((c) => c.id));
   let selected = $state(null);
   $effect(() => {
     if (selected !== null || !chips.length) return;
@@ -132,8 +134,12 @@
       {#if query}<button class="clear" aria-label="Clear search" onclick={() => (query = '')}><Icon icon="mdi:close" size="1.1em" /></button>{/if}
     </div>
     <div class="chips" data-stop>
-      {#each chips as id (id)}
-        <button class="chip" class:on={selected?.includes(id)} onclick={() => toggle(id)}>{name(states.get(id))}</button>
+      {#each allChips as c (c.id)}
+        {#if c.usable}
+          <button class="chip" class:on={selected?.includes(c.id)} onclick={() => toggle(c.id)}>{name(states.get(c.id)) || c.id}</button>
+        {:else}
+          <button class="chip off" disabled title="{c.id} isn't a Music Assistant player: pick its Music Assistant version in the card settings">{name(states.get(c.id)) || c.id} · not in Music Assistant</button>
+        {/if}
       {:else}
         <span class="hint">Choose the speakers to offer in this card's settings.</span>
       {/each}
@@ -178,6 +184,7 @@
   .chips { display: flex; flex-wrap: wrap; gap: 8px; }
   .chip { background: none; color: inherit; font: inherit; font-size: .85em; border: 1px solid rgba(255,255,255,.25); border-radius: 999px; padding: 6px 12px; }
   .chip.on { background: var(--accent); border-color: var(--accent); color: #000; font-weight: 600; }
+  .chip.off { opacity: .45; border-style: dashed; }
   .rows { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; }
   .label { color: var(--muted); font-size: .8em; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }

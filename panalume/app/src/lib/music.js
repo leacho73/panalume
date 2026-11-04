@@ -21,6 +21,16 @@ export const isGroupPlayer = (st) => st?.attributes?.mass_player_type === 'group
 /** Can it be joined with other speakers so they play in sync? */
 export const canJoin = (st) => isMaPlayer(st) && !isGroupPlayer(st) && ((st.attributes.supported_features ?? 0) & GROUPING) === GROUPING;
 
+/**
+ * The speaker chips for the card's chosen players, in order and without
+ * repeats. Ones Music Assistant can't play (e.g. the plain Cast copy of a
+ * speaker, or one that no longer exists) stay visible but unusable, so a wrong
+ * pick in the settings is easy to spot.
+ */
+export function speakerChips(players, getState) {
+  return [...new Set(players)].map((id) => ({ id, usable: isMaPlayer(getState(id)) }));
+}
+
 /** A Music Assistant item as a tile: name, subtitle, picture and what to play. */
 export function toTile(item) {
   const type = item.media_type;
