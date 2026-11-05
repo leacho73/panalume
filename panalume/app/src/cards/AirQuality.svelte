@@ -3,20 +3,27 @@
   export const meta = {
     type: 'air-quality', name: 'Air quality', icon: 'mdi:air-filter', category: 'Info',
     size: { w: 380, h: 220 }, tap: 'more-info',
-    defaults: { entity: '', extra: '', extra2: '', scale: 'aqhi', show_band: true },
+    defaults: { entity: '', extra: '', extra2: '', scale: 'auto', show_band: true },
     autofill: () => {
       // A sensor that says it is an air quality index, else one that is named like one.
-      const ids = [...states.keys()].filter((id) => id.startsWith('sensor.'));
-      const pick = ids.find((id) => states.get(id)?.attributes?.device_class === 'aqi')
-        || ids.find((id) => /aqhi|air_quality|air_quality_index/i.test(id)) || '';
+      // sensor.air_quality is Home Assistant's own count of air quality platforms, not a
+      // reading, so it is never a candidate.
+      const ids = [...states.keys()].filter((id) => id.startsWith('sensor.') && id !== 'sensor.air_quality');
+      const numeric = (id) => Number.isFinite(Number(states.get(id)?.state));
+      const pick = ids.find((id) => states.get(id)?.attributes?.device_class === 'aqi' && numeric(id))
+        || ids.find((id) => /aqhi|air_quality_index|_aqi$/.test(id) && numeric(id)) || '';
       const pm = ids.find((id) => /pm2_?5|pm_2_5/i.test(id)) || '';
-      return pick ? { entity: pick, extra: pm } : {};
+      if (!pick) return {};
+      // AQHI is Canadian and carries its own name; anything else is read as US AQI.
+      const canadian = /aqhi/i.test(pick)
+        || /aqhi/i.test(states.get(pick)?.attributes?.unit_of_measurement || '');
+      return { entity: pick, extra: pm, scale: canadian ? 'aqhi' : 'us' };
     },
     sections: [{ key: 'band', label: 'Risk band' }, { key: 'extra', label: 'Second reading' },
       { key: 'extra2', label: 'Third reading' }],
     fields: [
-      { key: 'entity', label: 'Index sensor', type: 'entity', domain: 'sensor', hint: 'Any air quality index sensor: Environment Canada’s AQHI, OpenWeatherMap’s index, a PurpleAir sensor.' },
-      { key: 'scale', label: 'Scale', type: 'select', options: [{ value: 'aqhi', label: 'AQHI (Canada, 1–10+)' }, { value: 'us', label: 'US AQI (0–500)' }], hint: 'Decides the words and the colours. AQHI is what Environment Canada and The Weather Network show in Canada.' },
+      { key: 'entity', label: 'Index sensor', type: 'entity', domain: 'sensor', hint: 'Any sensor whose state is an air quality index: Environment Canada’s AQHI, WAQI, AirVisual, PurpleAir, IQAir.' },
+      { key: 'scale', label: 'Scale', type: 'select', options: [{ value: 'auto', label: 'Work it out from the sensor' }, { value: 'aqhi', label: 'AQHI (Canada, 1–10+)' }, { value: 'us', label: 'US AQI (0–500)' }], hint: 'The words and the colours come from the scale. On “work it out”, a sensor named for the AQHI is read as AQHI and everything else as US AQI; a reading above 10 is always US AQI.' },
       { key: 'extra', label: 'Another reading', type: 'entity', domain: 'sensor', hint: 'Optional, e.g. PM2.5. Shown as a small tile with its own unit.' },
       { key: 'extra2', label: 'One more reading', type: 'entity', domain: 'sensor', hint: 'Optional, e.g. ozone or PM10.' },
     ],
@@ -26,7 +33,8 @@
 <script>
   // An air quality index with the words that go with it. The bands are the published
   // ones: AQHI 1-3 low, 4-6 moderate, 7-10 high, above 10 very high, and the US AQI
-  // breakpoints when that scale is chosen.
+  // breakpoints (50 / 100 / 150 / 200 / 300) when that scale is in use. Which scale
+  // applies is worked out from the sensor unless the card is told otherwise.
   import Icon from '../components/Icon.svelte';
   import { t, ent } from '../lib/tpl.js';
   import { name as entName } from '../lib/entity.js';
@@ -53,11 +61,28 @@
     { max: 300, key: 'veryhigh', label: 'Very unhealthy', color: '#862e9c', note: 'Avoid prolonged exertion outdoors.' },
     { max: Infinity, key: 'hazard', label: 'Hazardous', color: '#5c0011', note: 'Stay indoors.' },
   ];
-  const bands = $derived(props.scale === 'us' ? US : AQHI);
+
+  // Which scale the reading is on. Watermark on the number, gradient and marker width all
+  // follow this, so a US AQI of 120 lands in its own band instead of off an AQHI dial.
+  const scaleKey = $derived.by(() => {
+    const want = String(props.scale || 'auto');
+    if (want === 'aqhi' || want === 'us') return want;
+    if (!e) return 'aqhi';
+    const a = e.attributes || {};
+    const hay = `${props.entity || ''} ${a.unit_of_measurement || ''} ${a.attribution || ''} ${a.friendly_name || ''}`.toLowerCase();
+    if (hay.includes('aqhi')) return 'aqhi';
+    const n = Number(e.state);
+    if (Number.isFinite(n) && n <= 10 && /environment canada|weather\.gc\.ca/.test(hay)) return 'aqhi';
+    return 'us';
+  });
+  const bands = $derived(scaleKey === 'us' ? US : AQHI);
   const band = $derived(v == null ? null : bands.find((b) => v <= b.max));
   // Position on the band scale, for the marker.
-  const top = $derived(props.scale === 'us' ? 300 : 10);
+  const top = $derived(scaleKey === 'us' ? 300 : 10);
   const pct = $derived(v == null ? 0 : Math.max(2, Math.min(100, (v / top) * 100)));
+  // Band edges as a share of the same scale, so the colours line up with the marker.
+  const AQHI_TRACK = 'linear-gradient(90deg, #2f9e44 0 30%, #f08c00 30% 60%, #e8590c 60% 100%)';
+  const US_TRACK = 'linear-gradient(90deg, #2f9e44 0 16.7%, #f08c00 16.7% 33.3%, #e8590c 33.3% 50%, #c92a2a 50% 66.7%, #862e9c 66.7% 100%)';
 
   const extra = (id) => {
     const x = ent(id);
@@ -76,7 +101,7 @@
     <div class="top">
       <div class="idx">
         <b>{v % 1 === 0 ? v : v.toFixed(1)}</b>
-        <small>{props.scale === 'us' ? 'AQI' : 'AQHI'}</small>
+        <small>{scaleKey === 'us' ? 'AQI' : 'AQHI'}</small>
       </div>
       <div class="band">
         <span class="nam">{band?.label || ''}</span>
@@ -84,7 +109,7 @@
       </div>
     </div>
     {#if show('band')}
-      <div class="track"><span class="mark" style:left="{pct}%"></span></div>
+      <div class="track" style:background={scaleKey === 'us' ? US_TRACK : AQHI_TRACK}><span class="mark" style:left="{pct}%"></span></div>
     {/if}
     {#if extras.length}
       <div class="more">
@@ -111,7 +136,7 @@
   .band { display: flex; flex-direction: column; gap: .1em; min-width: 0; }
   .nam { font-size: .95em; font-weight: 600; color: var(--tone); }
   .note { font-size: .72em; color: var(--muted); line-height: 1.25; }
-  .track { position: relative; height: .5em; border-radius: .3em; background: linear-gradient(90deg, #2f9e44 0 30%, #f08c00 30% 55%, #e8590c 55% 78%, #c92a2a 78% 100%); opacity: .85; flex: none; }
+  .track { position: relative; height: .5em; border-radius: .3em; opacity: .85; flex: none; }
   .mark { position: absolute; top: -.28em; width: .22em; height: 1.05em; border-radius: .2em; background: #fff; box-shadow: 0 0 0 1.5px rgba(0, 0, 0, .55); transform: translateX(-50%); }
   .more { display: flex; gap: .4em; margin-top: auto; }
   .tile { flex: 1; min-width: 0; background: rgba(255, 255, 255, .05); border-radius: .55em; padding: .3em .5em; display: flex; flex-direction: column; gap: .05em; }
