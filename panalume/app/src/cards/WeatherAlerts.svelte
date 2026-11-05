@@ -113,8 +113,9 @@
       if (!found) {
         const title = first(a, TITLE);
         const sev = first(a, SEVERITY);
-        const live = !['0', 'off', 'false', 'no', 'none', ''].includes(String(e.state).toLowerCase());
-        if (title || (sev && live)) {
+        const st = String(e.state).trim();
+        const live = !['0', 'off', 'false', 'no', 'none', ''].includes(st.toLowerCase());
+        if (live && (title || sev)) {
           const type = phrase(a.awareness_type || '');
           const level = phrase(sev);
           out.push({
@@ -124,7 +125,10 @@
             when: first(a, WHEN),
             source: name,
           });
-        } else if (/^\d+$/.test(String(e.state)) && Number(e.state) > 0) {
+        } else if (live && !/^\d+(\.\d+)?$/.test(st) && st.length > 2) {
+          // A sensor whose state is the warning itself, with no attributes to read.
+          out.push({ key: `${id}:state`, kind: severityKind(st) || fromName, title: st, when: first(a, WHEN), source: name });
+        } else if (/^\d+$/.test(st) && Number(st) > 0) {
           // A count with nothing else to go on: still better than hiding a live alert.
           out.push({ key: `${id}:count`, kind: fromName, title: name, when: '', source: '' });
         }
