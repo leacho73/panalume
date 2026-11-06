@@ -1,5 +1,6 @@
 // Entity helpers: names, formatted states, default icons, toggling.
 import { callService } from './ha.svelte.js';
+import { stateWord } from './i18n.svelte.js';
 
 export const domain = (id) => id?.split('.')[0] || '';
 
@@ -42,6 +43,17 @@ export function formatNumber(v, digits) {
 
 const LABEL = { on: 'On', off: 'Off', unavailable: 'Unavailable', unknown: 'Unknown', home: 'Home', not_home: 'Away', open: 'Open', closed: 'Closed', playing: 'Playing', paused: 'Paused', idle: 'Idle', locked: 'Locked', unlocked: 'Unlocked', heat: 'Heat', cool: 'Cool', auto: 'Auto', heat_cool: 'Heat/Cool', dry: 'Dry', fan_only: 'Fan' };
 
+// Binary sensor states in Home Assistant's own words, by device class.
+const OPEN = ['Open', 'Closed'], DETECT = ['Detected', 'Clear'];
+const BINARY = {
+  door: OPEN, window: OPEN, opening: OPEN, garage_door: OPEN,
+  motion: DETECT, occupancy: DETECT, presence: ['Home', 'Away'], smoke: DETECT, gas: DETECT, carbon_monoxide: DETECT, sound: DETECT, vibration: DETECT, tamper: DETECT,
+  moisture: ['Wet', 'Dry'], lock: ['Unlocked', 'Locked'], plug: ['Plugged in', 'Unplugged'], connectivity: ['Connected', 'Disconnected'],
+  battery: ['Low', 'Normal'], battery_charging: ['Charging', 'Not charging'], problem: ['Problem', 'OK'], safety: ['Unsafe', 'Safe'],
+  cold: ['Cold', 'Normal'], heat: ['Hot', 'Normal'], light: ['Light', 'No light'], moving: ['Moving', 'Not moving'], power: ['Power', 'No power'],
+  running: ['Running', 'Not running'], update: ['Update available', 'Up to date'],
+};
+
 export function stateText(e, { digits, unit = true } = {}) {
   if (!e) return '—';
   const d = domain(e.entity_id);
@@ -49,9 +61,16 @@ export function stateText(e, { digits, unit = true } = {}) {
   if (d === 'cover' && e.attributes.current_position != null && e.state === 'open') return e.attributes.current_position + '%';
   if (d === 'climate') {
     const t = e.attributes.current_temperature;
-    return t != null ? `${formatNumber(t, 1)}°` : LABEL[e.state] || e.state;
+    return t != null ? `${formatNumber(t, 1)}°` : stateWord(d, null, e.state) || LABEL[e.state] || e.state;
   }
   if (e.attributes.device_class === 'timestamp' || d === 'input_datetime') return relTime(e.state);
+  // In Home Assistant's language when it isn't English (Ligado, Aberta…).
+  const word = stateWord(d, e.attributes.device_class, e.state);
+  if (word) return word;
+  if (d === 'binary_sensor' && (e.state === 'on' || e.state === 'off')) {
+    const w = BINARY[e.attributes.device_class];
+    if (w) return w[e.state === 'on' ? 0 : 1];
+  }
   const n = Number(e.state);
   if (e.state !== '' && !Number.isNaN(n)) {
     const u = e.attributes.unit_of_measurement;
@@ -117,4 +136,23 @@ export function lightColor(e) {
   if (a.rgb_color) return `rgb(${a.rgb_color.join(',')})`;
   if (a.hs_color) return `hsl(${a.hs_color[0]} ${Math.max(a.hs_color[1], 30)}% 60%)`;
   return null;
+}
+
+// Thermostats that only take a heat and a cool setpoint (Elk M1 and others with just
+// "target temperature range"): the card's one target is the heat setpoint, or the cool
+// one in cool mode, and both are sent back together. null for a single-target thermostat.
+const rangeKey = (e) => {
+  const a = e?.attributes || {};
+  if (a.temperature != null || a.target_temp_low == null) return null;
+  return e.state === 'cool' && a.target_temp_high != null ? 'target_temp_high' : 'target_temp_low';
+};
+/** A thermostat's target temperature as the card shows it. */
+export const targetTemp = (e) => { const a = e?.attributes || {}; const k = rangeKey(e); return k ? a[k] : a.temperature ?? a.target_temp_high ?? a.target_temp_low; };
+/** set_temperature data for a new target, for single-target and heat / cool thermostats alike. */
+export function targetData(e, v) {
+  const k = rangeKey(e);
+  if (!k) return { temperature: v };
+  let lo = e.attributes.target_temp_low, hi = e.attributes.target_temp_high ?? lo + 2;
+  if (k === 'target_temp_low') { lo = v; if (hi <= lo) hi = lo + 1; } else { hi = v; if (lo >= hi) lo = hi - 1; }
+  return { target_temp_low: lo, target_temp_high: hi };
 }

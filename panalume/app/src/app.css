@@ -1,5 +1,5 @@
 *, *::before, *::after { box-sizing: border-box; }
-:root { --bar-h: 52px; } /* height of the editing toolbar docked along the bottom */
+:root { --bar-h: 52px; --sa-top: 0px; --sa-right: 0px; --sa-bottom: 0px; --sa-left: 0px; } /* height of the editing toolbar docked along the bottom */
 html { background: #0b0f17; }
 body {
   margin: 0; min-height: 100dvh; color: var(--text); font-family: var(--font);

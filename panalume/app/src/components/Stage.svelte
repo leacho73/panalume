@@ -1,6 +1,7 @@
 <script>
   import { untrack } from 'svelte';
   import { param } from '../lib/params.js';
+  import { safe } from '../lib/safearea.svelte.js';
   // The dashboard canvas. Laid out at the layout's design width and scaled
   // (CSS zoom) to fit the screen. In edit mode cards can be dragged anywhere
   // (including between the sidebar and main area) and resized from any edge or
@@ -8,19 +9,25 @@
   // Shift/Ctrl-click or drag a box on empty space to select several.
   // Positions snap to a 10px grid (hold Shift while dragging for 1px).
   import CardFrame from './CardFrame.svelte';
-  import { app, layout, GRID, changed, zoneList, ensureEditable, selectionSet, fitOverflow, usualGap } from '../lib/config.svelte.js';
+  import { app, layout, GRID, changed, zoneList, ensureEditable, selectionSet, fitOverflow, usualGap, cardHidden, sideWidth, topHeight } from '../lib/config.svelte.js';
 
   let { available, autoDevice, offset = 0 } = $props(); // offset: space taken on the left (the editor panel when docked left)
-  let vh = $state(innerHeight);
+  // The window height, less the screen edges Panalume pads itself (safearea.svelte.js).
+  let winH = $state(innerHeight);
+  const vh = $derived(winH - safe.top - safe.bottom);
   let scrollY = $state(0);
   let sbEl = $state();
+  let topEl = $state();
   // The sidebar's scroll position, kept while a card is being dragged (the
   // sidebar stops scrolling then so cards can be dragged out of it, and the
   // content is shifted by this much instead, so nothing jumps).
   let sbScroll = $state(0);
 
   const L = $derived(layout());
-  const sb = $derived(L.sidebar.enabled ? L.sidebar.width : 0);
+  // The sidebar beside the views (sb: its width), or as a bar across the top (tb: its height).
+  const sb = $derived(sideWidth(L));
+  const tb = $derived(topHeight(L));
+  const topBar = $derived(tb > 0);
   const fit = $derived(available / L.width);
   // Sizing per device (Layout tab, or ?fit=width|screen|actual in the URL):
   // fill the width, fit the whole view on screen (wall tablets), or actual size.
@@ -38,7 +45,7 @@
     if (split) return 1;
     if (preview) return Math.min(fit, 1);
     if (display === 'actual') return Math.min(fit, 1);
-    if (display === 'screen' && !app.editing) return Math.min(fit, vh / Math.max(mainContentH, sideContentH));
+    if (display === 'screen' && !app.editing) return Math.min(fit, vh / (topBar ? mainContentH + tb : Math.max(mainContentH, sideContentH)));
     return fit;
   });
   // When a wall tablet shrinks a tall view to fit, stretch the canvas to the full
@@ -61,15 +68,66 @@
   const sideRight = $derived((L.zones.sidebar || []).reduce((m, p) => Math.max(m, p.x + p.w), 0));
   const sideLeft = $derived((L.zones.sidebar || []).reduce((m, p) => Math.min(m, p.x), Infinity));
   const ks = $derived(app.editing || !sb || sideRight <= sb ? 1 : sb / (sideRight + sideLeft));
+  // A bar across the top widens and squeezes like the main area.
+  const kt = $derived((fill ? stageW / L.width : 1) * (app.editing || sideRight <= L.width ? 1 : L.width / (sideRight + sideLeft)));
   const origin = (zone) => ({
     x: zone === 'sidebar' ? (L.sidebar.side === 'right' ? stageW - sb : 0) : L.sidebar.side === 'right' ? 0 : sb,
-    y: zone === 'sidebar' ? scrollY / scale - sbScroll : 0,
+    y: zone === 'sidebar' ? (topBar ? scrollY / scale : scrollY / scale - sbScroll) : tb,
   });
   /** Pointer position in a zone's own coordinates. */
   const local = (e, zone) => ({ x: (e.clientX - left) / scale - origin(zone).x, y: (e.clientY + scrollY) / scale - origin(zone).y });
   const mainList = $derived(L.zones[app.view] || []);
   const sideList = $derived(L.zones.sidebar || []);
-  const mainH = $derived(Math.max(vh / scale / mainZ, mainList.reduce((m, p) => Math.max(m, p.y + p.h), 0) + (app.editing ? 400 : 20)));
+  // On phones with their own layout, a card hidden by its "Visible when" template
+  // gives its space to the cards below it instead of leaving a gap (the automatic
+  // phone layout leaves hidden cards out altogether). Only rows where nothing else is
+  // showing close up, so a hidden card beside a visible one keeps the row as it is.
+  // The vertical bands a list's hidden cards free up (where nothing else in the list is showing).
+  function freedBands(list, hid, G) {
+    const span = (p) => [p.y, p.y + p.h + G];
+    const shown = list.filter((_, i) => !hid[i]).map(span).sort((a, b) => a[0] - b[0]);
+    const bands = [];
+    for (const [a0, b] of list.filter((_, i) => hid[i]).map(span)) {
+      let a = a0;
+      for (const [c, d] of shown) {
+        if (d <= a || c >= b) continue;
+        if (c > a) bands.push([a, c]);
+        a = Math.max(a, d);
+        if (a >= b) break;
+      }
+      if (a < b) bands.push([a, b]);
+    }
+    bands.sort((x, y) => x[0] - y[0]);
+    const merged = [];
+    for (const [a, b] of bands) { const m = merged.at(-1); if (m && a <= m[1]) m[1] = Math.max(m[1], b); else merged.push([a, b]); }
+    return merged;
+  }
+  const upBy = (bands, y) => bands.reduce((n, [a, b]) => n + (b <= y ? b - a : a < y ? y - a : 0), 0);
+  const lift = $derived.by(() => {
+    if (app.editing || app.device !== 'phone') return null;
+    const hid = mainList.map((p) => cardHidden(app.config.cards[p.card]));
+    if (!hid.some(Boolean)) return null;
+    const bands = freedBands(mainList, hid, usualGap(mainList) || 12);
+    return { hid, bands, total: bands.reduce((n, [a, b]) => n + b - a, 0) };
+  });
+  const liftY = (y) => (lift ? upBy(lift.bands, y) : 0);
+  // Elsewhere (tablets and desktops), the same only inside a card
+  // group ticked "Close gaps when a card in this group is hidden": the group's cards move
+  // up into the space, and everything outside the group stays exactly where it was placed.
+  const groupLift = $derived.by(() => {
+    if (app.editing || lift) return null;
+    const groups = new Map();
+    mainList.forEach((p, i) => { if (p.group && p.close) (groups.get(p.group) || groups.set(p.group, []).get(p.group)).push(i); });
+    const out = new Map();
+    const G = usualGap(mainList) || 12;
+    for (const [g, idx] of groups) {
+      const hid = idx.map((i) => cardHidden(app.config.cards[mainList[i].card]));
+      if (hid.some(Boolean)) out.set(g, freedBands(idx.map((i) => mainList[i]), hid, G));
+    }
+    return out.size ? out : null;
+  });
+  const groupUp = (p) => (groupLift && p.group ? upBy(groupLift.get(p.group) || [], p.y) : 0);
+  const mainH = $derived(Math.max(vh / scale / mainZ - tb, mainList.reduce((m, p) => Math.max(m, p.y + p.h), 0) - (lift?.total || 0) + (app.editing ? 400 : 20)));
   const sideH = $derived(Math.max(vh / scale / sideZ, sideList.reduce((m, p) => Math.max(m, p.y + p.h), 0) + 20));
 
   // Starting to edit puts any cards hanging off the edge back inside for good.
@@ -368,7 +426,8 @@
     const { zone, mode } = cur;
     const list = L.zones[zone];
     let target = zone;
-    if (mode === 'move' && sb) {
+    if (mode === 'move' && topBar && topEl) target = e.clientY < topEl.getBoundingClientRect().bottom ? 'sidebar' : app.view;
+    else if (mode === 'move' && sb) {
       const sx = (e.clientX - left) / scale;
       const sbX = origin('sidebar').x;
       target = sx >= sbX && sx < sbX + sb ? 'sidebar' : app.view;
@@ -391,7 +450,7 @@
     // Keep everything inside its zone horizontally.
     const z = app.selected.zone;
     const zl = L.zones[z];
-    const zw = z === 'sidebar' ? sb : mainW;
+    const zw = z === 'sidebar' ? (topBar ? stageW : sb) : mainW;
     const idx = selectionSet();
     const minX = Math.min(...idx.map((i) => zl[i].x));
     const maxX = Math.max(...idx.map((i) => zl[i].x + zl[i].w));
@@ -448,16 +507,17 @@
   }
 </script>
 
-<svelte:window bind:innerHeight={vh} bind:scrollY />
+<svelte:window bind:innerHeight={winH} bind:scrollY />
 
 {#snippet zone(name, list)}
   {#each list as p, i (p.card + ':' + i)}
     {@const card = app.config.cards[p.card]}
-    {@const k = name === 'sidebar' ? ks : kx}
+    {@const k = name === 'sidebar' ? (topBar ? kt : ks) : kx}
     {@const pw = Math.round(p.w * k)}
-    {#if card}
+    {@const main = name !== 'sidebar' && lift}
+    {#if card && !(main && lift.hid[i])}
       <div class="place" class:sel={inSel(name, i)} class:primary={isPrimary(name, i) && sel.size === 1} class:grouped={app.editing && p.group}
-        style="left:{Math.round(p.x * k)}px;top:{p.y}px;width:{pw}px;height:{p.h}px;z-index:{(p.z || 0) + (op && inSel(name, i) ? 1000 : isPrimary(name, i) ? 500 : 0)}">
+        style="left:{Math.round(p.x * k)}px;top:{main ? p.y - liftY(p.y) : name !== 'sidebar' ? p.y - groupUp(p) : p.y}px;width:{pw}px;height:{p.h}px;z-index:{(p.z || 0) + (op && inSel(name, i) ? 1000 : isPrimary(name, i) ? 500 : 0)}">
         <CardFrame {card} w={pw} h={p.h} editing={app.editing} />
         {#if app.editing}
           <div class="grab" role="button" tabindex="-1" ondblclick={() => dbl(name, i)}
@@ -496,9 +556,13 @@
   {/if}
 {/snippet}
 
-<div class="stage" class:editing={app.editing} class:dragging={!!op} class:right={L.sidebar.side === 'right'}
+<div class="stage" class:editing={app.editing} class:dragging={!!op} class:right={L.sidebar.side === 'right'} class:top={topBar}
   style="width:{stageW}px;zoom:{scale};margin-left:{left / scale}px;--grid:{GRID}px">
-  {#if sb}
+  {#if topBar}
+    <header class="zone sidebar topbar" bind:this={topEl} style="width:{stageW}px;height:{tb}px">
+      <div class="inner" role="presentation" style="height:{tb}px" onpointerdown={(e) => bgDown(e, 'sidebar')} onpointermove={move} onpointerup={end}>{@render zone('sidebar', sideList)}</div>
+    </header>
+  {:else if sb}
     <aside class="zone sidebar" bind:this={sbEl} style="width:{sb}px;height:{vh / scale / sideZ}px;zoom:{sideZ}" onscroll={() => { if (!op) sbScroll = sbEl.scrollTop; }}>
       <div class="inner" role="presentation" style="height:{sideH}px;--sb-scroll:{sbScroll}" onpointerdown={(e) => bgDown(e, 'sidebar')} onpointermove={move} onpointerup={end}>{@render zone('sidebar', sideList)}</div>
     </aside>
@@ -515,6 +579,11 @@
   .zone { position: relative; flex: none; }
   .sidebar { position: sticky; top: 0; overflow-y: auto; overflow-x: hidden; background: var(--sidebar-bg); border-right: 1px solid rgba(255,255,255,.05); scrollbar-width: none; }
   .right .sidebar { border-right: 0; border-left: 1px solid rgba(255,255,255,.05); }
+  /* Across the top: stays in view while the page scrolls under it. */
+  .stage.top { flex-direction: column; }
+  .stage.top .main { z-index: 0; }   /* its own layer, so the cards scroll under the bar */
+  .sidebar.topbar { z-index: 10; overflow: hidden; border-right: 0; border-bottom: 1px solid rgba(255,255,255,.06); background: linear-gradient(var(--sidebar-bg), var(--sidebar-bg)), #0d121b; }
+  .editing .sidebar.topbar, .dragging .sidebar.topbar { overflow: visible; }
   .sidebar .inner { position: relative; }
   .dragging .sidebar { overflow-x: visible; overflow-y: clip; z-index: 5; }
   .dragging .sidebar .inner { transform: translateY(calc(var(--sb-scroll) * -1px)); }

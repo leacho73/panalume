@@ -11,6 +11,8 @@
       { key: 'entity', label: 'Light', type: 'entity', domain: 'light' },
       { key: 'name', label: 'Name', type: 'text' },
       { key: 'icon', label: 'Icon', type: 'icon' },
+      { key: 'layout', label: 'Layout', type: 'select', options: [{ value: '', label: 'Full (slider and colours)' }, { value: 'vertical', label: 'Vertical (like a button)' }, { value: 'horizontal', label: 'Horizontal (like a button)' }, { value: 'icon', label: 'Icon (like a button)' }], hint: 'The button-style layouts match Button cards beside them. Tap to switch the light, hold for brightness and colours.' },
+      { key: 'simple_off', label: 'Simple when off', type: 'bool', hint: "When the light's off the card shows just its name and icon (tap to turn it on); the rest appears once it's on." },
       { key: 'colours', label: 'Colour buttons (pick up to 6, or type colours)', type: 'swatches', section: 'colours', placeholder: '#ff4d4d, #ffc861, #5bd88f, #4fb4ff, #b48cff' },
     ],
   };
@@ -21,11 +23,15 @@
   // warm/cool and colour buttons. Tap toggles, hold for full controls.
   import Icon from '../components/Icon.svelte';
   import Slider from '../components/Slider.svelte';
+  import { canMix } from '../lib/compat.js';
   import { t, ent } from '../lib/tpl.js';
+  import { stateWord } from '../lib/i18n.svelte.js';
   import { name, entityIcon, lightColor, toggle } from '../lib/entity.js';
   import { callService, states } from '../lib/ha.svelte.js';
   let { props, h = 170 } = $props();
-  const show = (k) => !props.hide?.[k];
+  // "Simple when off": these parts only show while the light is on.
+  const OFF_HIDE = new Set(['brightness', 'temp', 'colours', 'state', 'members']);
+  const show = (k) => !props.hide?.[k] && !(props.simple_off && !on && OFF_HIDE.has(k));
   const e = $derived(ent(props.entity));
   const a = $derived(e?.attributes || {});
   const on = $derived(e?.state === 'on');
@@ -47,9 +53,24 @@
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
   }
   const compact = $derived(h < 150);
+  // Button-style layouts, to sit alongside Button cards.
+  const tile = $derived(['vertical', 'horizontal', 'icon'].includes(props.layout) ? props.layout : '');
+  const stateLine = $derived(on ? (dimmable ? `${pct}%` : stateWord('light', null, 'on') || 'On') : e?.state === 'off' ? stateWord('light', null, 'off') || 'Off' : e?.state || '—');
 </script>
 
-<div class="light" class:on class:compact style="--lc:{color}">
+{#if tile}
+<div class="tile {tile}" class:on style="--lc:{color}">
+  <div class="tic"><Icon icon={t(props.icon) || entityIcon(e)} size={tile === 'icon' ? '2.4em' : '1.6em'} /></div>
+  {#if tile !== 'icon'}
+    <div class="txt">
+      <div class="name">{t(props.name) || name(e)}</div>
+      {#if show('state')}<div class="state">{stateLine}{#if show('members') && members}<span class="mem">{' · '}{membersOn}/{members.length} on</span>{/if}</div>{/if}
+    </div>
+  {/if}
+</div>
+{:else}
+
+<div class="light" class:simple={props.simple_off && !on} class:on class:compact style="--lc:{color}">
   {#if show('glow')}<div class="glow" style="opacity:{on ? 0.25 + (pct / 100) * 0.75 : 0}"></div>{/if}
   <div class="top">
     <button class="ic" data-stop onclick={() => e && toggle(e)} aria-label="Toggle">
@@ -59,7 +80,7 @@
       <div class="name">{t(props.name) || name(e)}</div>
       {#if show('state')}
         <div class="state">
-          {on ? (dimmable ? `${pct}%` : 'On') : e?.state === 'off' ? 'Off' : e?.state || '—'}
+          {stateLine}
           {#if show('members') && members}<span class="mem">{' · '}{membersOn}/{members.length} on</span>{/if}
         </div>
       {/if}
@@ -68,7 +89,7 @@
 
   {#if dimmable && show('brightness')}
     <div class="bri">
-      <Slider value={pct} min={1} max={100} color="linear-gradient(90deg, color-mix(in srgb, var(--lc) 45%, transparent), var(--lc))" height={compact ? 34 : 42}
+      <Slider value={pct} min={1} max={100} color={canMix ? 'linear-gradient(90deg, color-mix(in srgb, var(--lc) 45%, transparent), var(--lc))' : 'var(--lc)'} height={compact ? 34 : 42}
         label={on ? '' : 'Off'} unit="%" onchange={(v) => svc({ brightness_pct: v })} />
     </div>
   {/if}
@@ -90,9 +111,11 @@
     </div>
   {/if}
 </div>
+{/if}
 
 <style>
   .light { position: relative; height: 100%; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; isolation: isolate; }
+  .simple { justify-content: center; }
   .glow { position: absolute; inset: calc(var(--pad) * -1); z-index: -1; pointer-events: none; transition: opacity .5s, background .5s;
     background: radial-gradient(90% 120% at 12% 10%, color-mix(in srgb, var(--lc) 45%, transparent), transparent 65%); }
   .top { display: flex; align-items: center; gap: 12px; min-width: 0; }
@@ -106,5 +129,14 @@
   .quick button { flex: 1 1 0; min-width: 0; max-width: 1.9em; aspect-ratio: 1; border-radius: 50%; border: 2px solid rgba(255,255,255,.15); padding: 0; transition: transform .15s; }
   .quick button:active { transform: scale(.88); }
   .warm { background: #ffb46b; } .neutral { background: #fff1dc; } .cool { background: #cfe3ff; }
+  /* The button-style layouts: the same shapes as the Button card. */
+  .tile { position: relative; height: 100%; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; min-width: 0; }
+  .tile.horizontal { flex-direction: row; align-items: center; justify-content: flex-start; gap: 14px; }
+  .tile.icon { align-items: center; justify-content: center; }
+  .tic { width: 2.6em; height: 2.6em; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.08); color: var(--muted); transition: all .25s; flex: none; }
+  .tile.icon .tic { width: auto; height: auto; background: none; }
+  .tile.on .tic { background: color-mix(in srgb, var(--lc) 22%, transparent); color: var(--lc); }
+  .tile.icon.on .tic { background: none; }
+  .tile .state { font-size: .88em; margin-top: 2px; }
   .sep { flex: none; width: 1px; height: 1.4em; background: rgba(255,255,255,.12); margin: 0 2px; }
 </style>

@@ -1,9 +1,12 @@
 <script module>
   export const meta = {
     type: 'weather', name: 'Weather', icon: 'mdi:weather-partly-cloudy', category: 'Info',
-    size: { w: 380, h: 200 }, tap: 'more-info',
+    size: { w: 420, h: 220 }, tap: 'more-info',
     defaults: { entity: '', forecast: 'daily', days: 5 },
-    sections: [{ key: 'icon', label: 'Icon' }, { key: 'temp', label: 'Temperature' }, { key: 'cond', label: 'Condition' }, { key: 'humidity', label: 'Humidity' }, { key: 'wind', label: 'Wind' }, { key: 'forecast', label: 'Forecast', section: 'forecast' }, { key: 'low', label: 'Forecast lows' }],
+    sections: [{ key: 'icon', label: 'Icon' }, { key: 'temp', label: 'Temperature' }, { key: 'cond', label: 'Condition' },
+      { key: 'feels', label: 'Feels like' }, { key: 'humidity', label: 'Humidity' }, { key: 'wind', label: 'Wind' },
+      { key: 'gust', label: 'Gusts' }, { key: 'uv', label: 'UV index' }, { key: 'rain', label: 'Rain today' },
+      { key: 'forecast', label: 'Forecast', section: 'forecast' }, { key: 'low', label: 'Forecast lows' }],
     fields: [
       { key: 'entity', label: 'Weather', type: 'entity', domain: 'weather' },
       { key: 'name', label: 'Name', type: 'text' },
@@ -18,6 +21,7 @@
 <script>
   import Icon from '../components/Icon.svelte';
   import { t, ent } from '../lib/tpl.js';
+  import { stateWord } from '../lib/i18n.svelte.js';
   import { subscribe } from '../lib/ha.svelte.js';
   let { props, w } = $props();
   const show = (k) => !props.hide?.[k];
@@ -30,22 +34,47 @@
     if (!id || type === 'none') return;
     return subscribe({ type: 'weather/subscribe_forecast', entity_id: id, forecast_type: type }, (ev) => (forecast = ev.forecast || []));
   });
-  // Today's high and low come from the daily forecast, whatever the card shows.
+  // The daily forecast feeds today's high and low, and today's rain, whatever
+  // the card itself shows.
   let daily = $state([]);
   $effect(() => {
     const id = e?.entity_id;
-    if (!id || !props.hilo || props.forecast === 'daily') return;
+    if (!id || props.forecast === 'daily') return;
+    if (!props.hilo && props.hide?.rain) return;
     return subscribe({ type: 'weather/subscribe_forecast', entity_id: id, forecast_type: 'daily' }, (ev) => (daily = ev.forecast || []));
   });
-  const today = $derived.by(() => {
-    if (!props.hilo) return null;
+  const day0 = $derived.by(() => {
     const list = props.forecast === 'daily' ? forecast : daily;
     const d = new Date().toDateString();
     return list.find((f) => new Date(f.datetime).toDateString() === d) || null;
   });
+  const today = $derived(props.hilo ? day0 : null);
   const COND = { partlycloudy: 'Partly cloudy', 'clear-night': 'Clear', 'lightning-rainy': 'Thunderstorms', 'snowy-rainy': 'Sleet', 'windy-variant': 'Windy', exceptional: 'Severe weather' };
   const items = $derived(forecast.slice(0, Number(props.days) || 5));
   const label = (f) => props.forecast === 'hourly' ? new Date(f.datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : new Date(f.datetime).toLocaleDateString([], { weekday: 'short' });
+
+  // Conditions beside the temperature, in the space to its right, so they never add
+  // height and push the forecast down. Only what this weather entity carries, and
+  // only the rows left switched on, so the card degrades instead of showing blanks.
+  const bearing = $derived(a.wind_bearing == null ? null : Number(a.wind_bearing));
+  const details = $derived.by(() => {
+    const out = [];
+    if (a.humidity != null && show('humidity')) out.push({ key: 'humidity', icon: 'mdi:water-percent', text: `${Math.round(a.humidity)}%` });
+    if (a.wind_speed != null && show('wind')) out.push({ key: 'wind', icon: 'mdi:weather-windy', text: `${Math.round(a.wind_speed)} ${a.wind_speed_unit || ''}`.trim(), bearing });
+    if (a.apparent_temperature != null && show('feels')) out.push({ key: 'feels', icon: 'mdi:thermometer', text: `Feels ${Math.round(a.apparent_temperature)}°` });
+    if (a.wind_gust_speed != null && show('gust')) out.push({ key: 'gust', icon: 'mdi:weather-windy-variant', text: `Gusts ${Math.round(a.wind_gust_speed)} ${a.wind_gust_speed_unit || a.wind_speed_unit || ''}`.trim() });
+    if (a.uv_index != null && show('uv')) out.push({ key: 'uv', icon: 'mdi:white-balance-sunny', text: `UV ${Math.round(a.uv_index)}`, tone: a.uv_index >= 8 ? 'high' : a.uv_index >= 6 ? 'mid' : '' });
+    if (day0 && show('rain')) {
+      if (day0.precipitation != null) out.push({ key: 'rain', icon: 'mdi:weather-rainy', text: `Rain ${day0.precipitation} ${day0.precipitation_unit || a.precipitation_unit || ''}`.trim() });
+      else if (day0.precipitation_probability != null) out.push({ key: 'rain', icon: 'mdi:weather-rainy', text: `Rain ${day0.precipitation_probability}%` });
+    }
+    return out;
+  });
+  // As many whole lines as fit beside the icon and temperature (measured), so the
+  // details never make the top of the card taller.
+  let dh = $state(0), lineH = $state(17), detEl = $state();
+  $effect(() => { w; if (detEl) lineH = parseFloat(getComputedStyle(detEl).fontSize) * 1.35 || 17; });
+  const rows = $derived(Math.max(1, Math.floor((dh + 3) / (lineH + 3))));
 </script>
 
 <div class="wx">
@@ -56,12 +85,22 @@
         {#if show('temp')}<div class="temp">{a.temperature != null ? Math.round(a.temperature) + '°' : '—'}</div>{/if}
         {#if today}<div class="hl"><span>↑ {Math.round(today.temperature)}°</span>{#if today.templow != null}<span class="lo">↓ {Math.round(today.templow)}°</span>{/if}</div>{/if}
       </div>
-      {#if show('cond')}<div class="cond">{t(props.name) || COND[e?.state] || (e?.state || '').replace(/-/g, ' ')}</div>{/if}
+      {#if show('cond')}<div class="cond">{t(props.name) || stateWord('weather', null, e?.state) || COND[e?.state] || (e?.state || '').replace(/-/g, ' ')}</div>{/if}
     </div>
-    <div class="extra">
-      {#if a.humidity != null && show('humidity')}<span><Icon icon="mdi:water-percent" size="1em" /> {a.humidity}%</span>{/if}
-      {#if a.wind_speed != null && show('wind')}<span><Icon icon="mdi:weather-windy" size="1em" /> {Math.round(a.wind_speed)} {a.wind_speed_unit || ''}</span>{/if}
-    </div>
+    {#if details.length}
+      <div class="dwrap" bind:clientHeight={dh}><div class="details" bind:this={detEl} style:max-height="{rows * lineH + (rows - 1) * 3}px">
+        {#each details as d (d.key)}
+          <span class="stat {d.tone || ''}">
+            {#if d.bearing != null}
+              <span class="dir" style="transform:rotate({d.bearing}deg)"><Icon icon="mdi:navigation" size="0.95em" /></span>
+            {:else}
+              <Icon icon={d.icon} size="0.95em" />
+            {/if}
+            {d.text}
+          </span>
+        {/each}
+      </div></div>
+    {/if}
   </div>
   {#if items.length && show('forecast')}
     <div class="fc">
@@ -79,14 +118,21 @@
 
 <style>
   .wx { height: 100%; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; }
-  .now { display: flex; align-items: center; gap: 14px; }
+  .now { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .now > div:not(.dwrap) { flex: none; }
   .temp { font-size: 2.2em; font-weight: 600; line-height: 1; }
   /* Today's high / low sit beside the temperature, so they take no extra height. */
   .trow { display: flex; align-items: center; gap: 8px; }
   .hl { display: flex; flex-direction: column; font-size: .78em; font-weight: 600; line-height: 1.2; }
   .cond { color: var(--muted); text-transform: capitalize; font-size: .9em; }
-  .extra { margin-left: auto; display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: .85em; text-align: right; }
-  .extra span { display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
+  /* Short lines, right-aligned in the space beside the temperature and never taller than it.
+     What doesn't fit is left off, last first, rather than pushing the forecast down. */
+  .dwrap { flex: 1; min-width: 0; align-self: stretch; position: relative; }
+  .details { position: absolute; inset: 0 0 auto 0; display: flex; flex-wrap: wrap; justify-content: flex-end; align-content: flex-start; gap: 3px 12px; line-height: 1.35; overflow: hidden; color: var(--muted); font-size: .8em; }
+  .stat { display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .stat.mid { color: #ffc861; }
+  .stat.high { color: #ff8f6b; }
+  .dir { display: inline-flex; }
   .fc { display: flex; justify-content: space-between; gap: 4px; }
   .day { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: .85em; flex: 1; }
   .d { color: var(--muted); }

@@ -5,10 +5,11 @@
 const GAP = 12;
 const ASPECT = new Set(['camera', 'image', 'iframe', 'powerflow']);
 
-export function reflow(master, width, views, cards) {
+export function reflow(master, width, views, cards, skip = null) {
   const W = width - 32;
   const half = Math.floor((W - GAP) / 2);
-  const mainW = master.width - (master.sidebar.enabled ? master.sidebar.width : 0);
+  // A sidebar across the top doesn't take any width from the views.
+  const mainW = master.width - (master.sidebar.enabled && master.sidebar.side !== 'top' ? master.sidebar.width : 0);
   const type = (p) => cards[p.card]?.type;
   const side = master.sidebar.enabled ? master.zones.sidebar || [] : [];
   const navs = side.filter((p) => type(p) === 'nav');
@@ -23,6 +24,7 @@ export function reflow(master, width, views, cards) {
     const place = (items, srcW) => {
       let pending = null; // a half-width card waiting for a partner
       for (const p of items) {
+        if (skip?.(p)) continue;
         const small = p.w <= srcW * 0.3 && type(p) !== 'markdown';
         if (small) {
           if (pending) {
@@ -55,7 +57,7 @@ export function reflow(master, width, views, cards) {
       y += 6;
     }
     flushLoose();
-    if (vi === 0) place(rest, master.sidebar.width * 3.4);
+    if (vi === 0) place(rest, master.sidebar.side === 'top' ? mainW : master.sidebar.width * 3.4);
     zones[v.id] = out;
   });
   return { width, mode: 'auto', sidebar: { enabled: false, side: 'left', width: 300 }, zones };

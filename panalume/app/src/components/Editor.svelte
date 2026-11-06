@@ -5,8 +5,11 @@
   import { cards, categories } from '../lib/registry.js';
   import {
     app, layout, DEVICES, DEFAULT_THEME, changed, addCard, selectedCard, selectedPlacement, removeSelected,
-    duplicateSelected, copyToView, copyLayout, importConfig, selectionSet, groupSelected, ungroupSelected, ensureEditable, setMode, MODES, DISPLAYS, zoneList, addView, removeView, setView, isPlacedAnywhere, placeExisting, zoneWidth, setMainWidth,
+    duplicateSelected, copyToView, copyLayout, importConfig, selectionSet, groupSelected, ungroupSelected, ensureEditable, setMode, MODES, DISPLAYS, zoneList, addView, removeView, setView, isPlacedAnywhere, placeExisting, zoneWidth, setMainWidth, screenHome, setScreenHome, screenDevice, setScreenDevice, groupCloses, setGroupCloses, setSidebarSide, addFilledView, changeType, otherLayouts, copyToLayout,
   } from '../lib/config.svelte.js';
+  import { areas, areaCards } from '../lib/area.js';
+  // Settings kept on this screen only (not in the shared layout).
+  const screenOpts = $state({ home: screenHome(), device: screenDevice() });
 
   import { fromFusion } from '../lib/fusion.js';
   import { toast } from '../lib/ha.svelte.js';
@@ -33,6 +36,26 @@
   const card = $derived(selectedCard());
   const place = $derived(selectedPlacement());
   const def = $derived(card && cards[card.type]);
+  // Other card types that can show this card's entity (e.g. a button → a slider).
+  const swaps = $derived.by(() => {
+    const id = card?.props?.entity;
+    if (!id || typeof id !== 'string' || !id.includes('.')) return [];
+    const d = id.split('.')[0];
+    return Object.values(cards).map((c) => c.meta)
+      .filter((m) => m.type !== card.type && m.fields?.some((f) => f.key === 'entity' && f.type === 'entity' && (!f.domain || [].concat(f.domain).includes(d))))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  });
+  // Home Assistant's areas, for "Add a view for an area".
+  let areaList = $state(null);
+  $effect(() => { if (app.panel === 'views' && !areaList) areas().then((l) => (areaList = l)).catch(() => (areaList = [])); });
+  async function addAreaView(id) {
+    const a = areaList?.find((x) => x.area_id === id);
+    if (!a) return;
+    const items = await areaCards(id).catch(() => []);
+    if (!items.length) return toast(`Nothing in ${a.name} to add`);
+    addFilledView(a.name, a.icon, items);
+    toast(`Added ${a.name} with ${items.length} card${items.length > 1 ? 's' : ''}`);
+  }
   let addTo = $state('main');
   let section = $state('content');
 
@@ -40,19 +63,19 @@
     { key: 'background', label: 'Background', type: 'color', placeholder: 'rgba(...) / gradient / template' },
     { key: 'backgroundImage', label: 'Background image URL', type: 'text' },
     { key: 'color', label: 'Text colour', type: 'color' },
-    { key: 'accent', label: 'Accent / active colour', type: 'color' },
+    { key: 'accent', label: 'Accent colour', type: 'color', hint: 'Sliders, dials, graphs and selected buttons on this card.' },
     { key: 'radius', label: 'Corner radius', type: 'text', placeholder: '22' },
     { key: 'padding', label: 'Padding', type: 'text', placeholder: '16' },
     { key: 'border', label: 'Border', type: 'text', placeholder: '1px solid rgba(255,255,255,.1)' },
     { key: 'shadow', label: 'Shadow', type: 'text', placeholder: '0 8px 30px rgba(0,0,0,.3)' },
-    { key: 'blur', label: 'Backdrop blur', type: 'text', placeholder: '18' },
+    { key: 'blur', label: 'Glass blur', type: 'text', placeholder: '18', hint: 'How much the background blurs behind this card (frosted glass).' },
     { key: 'opacity', label: 'Opacity', type: 'text', placeholder: '1' },
     { key: 'font', label: 'Font family', type: 'text' },
     { key: 'fontSize', label: 'Font size', type: 'text', placeholder: '16' },
     { key: 'fontWeight', label: 'Font weight', type: 'select', options: ['', '300', '400', '500', '600', '700'] },
     { key: 'align', label: 'Text align', type: 'select', options: ['', 'left', 'center', 'right'] },
     { key: 'scale', label: 'Content size % (text, buttons, everything — also the −/+ under the card)', type: 'number' },
-    { key: 'css', label: 'Custom CSS (declarations)', type: 'textarea' },
+    { key: 'css', label: 'Custom CSS', type: 'textarea', hint: 'Declarations style the card, e.g. border-radius: 30px. Rules style parts inside it, e.g. & .name { white-space: normal }.' },
   ];
   const ACTIONS = ['default', 'toggle', 'more-info', 'fullscreen', 'popup', 'navigate', 'service', 'url', 'none'];
   const actFields = (a) => [
@@ -60,23 +83,23 @@
     ...(a?.action === 'more-info' || a?.action === 'toggle' || a?.action === 'fullscreen' ? [{ key: 'entity', label: 'Entity (blank: the card’s own)', type: 'entity' }] : []),
     ...(a?.action === 'popup' ? [{ key: 'title', label: 'Pop-up title', type: 'text' }, { key: 'cards', label: 'Cards in pop-up', type: 'cards' }] : []),
     ...(a?.action === 'navigate' ? [{ key: 'view', label: 'View', type: 'select', options: app.config.views.map((v) => ({ value: v.id, label: v.name })) }] : []),
-    ...(a?.action === 'service' ? [{ key: 'service', label: 'Service (domain.service)', type: 'text', placeholder: 'light.turn_on' }, { key: 'data', label: 'Data (JSON, template ok)', type: 'textarea' }] : []),
+    ...(a?.action === 'service' ? [{ key: 'service', label: 'Service (domain.service)', type: 'text', placeholder: 'light.turn_on' }, { key: 'data', label: 'Data (JSON, template ok)', type: 'textarea', hint: 'e.g. {"brightness_pct": 50}. For a script, call it directly (script.my_script) and put its fields here, with no "data" wrapper.' }] : []),
     ...(a?.action === 'url' ? [{ key: 'url', label: 'URL', type: 'text' }] : []),
   ];
   const THEME = [
     { key: 'background', label: 'Page background (css)', type: 'textarea' },
     { key: 'sidebarBg', label: 'Sidebar background', type: 'color' },
     { key: 'text', label: 'Text', type: 'color' },
-    { key: 'muted', label: 'Secondary text', type: 'color' },
-    { key: 'accent', label: 'Accent', type: 'color' },
-    { key: 'on', label: 'Active / on colour', type: 'color' },
+    { key: 'muted', label: 'Secondary text', type: 'color', hint: 'Smaller text such as names, units and labels.' },
+    { key: 'accent', label: 'Accent colour', type: 'color', hint: 'Sliders, dials, graphs, links and selected buttons.' },
+    { key: 'on', label: '“On” colour', type: 'color', hint: 'Icons and toggles of things that are on, like switches. Lights use their own colour.' },
     { key: 'cardBg', label: 'Card background', type: 'color' },
     { key: 'cardBorder', label: 'Card border', type: 'text' },
     { key: 'cardShadow', label: 'Card shadow', type: 'text' },
     { key: 'cardRadius', label: 'Card radius', type: 'number' },
     { key: 'cardPadding', label: 'Card padding', type: 'number' },
-    { key: 'cardScale', label: 'Card content size % (all cards)', type: 'number' },
-    { key: 'cardBlur', label: 'Card blur (0 = fastest)', type: 'number' },
+    { key: 'cardScale', label: 'Card content size %', type: 'number', hint: 'Makes everything inside every card bigger or smaller.' },
+    { key: 'cardBlur', label: 'Card glass blur', type: 'number', hint: 'How much the page background blurs behind cards (frosted glass). 0 turns it off, which is fastest on older tablets.' },
     { key: 'font', label: 'Font family', type: 'text' },
     { key: 'fontUrl', label: 'Font stylesheet URL (e.g. Google Fonts)', type: 'text' },
     { key: 'customCss', label: 'Custom CSS (global)', type: 'textarea' },
@@ -240,7 +263,8 @@
         <p class="hint">Drag any selected card to move them all. Shift/Ctrl-click to add or remove cards; drag a box on empty space to select.</p>
         <div class="row danger">
           <select class="sm" value="" onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ''; if (v) copyToView(v); }} title="Copy to another view"><option value="">Copy to view…</option>{#each app.config.views as v (v.id)}<option value={v.id}>{v.name}{v.id === app.view ? ' (this view)' : ''}</option>{/each}</select>
-          <button class="sm" onclick={() => removeSelected(false)}><Icon icon="mdi:eye-off-outline" size="1em" /> Unplace</button>
+          {#if otherLayouts().length}<select class="sm" value="" onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ''; if (v) copyToLayout(v); }} title="Put it on another device's layout too"><option value="">Copy to layout…</option>{#each otherLayouts() as d (d)}<option value={d}>{DEVICES[d].label}</option>{/each}</select>{/if}
+          <button class="sm" onclick={() => removeSelected(false)} title="Takes them off this device's layout only. They stay on other layouts and in pop-ups."><Icon icon="mdi:eye-off-outline" size="1em" /> Remove from this layout</button>
           <button class="sm red" onclick={() => confirm(`Delete ${multiCount} cards from every layout?`) && removeSelected(true)}><Icon icon="mdi:delete-outline" size="1em" /> Delete</button>
         </div>
       {:else if !card}
@@ -254,6 +278,9 @@
             {#if app.single}<button class="sm" onclick={() => (app.single = false)}>Whole group</button>{/if}
             <button class="sm" onclick={ungroupSelected}>Ungroup</button>
           </div>
+          <div class="fields">
+            <Field obj={{ close: groupCloses() }} f={{ key: 'close', label: 'Close gaps when a card in this group is hidden', type: 'bool', hint: 'Outside edit mode, the group\'s cards below a hidden one (Visible when) move up. Cards outside the group stay where they are.' }} onset={(v) => setGroupCloses(v)} />
+          </div>
         {/if}
         <div class="seg row">
           {#each [['content', 'Content'], ['style', 'Style'], ['actions', 'Actions'], ['position', 'Size']] as [k, l]}
@@ -261,6 +288,14 @@
           {/each}
         </div>
         {#if section === 'content'}
+          {#if swaps.length}
+            <label class="devsw"><span>Card type</span>
+              <select value="" onchange={(ev) => { const m = cards[ev.currentTarget.value]?.meta; ev.currentTarget.value = ''; if (!m) return; changeType(card, m.type, m); toast(`Changed to ${m.name}`); }}>
+                <option value="">{def?.meta.name} — change to…</option>
+                {#each swaps as m (m.type)}<option value={m.type}>{m.name}</option>{/each}
+              </select>
+            </label>
+          {/if}
           {#if sections.length}
             <div class="secs">
               <span class="lbl">Show</span>
@@ -313,7 +348,8 @@
         <div class="row danger">
           <button class="sm" onclick={duplicateSelected}><Icon icon="mdi:content-copy" size="1em" /> Duplicate</button>
           <select class="sm" value="" onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ''; if (v) copyToView(v); }} title="Copy to another view"><option value="">Copy to view…</option>{#each app.config.views as v (v.id)}<option value={v.id}>{v.name}{v.id === app.view ? ' (this view)' : ''}</option>{/each}</select>
-          <button class="sm" onclick={() => removeSelected(false)} title="Remove from this layout (keeps the card for pop-ups / other devices)"><Icon icon="mdi:eye-off-outline" size="1em" /> Unplace{multiCount > 1 ? ' group' : ''}</button>
+          {#if otherLayouts().length}<select class="sm" value="" onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ''; if (v) copyToLayout(v); }} title="Put it on another device's layout too"><option value="">Copy to layout…</option>{#each otherLayouts() as d (d)}<option value={d}>{DEVICES[d].label}</option>{/each}</select>{/if}
+          <button class="sm" onclick={() => removeSelected(false)} title="Takes it off this device's layout only. It stays on other layouts and in pop-ups."><Icon icon="mdi:eye-off-outline" size="1em" /> Remove from this layout</button>
           <button class="sm red" onclick={() => (multiCount < 2 || confirm(`Delete all ${multiCount} cards in this group?`)) && removeSelected(true)}><Icon icon="mdi:delete-outline" size="1em" /> Delete{multiCount > 1 ? ` group (${multiCount})` : ''}</button>
         </div>
       {/if}
@@ -322,6 +358,9 @@
       <p class="hint">This screen: {innerWidth}×{innerHeight}, showing <b>{DEVICES[app.device].label}</b>{param('device') ? ' (set by ?device= in the address)' : ''}.</p>
       <div class="row seg">
         {#each Object.entries(DEVICES) as [k, d]}<button class:on={app.device === k} onclick={() => { app.device = k; app.selected = null; app.multi = []; }}>{d.label}</button>{/each}
+      </div>
+      <div class="fields">
+        <Field obj={screenOpts} f={{ key: 'device', label: 'Layout on this screen', type: 'select', options: [{ value: '', label: 'Automatic' }, ...Object.entries(DEVICES).map(([value, d]) => ({ value, label: d.label }))], hint: 'Saved on this screen, e.g. a big tablet that shows the desktop layout. ?device= in the address does the same and wins.' }} onset={(v) => { screenOpts.device = v; setScreenDevice(v); }} />
       </div>
       {#if app.device === 'tablet'}
         <p class="hint">The <b>tablet layout</b> is the main one: phones and desktops show it too unless you give them their own. Pin a screen to a device with <code>?device=phone</code> / <code>desktop</code> in the URL.</p>
@@ -334,17 +373,31 @@
       <div class="fields">
         <Field obj={app.config.layouts[app.device]} f={{ key: 'kiosk', label: `Hide Home Assistant's header bar on ${app.device === 'tablet' ? 'tablets' : DEVICES[app.device].label.toLowerCase() + 's'}`, type: 'bool' }} />
         <Field obj={app.config.layouts[app.device]} f={{ key: 'display', label: `Sizing on ${app.device === 'tablet' ? 'tablets' : DEVICES[app.device].label.toLowerCase() + 's'}`, type: 'select', options: Object.entries(DISPLAYS).map(([value, label]) => ({ value, label })) }} />
+        <Field obj={app.config.layouts[app.device]} f={{ key: 'home_view', label: `Home view on ${app.device === 'tablet' ? 'tablets' : DEVICES[app.device].label.toLowerCase() + 's'}`, type: 'select', options: [{ value: '', label: 'The first view' }, ...app.config.views.map((v) => ({ value: v.id, label: v.name }))], hint: 'The view this device opens on and goes back to. ?view= in the address does the same and wins.' }} />
+        <Field obj={screenOpts} f={{ key: 'home', label: 'Home view on this screen only', type: 'select', options: [{ value: '', label: 'Same as above' }, ...app.config.views.map((v) => ({ value: v.id, label: v.name }))], hint: 'Saved on this screen, e.g. the kitchen tablet going to Kitchen and the living-room one to Living room, even in kiosk apps that can\'t change the address.' }} onset={(v) => { screenOpts.home = v; setScreenHome(v); }} />
+        <Field obj={app.config.layouts[app.device]} f={{ key: 'return_mins', label: 'Go back to the home view after (minutes without a touch, blank = never)', type: 'number', hint: 'For wall tablets left on another page. ?return=5 in the address does the same and wins.' }} />
+        <Field obj={app.config.layouts[app.device]} f={{ key: 'popup_secs', label: 'Close pop-ups after (seconds without a touch, blank = never)', type: 'number', hint: 'Each touch inside the pop-up starts the count again.' }} />
+        <Field obj={app.config.layouts[app.device]} f={{ key: 'saver_mins', label: 'Screensaver after (minutes without a touch, blank = never)', type: 'number', hint: 'A dim clock, or your photos, until the screen is tapped. ?saver=10 in the address does the same.' }} />
+        {#if Number(app.config.layouts[app.device].saver_mins) > 0}
+          <Field obj={app.config.layouts[app.device]} f={{ key: 'saver_photos', label: 'Screensaver photos (optional)', type: 'media-folder', hint: 'A folder or album from Home Assistant\'s media. Blank for just the clock.' }} />
+          {#if app.config.layouts[app.device].saver_photos}<Field obj={app.config.layouts[app.device]} f={{ key: 'saver_no_clock', label: 'Photos only (no clock over them)', type: 'bool' }} />{/if}
+        {/if}
       </div>
       {#if app.device === 'tablet' || app.config.layouts[app.device].mode === 'custom'}
         <div class="fields">
           <Field obj={layout()} f={{ key: 'width', label: 'Design width (px) — scaled to fit the screen', type: 'number' }} onset={(v) => setMainWidth((l) => (l.width = v))} />
+          <Field obj={app.config} f={{ key: 'new_cards', label: 'New cards go on', type: 'select', options: [{ value: '', label: 'Every layout (tablet, phone and desktop)' }, { value: 'this', label: 'Only the layout you\'re editing' }], hint: 'With "only this layout", use Copy to layout… on a card to put it on another device too.' }} />
         </div>
         <h4>Sidebar</h4>
         <div class="fields">
           <Field obj={layout().sidebar} f={{ key: 'enabled', label: 'Show sidebar', type: 'bool' }} onset={(v) => setMainWidth((l) => (l.sidebar.enabled = v))} />
           {#if !layout().sidebar.enabled}<p class="hint">Hidden: its cards are kept and come back when you show it again. Without it, views with no Navigation card get a small views menu in the top corner.</p>{/if}
-          <Field obj={layout().sidebar} f={{ key: 'side', label: 'Side', type: 'select', options: ['left', 'right'] }} />
-          <Field obj={layout().sidebar} f={{ key: 'width', label: 'Width', type: 'number' }} onset={(v) => setMainWidth((l) => (l.sidebar.width = v))} />
+          <Field obj={layout().sidebar} f={{ key: 'side', label: 'Side', type: 'select', options: [{ value: 'left', label: 'Left' }, { value: 'right', label: 'Right' }, { value: 'top', label: 'Top (a bar across every view)' }] }} onset={(v) => setSidebarSide(v)} />
+          {#if layout().sidebar.side === 'top'}
+            <Field obj={layout().sidebar} f={{ key: 'height', label: 'Height', type: 'number', placeholder: '100', hint: 'Put a Navigation card set to Horizontal in it for a menu across the top. It stays in view while the page scrolls.' }} />
+          {:else}
+            <Field obj={layout().sidebar} f={{ key: 'width', label: 'Width', type: 'number' }} onset={(v) => setMainWidth((l) => (l.sidebar.width = v))} />
+          {/if}
           {#if app.config.layouts[app.device].display === 'screen'}
             <Field obj={layout().sidebar} f={{ key: 'scaling', label: 'When a view shrinks to fit the screen', type: 'select', options: [{ value: 'fixed', label: 'Sidebar keeps its size' }, { value: 'shared', label: 'Sidebar shrinks with it' }] }} />
           {/if}
@@ -372,11 +425,21 @@
           <div class="fields">
             <Field obj={v} f={{ key: 'name', label: 'Name', type: 'text' }} />
             <Field obj={v} f={{ key: 'icon', label: 'Icon', type: 'icon' }} />
+            <Field obj={v} f={{ key: 'image', label: 'Image (URL or path — shown instead of the icon)', type: 'text' }} />
             <Field obj={v} f={{ key: 'background', label: 'Background (overrides theme)', type: 'text' }} />
           </div>
         </div>
       {/each}
       <button class="sm" onclick={() => addView('New view')}><Icon icon="mdi:plus" size="1em" /> Add view</button>
+      {#if areaList?.length}
+        <label class="devsw"><span>Add a view for an area</span>
+          <select value="" onchange={(ev) => { const id = ev.currentTarget.value; ev.currentTarget.value = ''; addAreaView(id); }}>
+            <option value="">Pick an area…</option>
+            {#each areaList as a (a.area_id)}<option value={a.area_id}>{a.name}</option>{/each}
+          </select>
+        </label>
+        <p class="hint">Fills a new view with a card for each thing in the area (lights, switches, thermostats, media players, cameras…) and a list of its sensors. They're normal cards after that.</p>
+      {/if}
     {:else if app.panel === 'theme'}
       <div class="fields">{#each THEME as f (f.key)}<Field obj={app.config.theme} {f} />{/each}</div>
       <button class="sm" onclick={() => { app.config.theme = { ...DEFAULT_THEME }; changed(); }}>Reset theme</button>

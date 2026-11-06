@@ -1,5 +1,105 @@
 # Changelog
 
+## 0.39.0
+
+- **Map card** (thanks, j4mesw2). Shows where people and trackers are on a map, with their pictures, your home zone and its radius, and a pop-up when you tap one. It zooms to fit everyone, and markers that overlap merge into one badge with a count, which splits apart again as you zoom in. Choose a light or dark map, or your own map tiles.
+- **Countdown card** (thanks, mrclean5953). The next date on a calendar (birthdays, holidays, trips) with how many days are left, plus the dates after it in a short list underneath. It shows Today and Tomorrow instead of 0 and 1 days.
+- **Now playing card** (thanks, mrclean5953). A square tile for a media player: artwork filling the card, the track and artist over it, a progress bar, and previous, play/pause and next.
+- **Batteries card** (thanks, mrclean5953). Every battery in the house, emptiest first, with a count of how many are low. New devices appear without editing the card, or you can pick the batteries yourself.
+- **Screensaver.** **Layout → Screensaver after** covers the dashboard with a dim clock, or a slideshow from a Home Assistant media folder or album, after that many minutes without a touch. A tap brings the dashboard back (thanks, Vadimys19).
+- **Pop-ups can close by themselves.** **Layout → Close pop-ups after** shuts a pop-up after that many seconds without a touch, per device (thanks, DaveCBr).
+- **Light card: button-style layouts** (thanks, theadd668). Vertical, horizontal or icon, the same shapes as the Button card, so the two match on a dashboard. Tap switches the light; hold for brightness and colours.
+- **Glance: icon colours** (thanks, jandamf). Each item's icon can have its own colour, including from a template run for each entity, e.g. `{{ 'red' if is_state(entity_id, 'on') else 'green' }}`.
+- **Your name in templates** (thanks, CykloneFij). Templates can use `user` (the Home Assistant user's ID) and `user_name`, so a card can show on one tablet only, or say "Good morning, Sam" to whoever is looking.
+- **No grey strip on iPad and iPhone.** In the Home Assistant app, Panalume now fills the screen to the edges itself instead of leaving a grey strip along the bottom (thanks, stevelup, who also worked out the fix).
+- **Dishwasher card: more detail** (thanks, mrclean5953). Time left, which now works whether your dishwasher reports minutes or a finish time, salt and rinse aid levels, whether the load inside is clean, and the door when it's left open. LG ThinQ dishwashers are found automatically too.
+- **Upcoming media: how it's released** (thanks, mrclean5953). Films now say whether they're out in cinemas, online or on disc.
+- **Navigation card: tile icons** (thanks, mrclean5953). An Android-style rounded square behind each icon, with the view you're on filled in. The default stays as it was.
+- **Pictures for views** (thanks, mrclean5953). A view can have an image (a logo, a photo, your own icon) in place of its icon, in the views menu and on the Navigation card.
+- Cards that haven't been set up yet now say what they need (pick a camera, give a web address…) instead of showing an empty card, and a new Camera card picks the first working camera by itself (thanks, mrclean5953).
+
+## 0.38.0
+
+- **Fan card.** For fans and air purifiers: on / off, a speed slider, the fan's modes (auto, sleep, turbo…), and oscillate and direction when it has them. Add a **light** for a ceiling fan's light (on / off and brightness on the same card), or **sensors** such as PM2.5, humidity or filter life for an air purifier.
+- **Light cards: Simple when off.** When the light's off, the card shows just its name and icon (tap to turn it on); the brightness, colours and the rest appear once it's on.
+- **Button: Active only above (W).** Pick the smart plug's power sensor and a number, and the button only lights up (and says Running) above that power, so a plug on with the machine idle shows as Idle.
+- **Building separate phone and desktop layouts is easier.** **Copy to layout…** puts a card on another device's layout too, and in Layout you can choose whether new cards go on every layout or only the one you're editing. **Unplace** is now called **Remove from this layout**, which says what it does.
+- **Alarm card: codes are respected.** If your alarm needs a code to disarm, the card now asks for one and won't disarm without it (it used to disarm with nothing typed in), and it only asks for a code to arm when the alarm does. A new option, **Always ask for a code to disarm**, covers alarms that don't say (thanks, DaveCBr).
+
+## 0.37.1
+
+- **Weather card:** the new details (feels like, gusts, UV, rain) now sit in the space beside the temperature, where humidity and wind always were, instead of a new row underneath that pushed the forecast down on existing dashboards. What doesn't fit beside it is left off, so the card keeps its layout at any size.
+
+## 0.37.0
+
+- **Sidebar across the top.** **Layout → Sidebar → Side: Top** turns the sidebar into a bar across the top that every view shares and that stays in view as you scroll. Put a Navigation card in it for a menu along the top, with a clock or anything else beside it. Its cards are laid out in a row when you switch, and any that don't fit move to the bottom of the view you're on.
+- **To-do list card.** Your Home Assistant lists (shopping list, Local to-do, Todoist and others): tick items off, add new ones and clear the ticked ones. Changes made anywhere show straight away.
+- **Humidifier card.** For humidifiers and dehumidifiers: a dial for the target humidity, the current humidity, on / off and the device's own modes (auto, sleep, low / high…).
+- **Home Assistant dashboards in the web page card.** Pick one of Home Assistant's own dashboards and a view on it, and the card shows just that view, without Home Assistant's header and sidebar. It loads from whatever address you're using, so it works away from home too.
+- **A view for an area.** **Views → Add a view for an area** makes a new view with a card for each thing in that area in Home Assistant (lights, switches, thermostats, media players, cameras…) and a list of its sensors. After that they're normal cards to move, resize or remove.
+- **Change a card's type.** **Card type** at the top of a card's settings turns it into another kind of card for the same thing, e.g. a button into a slider, keeping its name, style and place.
+- **Kettle card.** For smart kettles: the water temperature, the target with − / +, on / off, how much water is in it (from a weight sensor), presets such as green tea or baby bottle, and whether it's on its base. It finds the kettle's entities by itself.
+- **Calendar: week with hours** (thanks, jaycrafts). A Google Calendar-style week: hours down the side, each event a block from its start to its end, all-day events in a row on top, and a line for the time now. **First / last hour shown** set the hours.
+- **Washer, dryer and dishwasher: Running only above (W).** For machines on a smart plug: below this the card shows Idle even with the plug on, so the plug's own draw doesn't count as running (thanks, 8ctvfhjs59-ctrl).
+- **Upcoming media card** (thanks, mrclean5953). Upcoming episodes and films from the Upcoming Media integration (Sonarr, Radarr and others), as a list or as posters. Tap one to open it in Sonarr or Radarr.
+- **Media activity card** (thanks, mrclean5953). What's playing on your Plex server right now, from Tautulli: who's watching, how far in, and whether it's direct play or transcoding. Works with Emby too.
+- **Recently watched card** (thanks, mrclean5953). The latest plays from Tautulli: what, who, when and how much of it.
+- **Weather: more detail** (thanks, mrclean5953). Feels like, wind with its direction, gusts, UV index and today's rain, each with its own switch. They show in a row under the temperature, in place of the humidity and wind in the corner.
+- **Vacuum: large room buttons.** An option for bigger, easier-to-tap room buttons.
+- History graphs of sensors that update often (e.g. every minute) no longer draw a flat line over long periods (thanks, castleyt).
+- Thermostats that only take separate heat and cool setpoints (e.g. Elk M1) can now have their temperature changed from the thermostat and climate group cards.
+- The editor no longer shrinks every card on a view to a sliver when its cards run a long way past the edge.
+
+## 0.36.0
+
+- **Football card.** For the Soccer Live integration: the match on now with the score and minute, or the next one with its kick-off, then the next fixtures and recent results with a win / draw / loss for your team. Teams show as short badges; tick **Team logos** to load their logos from ESPN.
+- **Propane tank card** (thanks, FORCEGC). A picture of the tank filled to its level, for Mopeka sensors or any fill % sensor, in every common size, with what's left in lb, kg or gallons.
+- **Close gaps in a group.** Tick **Close gaps when a card in this group is hidden** on a card group, and when one of its cards is hidden (Visible when), the cards below it in the group move up. Cards outside the group stay put.
+- **Button: corner badge.** Show another entity in the button's top-right corner, as a ring for percentages like a tablet's battery, or as its value.
+- **Graph: line styles.** Each line can be smooth, straight or stepped; stepped suits things that switch, like heating on / off.
+- **Layout on this screen.** Pick Tablet, Phone or Desktop for one screen, e.g. a big tablet that was showing the desktop layout.
+- **Links to views.** Home Assistant's address now shows the view you're on (…/panalume#energy), so you can bookmark it or open it straight from a kiosk app.
+- Pop-ups opened by a tap on phones no longer close straight away.
+
+## 0.35.0
+
+- **Calendar: week and month views.** Choose **View → Week** or **Month** in the calendar card's settings. Arrows move through the weeks or months and **Today** jumps back; tap a day to see its events in full. The week starts on the right day for your language, or pick it yourself. There's also a **12-hour times** option.
+- **Updates & notifications card** (thanks, Asben91). Pending Home Assistant updates with **Install** (tap twice to confirm), open repairs, and notifications with **Dismiss**, all in one card.
+- **Home view, and going back to it.** **Layout → Home view** picks the view each device opens on, or **Home view on this screen only** gives one screen its own (e.g. the kitchen tablet opens on Kitchen). **Go back to the home view after … minutes** returns there when a screen is left on another page. Handy for kiosk apps where you can't change the address; `?view=` and `?return=` still work too.
+- **Vacuum: cleaning mode.** A picker for the vacuum's cleaning mode (e.g. Dreame's vacuum / mop / both), found automatically.
+- The vacuum's map now follows the robot while it cleans (it stayed still until the page was reloaded).
+
+## 0.34.0
+
+- **Older tablets.** Panalume now runs on older iPads and Macs (Safari 14 and 15, e.g. iPads that stop at iPadOS 15), which showed a blank screen before. Newer devices are unchanged.
+- **Vacuum: clean chosen rooms.** Tap one or more rooms on the vacuum card, then **Clean**. Rooms are cleaned in the order you tap them. The rooms come from Home Assistant: match the vacuum's rooms to your areas in its settings in Home Assistant (Dreame, Roborock and others support this). With the Dreame integration, its own room list works too.
+- **Vacuum: map.** The vacuum card can show the vacuum's map, e.g. the Dreame integration's map camera. It's found automatically, and on bigger cards it takes the place of the round button.
+- **Power flow: appliances.** Add up to four appliances to the power flow card, such as a heat pump or hot tub. Each shows its own power around the house, with a matching icon.
+
+## 0.33.0
+
+- **Lawn mower card.** For robot mowers (Husqvarna Automower, Gardena, Worx Landroid, Mammotion and others). A big round button starts, pauses or resumes mowing, with a ring showing the battery, and **Dock** sends it home. Underneath: the status, the mower's own activity in plain words (e.g. *Parked until the next start*), the next scheduled start and operating hours. It finds the mower and its sensors automatically, only shows what the mower supports, and small cards become a single row.
+- **Photo frame card.** A slideshow of a folder or album from Home Assistant's media browser: your own media folders, Immich albums (with the Immich integration) and other photo sources. Photos fade from one to the next with a slow zoom; tap for the next one. Choose the album with **Choose** in the card's settings, and set the seconds per photo, shuffle or in order, and whether to fill the card or show the whole photo. New photos appear on their own.
+- **States in your language.** Panalume now uses Home Assistant's own translations, so states appear in Home Assistant's language: *Ligado*, *Aberto*, *A aquecer* in Portuguese, *Eingeschaltet* in German, and so on. That covers state text on every card, lights, thermostat modes, weather and the vacuum and mower status. English setups are unchanged, and Panalume's own menus stay in English.
+- **Camera sound.** The full-screen live view has a speaker button for cameras that send sound. It can be added to a camera card too, under **Speaker button**.
+- **Custom CSS for parts of a card.** A card's **Custom CSS** can now style parts inside it as well as the card itself, e.g. `& .name { white-space: normal }`. Buttons also have a **Wrap long names onto two lines** option.
+- The People card no longer splits a single word (e.g. *Ausente*) across two lines.
+
+## 0.32.0
+
+- **Hidden cards no longer leave gaps on phones.** When a card is hidden by its **Visible when** template, the automatic phone layout leaves it out, so the cards below move up and small cards pair up again. On a phone with its own layout, rows left empty by hidden cards close up too. Tablets and desktops keep their layout as it is, and while editing every card is still shown.
+- **Hue light card with scenes** (contributed by Asben91). The Light card for a Philips Hue room or zone, with the room's Hue scenes as buttons instead of colour buttons: tap one to set it, and dynamic scenes play animated. Scenes are found automatically in Hue's own order, or pick your own (from any room, in your order). The scene row scrolls sideways when there are many.
+- **Robot vacuum card: map picker.** A **Map** dropdown next to suction power switches between your vacuum's maps (e.g. Roborock's *selected map*). It's found automatically, can be set by hand under **Map picker**, and hidden with **Show**.
+- **Inter is built in.** The default font no longer loads from Google Fonts, so Panalume makes no requests outside your home network. It looks the same, loads a little faster, and works on tablets with no internet access. Dashboards that had the old Google link saved switch over automatically, and you can still add any Google Font under **Theme**.
+- Service actions: the **Data** box now shows an example, and explains that a script's fields go straight in when you call the script directly (`script.my_script`), with no `"data"` wrapper.
+
+## 0.31.1
+
+- **Sensor card: hide parts, and values that fit.** New **Show** buttons hide the icon, name, value or unit. The value now shrinks to fit the card, so a long state like *Detected* is no longer cut off on a small card, and **Value size %** sets its size yourself without making everything else bigger. **Value** now says it can be your own text, no template needed.
+- **Binary sensors in Home Assistant's words.** Door, window, motion, moisture, plug and other binary sensors now show *Open* / *Closed*, *Detected* / *Clear*, *Wet* / *Dry*, *Plugged in* / *Unplugged* and so on, as Home Assistant does, instead of *On* / *Off*, on every card.
+- **Alarm panel scales with the card.** Making the card smaller or bigger now resizes the buttons and keypad too, instead of only the text.
+- **Clearer theme settings.** Colour and blur settings now say what they change: **Accent colour** (sliders, dials, graphs, links, selected buttons), the **"On" colour** (icons and toggles of things that are on; lights use their own colour), **Secondary text**, **Card content size %** and **Card glass blur** (0 is fastest on older tablets).
+
 ## 0.31.0
 
 - **Calendar card.** Today's and upcoming events from your Home Assistant calendars (Google, CalDAV, Local calendar, holidays…), grouped by day, each calendar in its own colour. Events on now are highlighted, finished ones drop off, and tapping an event shows its location and description. Choose how many days ahead and how many events; small cards show just the next few.

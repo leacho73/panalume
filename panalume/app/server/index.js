@@ -86,7 +86,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, '{"ok":true}');
       }
     }
-    if (p === '/api/me') return send(res, 200, JSON.stringify({ admin: await isAdmin(req), name: req.headers['x-remote-user-display-name'] || null }));
+    if (p === '/api/me') return send(res, 200, JSON.stringify({ admin: await isAdmin(req), id: req.headers['x-remote-user-id'] || null, name: req.headers['x-remote-user-display-name'] || null }));
     if (p === '/api/icons') {
       const out = {};
       for (const n of (url.searchParams.get('n') || '').split(',').slice(0, 200)) if (n) out[n] = iconPath(n);
@@ -102,8 +102,13 @@ const server = http.createServer(async (req, res) => {
     }
     if (p.startsWith('/ha/')) {
       // Proxy HA image endpoints (camera_proxy, media_player_proxy, local files).
-      const target = HA_URL + p.slice(3) + url.search;
-      const r = await fetch(target, { headers: { Authorization: `Bearer ${TOKEN}` } });
+      // Signed media links (/media/…?authSig=, e.g. photos from local media) carry
+      // their own permission and aren't under /api, which the Supervisor's proxy
+      // only passes on, so in the app they go straight to Home Assistant.
+      const signed = !p.startsWith('/ha/api/') && url.searchParams.has('authSig');
+      const direct = signed && SUP ? await coreDirect() : null;
+      const target = (direct || HA_URL) + p.slice(3) + url.search;
+      const r = await fetch(target, { headers: direct ? {} : { Authorization: `Bearer ${TOKEN}` } });
       res.writeHead(r.status, { 'Content-Type': r.headers.get('content-type') || 'application/octet-stream', 'Cache-Control': 'no-cache' });
       if (!r.body) return res.end();
       const reader = r.body.getReader();

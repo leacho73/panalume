@@ -1,4 +1,4 @@
-import { param } from './params.js';
+import { param, parentHash } from './params.js';
 import { toast, validEntityId } from './ha.svelte.js';
 // Dashboard config: cards are defined once and placed on layouts. The main
 // (tablet) layout is shown everywhere by default: desktop scales it, phone gets
@@ -6,6 +6,7 @@ import { toast, validEntityId } from './ha.svelte.js';
 // Each layout has a design width (the stage is scaled to fit the screen), an
 // optional sidebar, and per-zone placements ('sidebar' or a view id).
 import { reflow } from './reflow.js';
+import { t, truthy } from './tpl.js';
 import { clientId } from './live.js';
 
 export const DEVICES = {
@@ -20,9 +21,11 @@ export const MODES = { same: 'Same as tablet (scaled to fit)', auto: 'Automatic 
 export const MODE_SHORT = { same: 'same as tablet', auto: 'automatic', custom: 'own layout' };
 export const GRID = 10;
 
+const GOOGLE_INTER = 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap';
+
 export const DEFAULT_THEME = {
   font: 'Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif',
-  fontUrl: 'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap',
+  fontUrl: '', // Inter is built in (src/inter.css); a Google Fonts link here loads another font
   background: 'radial-gradient(1200px 800px at 10% -10%, #1d2a4a 0%, transparent 60%), radial-gradient(1000px 700px at 110% 110%, #2a1d3d 0%, transparent 55%), #0b0f17',
   text: '#eef2f8',
   muted: 'rgba(238,242,248,.6)',
@@ -71,7 +74,7 @@ function starter() {
 export function detectDevice() {
   const q = param('device');
   if (q && DEVICES[q]) return q;
-  const saved = localStorage.getItem('hd-device');
+  const saved = screenDevice();
   if (saved && DEVICES[saved]) return saved;
   const w = Math.min(innerWidth, screen.width || innerWidth);
   if (w < 700) return 'phone';
@@ -106,13 +109,18 @@ export function setPanelSide(side) {
   try { localStorage.setItem('hd-panel-side', app.panelSide); } catch {}
 }
 
+/** A card its "Visible when" template currently hides. */
+export const cardHidden = (c) => !!c?.visible && !truthy(t(c.visible, { entity_id: c.props?.entity }));
+
 /** The layout a device actually shows (main, a reflow of main, or its own). */
 export function layout(dev = app.device) {
   const ls = app.config.layouts;
   const l = ls[dev];
   if (dev === 'tablet' || l.mode === 'custom') return l;
   if (l.mode === 'same') return ls.tablet;
-  return reflow(ls.tablet, l.width, app.config.views, app.config.cards);
+  // Outside editing, hidden cards are left out of the automatic phone layout, so
+  // the rest close up (and small cards re-pair) instead of leaving gaps.
+  return reflow(ls.tablet, l.width, app.config.views, app.config.cards, app.editing ? null : (p) => cardHidden(app.config.cards[p.card]));
 }
 
 /** Which stored layout edits on this device go to. */
@@ -164,7 +172,22 @@ export function importConfig(cfg) {
 let firstInit = true;
 let homeView = null;
 /** This screen's own view: ?view= if given, else the first view. */
-export const startView = () => (app.config.views.some((v) => v.id === homeView) ? homeView : app.config.views[0]?.id);
+// This screen's own home view, kept in this browser only (e.g. the kitchen tablet
+// and the living-room tablet each going to their own view, in kiosk apps that
+// can't add ?view= to the address).
+export function screenHome() {
+  try { return localStorage.getItem('hd-home-view') || ''; } catch { return ''; }
+}
+export function setScreenHome(id) {
+  try { id ? localStorage.setItem('hd-home-view', id) : localStorage.removeItem('hd-home-view'); } catch {}
+}
+// The view this screen opens on and goes back to: ?view= in the address first, then
+// this screen's own setting, then this device's Home view (Layout tab), then the first view.
+export const startView = () => {
+  const ok = (id) => !!id && app.config.views.some((v) => v.id === id);
+  const own = app.config.layouts[app.device]?.home_view;
+  return [homeView, screenHome(), own].find(ok) ?? app.config.views[0]?.id;
+};
 function init(cfg) {
   for (const [dev, d] of Object.entries(DEVICES)) {
     cfg.layouts[dev] ??= { width: d.width, sidebar: { enabled: false, side: 'left', width: 300 }, zones: { sidebar: [] } };
@@ -173,6 +196,8 @@ function init(cfg) {
     cfg.layouts[dev].display ??= d.display;
   }
   cfg.theme = { ...DEFAULT_THEME, ...cfg.theme };
+  // Inter used to load from Google Fonts by default; it's built in now.
+  if (cfg.theme.fontUrl === GOOGLE_INTER) cfg.theme.fontUrl = '';
   for (const c of Object.values(cfg.cards)) normalise(c);
   app.config = cfg;
   lastSaved = JSON.stringify(cfg);
@@ -180,8 +205,15 @@ function init(cfg) {
   if (firstInit) {
     const want = (param('view') || '').toLowerCase();
     const v = want && cfg.views.find((x) => x.id.toLowerCase() === want || x.name.toLowerCase() === want);
-    if (v) app.view = v.id;
     homeView = v?.id ?? null;
+    const own = [screenHome(), cfg.layouts[app.device]?.home_view].find((id) => id && cfg.views.some((x) => x.id === id));
+    // A view named in Home Assistant's address (…/panalume#energy, e.g. a bookmark) opens that
+    // view this time; the home view (for going back) stays as it is.
+    const linked = (parentHash() || '').toLowerCase();
+    const l = linked && cfg.views.find((x) => x.id.toLowerCase() === linked || x.name.toLowerCase() === linked);
+    if (v) app.view = v.id;
+    else if (l) app.view = l.id;
+    else if (own) app.view = own;
   }
   firstInit = false;
   if (!cfg.views.some((v) => v.id === app.view)) app.view = cfg.views[0]?.id;
@@ -237,11 +269,17 @@ export async function undoLast() {
   await fetch('api/config', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Client': clientId }, body: prev });
 }
 
-export function setDevice(d) {
-  app.device = d;
+// The layout this screen uses, chosen in the Layout tab and kept in this browser only
+// ('' = work it out from the screen). For tablets detected as desktops, in kiosk apps
+// that can't add ?device= to the address.
+export function screenDevice() {
+  try { return localStorage.getItem('hd-device') || ''; } catch { return ''; }
+}
+export function setScreenDevice(d) {
+  try { d ? localStorage.setItem('hd-device', d) : localStorage.removeItem('hd-device'); } catch {}
+  app.device = detectDevice();
   app.selected = null;
   app.multi = [];
-  localStorage.setItem('hd-device', d);
 }
 
 export function setView(id) {
@@ -252,7 +290,9 @@ export function setView(id) {
 }
 
 export function zoneList(zone, l = layout()) {
-  return (l.zones[zone] ??= []);
+  // Read back after creating it: the stored list is the state's own copy, not the [] put in.
+  l.zones[zone] ??= [];
+  return l.zones[zone];
 }
 
 /** Stored layouts that hold their own placements (main + any custom ones). */
@@ -269,11 +309,12 @@ export function selectedCard() {
   return p ? app.config.cards[p.card] : null;
 }
 
-// New cards go on every stored layout (at the bottom), so they show on all devices.
+// New cards go on every stored layout (at the bottom), so they show on all devices,
+// unless the Layout tab says "only the layout you're editing".
 function placeEverywhere(cardId, zone, size) {
   ensureEditable();
   const here = layout();
-  for (const l of new Set([here, ...storedLayouts()])) {
+  for (const l of app.config.new_cards === 'this' ? [here] : new Set([here, ...storedLayouts()])) {
     const z = zone === 'sidebar' && !l.sidebar.enabled ? app.view : zone;
     const list = zoneList(z, l);
     const y = list.reduce((m, p) => Math.max(m, p.y + p.h), 0) + GRID * 2;
@@ -305,9 +346,15 @@ export function placeExisting(cardId, zone = app.view) {
   changed();
 }
 
+// The sidebar sits beside the views (left / right) or as a bar across the top of them.
+/** How much width the sidebar takes from the views: 0 when it's off or across the top. */
+export const sideWidth = (l) => (l.sidebar.enabled && l.sidebar.side !== 'top' ? Number(l.sidebar.width) || 0 : 0);
+/** How tall the bar across the top is (0 unless the sidebar is set to Top). */
+export const topHeight = (l) => (l.sidebar.enabled && l.sidebar.side === 'top' ? Math.max(40, Number(l.sidebar.height) || 100) : 0);
+
 export function zoneWidth(zone, l = layout()) {
-  const sb = l.sidebar.enabled ? l.sidebar.width : 0;
-  return zone === 'sidebar' ? sb : l.width - sb;
+  if (zone === 'sidebar') return l.sidebar.side === 'top' ? (l.sidebar.enabled ? l.width : 0) : (l.sidebar.enabled ? l.sidebar.width : 0);
+  return l.width - sideWidth(l);
 }
 
 /** Indices (in the selected zone) of everything that moves together. */
@@ -339,6 +386,21 @@ export function removeSelected(deleteCard = false) {
   changed();
 }
 
+// "Close gaps" on the selected card's group: outside edit mode, when a card in the
+// group is hidden by its "Visible when", the group's cards below it move up. Kept on
+// each of the group's placements.
+export function groupCloses() {
+  const p = selectedPlacement();
+  return !!p?.group && !!p.close;
+}
+export function setGroupCloses(on) {
+  const p = selectedPlacement();
+  if (!p?.group) return;
+  ensureEditable();
+  for (const q of zoneList(app.selected.zone)) if (q.group === p.group) { if (on) q.close = true; else delete q.close; }
+  changed();
+}
+
 export function groupSelected() {
   ensureEditable();
   const list = zoneList(app.selected.zone);
@@ -352,7 +414,7 @@ export function groupSelected() {
 export function ungroupSelected() {
   ensureEditable();
   const list = zoneList(app.selected.zone);
-  for (const i of selectionSet()) delete list[i].group;
+  for (const i of selectionSet()) { delete list[i].group; delete list[i].close; }
   app.multi = [];
   changed();
 }
@@ -372,6 +434,41 @@ export function duplicateSelected() {
 
 /** Copy the selected card(s) to another view, on every layout they're on:
  *  at the same spot if it's free there, otherwise below what's already there. */
+/** Devices with their own stored layout, other than the one being edited (for "Copy to layout"). */
+export function otherLayouts() {
+  const here = editTarget();
+  return Object.keys(app.config.layouts).filter((d) => d !== here && (d === 'tablet' || app.config.layouts[d].mode === 'custom'));
+}
+
+/** Put the selected card(s) on another device's layout too, in the same view, in about the
+ * same place (scaled to that layout's width), or below its cards if that spot is taken. */
+export function copyToLayout(dev) {
+  const zone = app.selected?.zone;
+  const dst = app.config.layouts[dev];
+  if (!zone || !dst) return;
+  const src = zoneList(zone);
+  const list = zoneList(zone, dst);
+  const ps = selectionSet().map((i) => src[i]).filter((p) => !list.some((q) => q.card === p.card));
+  if (!ps.length) return toast(`Already on the ${DEVICES[dev].label.toLowerCase()} layout`);
+  const k = zoneWidth(zone, dst) / (zoneWidth(zone) || 1);
+  const W = zoneWidth(zone, dst);
+  const copies = ps.map((p) => {
+    const w = Math.min(Math.max(GRID * 4, Math.round((p.w * k) / GRID) * GRID), W - GRID * 4);
+    return { ...$state.snapshot(p), x: Math.max(GRID * 2, Math.min(Math.round((p.x * k) / GRID) * GRID, W - w - GRID * 2)), w };
+  });
+  const group = ps.length > 1 ? uid() : null;
+  for (const q of copies) { if (group) q.group = group; else delete q.group; }
+  const hit = (a, b) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+  if (copies.some((q) => list.some((r) => hit(q, r)))) {
+    const x0 = Math.min(...copies.map((q) => q.x)), y0 = Math.min(...copies.map((q) => q.y));
+    const bottom = list.reduce((m, r) => Math.max(m, r.y + r.h), 0);
+    for (const q of copies) { q.x = q.x - x0 + GRID * 2; q.y = q.y - y0 + bottom + GRID * 2; }
+  }
+  list.push(...copies);
+  changed();
+  toast(`Copied ${copies.length > 1 ? copies.length + ' cards' : 'the card'} to the ${DEVICES[dev].label.toLowerCase()} layout`);
+}
+
 export function copyToView(view) {
   ensureEditable();
   const zone = app.selected?.zone;
@@ -430,6 +527,38 @@ export function addView(name) {
   changed();
 }
 
+/** A new view filled with ready-made cards ([{ type, props, w, h }], e.g. from an area):
+ * each stored layout gets them in rows that fit its own width. */
+export function addFilledView(name, icon, items) {
+  ensureEditable();
+  const id = uid();
+  app.config.views.push({ id, name, icon: icon || 'mdi:view-dashboard' });
+  const ids = items.map((it) => { const c = uid(); app.config.cards[c] = normalise({ id: c, type: it.type, props: it.props }); return c; });
+  const gap = GRID * 2;
+  for (const l of new Set([layout(), ...storedLayouts()])) {
+    const W = zoneWidth(id, l), list = zoneList(id, l);
+    let x = gap, y = gap, rowH = 0;
+    items.forEach((it, i) => {
+      const w = Math.min(it.w, W - gap * 2);
+      if (x > gap && x + w > W - gap) { x = gap; y += rowH + gap; rowH = 0; }
+      list.push({ card: ids[i], x, y, w, h: it.h });
+      x += w + gap; rowH = Math.max(rowH, it.h);
+    });
+  }
+  setView(id);
+  changed();
+  return id;
+}
+
+/** Turn a card into another type (e.g. a button into a slider), keeping its entity,
+ * name, icon, style, actions and where it sits. */
+export function changeType(card, type, meta) {
+  const keep = Object.fromEntries(['entity', 'name', 'icon'].filter((k) => card.props[k] != null && card.props[k] !== '' && meta.fields?.some((f) => f.key === k)).map((k) => [k, card.props[k]]));
+  card.type = type;
+  card.props = { ...structuredClone(meta.defaults || {}), ...keep };
+  changed();
+}
+
 export function removeView(id) {
   if (app.config.views.length < 2) return;
   app.config.views = app.config.views.filter((v) => v.id !== id);
@@ -465,6 +594,45 @@ export function setMainWidth(apply) {
   for (const [z, list] of Object.entries(fitBase.zones)) {
     const from = fitBase[z === 'sidebar' ? 'sidebar' : 'main'], to = zw(z, l);
     if (l.zones[z] && from > 100 && to > 100) l.zones[z] = refit(list, from, to);
+  }
+  changed();
+}
+
+/** Move the sidebar to the left, right or top. Going to the top lays its cards out in a row
+ *  across the bar (cards that don't fit go to the bottom of this view); coming back stacks them
+ *  in a column again. The views are widened or narrowed to match, like changing the width. */
+export function setSidebarSide(side) {
+  const l = layout();
+  const was = l.sidebar.side || 'left';
+  if (side === was) return;
+  ensureEditable();
+  if (side !== 'top' && was !== 'top') { l.sidebar.side = side; changed(); return; }
+  const before = zoneWidth('main', l);
+  l.sidebar.side = side;
+  if (side === 'top') l.sidebar.height ??= 100;
+  const after = zoneWidth('main', l);
+  for (const v of app.config.views) if (l.zones[v.id]?.length && before > 100 && after > 100) l.zones[v.id] = refit(l.zones[v.id], before, after);
+  const G = GRID * 2;
+  const cards = [...(l.zones.sidebar || [])].sort((a, b) => a.y - b.y || a.x - b.x);
+  if (side === 'top') {
+    const h = topHeight(l) - G;
+    const keep = [], spill = [];
+    let x = G;
+    for (const p of cards) {
+      const w = Math.min(p.w, 360);
+      if (x + w <= l.width - G) { keep.push({ ...p, x, y: GRID, w, h }); x += w + G; } else spill.push(p);
+    }
+    l.zones.sidebar = keep;
+    if (spill.length) {
+      const dst = zoneList(app.view, l);
+      let y = dst.reduce((m, p) => Math.max(m, p.y + p.h), 0) + G;
+      for (const p of spill) { dst.push({ ...p, x: G, y }); y += p.h + G; }
+      toast(spill.length === 1 ? 'One sidebar card didn\'t fit the bar, so it\'s at the bottom of this view' : `${spill.length} sidebar cards didn't fit the bar, so they're at the bottom of this view`);
+    }
+  } else {
+    let y = GRID * 3;
+    const w = Math.max(GRID * 4, l.sidebar.width - G * 2);
+    l.zones.sidebar = cards.map((p) => { const q = { ...p, x: G, y, w, h: Math.max(p.h, GRID * 8) }; y += q.h + G; return q; });
   }
   changed();
 }
@@ -511,6 +679,10 @@ export function fitOverflow(l) {
     const right = list.reduce((m, p) => Math.max(m, p.x + p.w), 0);
     if (right <= w) continue;
     const k = w / (right + Math.max(0, Math.min(...list.map((p) => p.x)))); // right margin = left margin
+    // Only a nudge: cards a little past the edge come back inside. A big squeeze means something
+    // else is off (a card far out to the side, a sidebar nearly as wide as the screen…), and
+    // shrinking every card to a sliver would be worse than leaving them where they are.
+    if (k < 0.6) continue;
     for (const p of list) {
       const x = Math.round(p.x * k);
       p.w = Math.max(GRID * 4, Math.round((p.x + p.w) * k) - x);

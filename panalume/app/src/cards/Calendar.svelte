@@ -3,15 +3,20 @@
   export const meta = {
     type: 'calendar', name: 'Calendar', icon: 'mdi:calendar-month-outline', category: 'Info',
     size: { w: 360, h: 320 }, tap: 'none',
-    defaults: { entities: [], days: 7, max: 20 },
+    defaults: { entities: [], view: 'list', days: 7, max: 20, hour12: false },
     // Every calendar in Home Assistant, up to six.
     autofill: () => ({ entities: [...states.keys()].filter((id) => id.startsWith('calendar.')).sort().slice(0, 6) }),
     sections: [{ key: 'head', label: 'Title & date' }, { key: 'location', label: 'Locations' }, { key: 'legend', label: 'Calendar names' }],
     fields: [
       { key: 'title', label: 'Title (blank = today’s date)', type: 'text' },
       { key: 'entities', label: 'Calendars', type: 'entities', domain: 'calendar' },
-      { key: 'days', label: 'Days ahead', type: 'number' },
-      { key: 'max', label: 'Most events shown', type: 'number' },
+      { key: 'view', label: 'View', type: 'select', options: [{ value: 'list', label: 'List of upcoming events' }, { value: 'week', label: 'Week' }, { value: 'timeline', label: 'Week with hours' }, { value: 'month', label: 'Month' }] },
+      { key: 'days', label: 'Days ahead (list)', type: 'number' },
+      { key: 'max', label: 'Most events shown (list)', type: 'number' },
+      { key: 'week_start', label: 'Week starts on (week and month)', type: 'select', options: [{ value: '', label: 'Automatic (from the language)' }, { value: '1', label: 'Monday' }, { value: '0', label: 'Sunday' }, { value: '6', label: 'Saturday' }] },
+      { key: 'day_start', label: 'First hour shown (week with hours, 0–23)', type: 'number' },
+      { key: 'day_end', label: 'Last hour shown (week with hours, 1–24)', type: 'number' },
+      { key: 'hour12', label: '12-hour times', type: 'bool' },
     ],
   };
 </script>
@@ -19,7 +24,9 @@
 <script>
   // Today's and upcoming events from Home Assistant's calendars (Google, CalDAV,
   // Local calendar, holidays…), grouped by day. Each calendar has its own colour;
-  // events on now are highlighted, and tapping one shows its details.
+  // events on now are highlighted, and tapping one shows its details. Or a week
+  // or month at a glance, with arrows to move through them; tapping a day opens
+  // its events.
   import Icon from '../components/Icon.svelte';
   import { t } from '../lib/tpl.js';
   import { clock } from '../lib/clock.svelte.js';
@@ -29,6 +36,12 @@
 
   const cals = $derived((props.entities || []).filter((id) => id?.startsWith('calendar.')));
   const days = $derived(Math.min(31, Math.max(1, Number(props.days) || 7)));
+  const view = $derived(props.view === 'week' || props.view === 'month' || props.view === 'timeline' ? props.view : 'list');
+  // Weeks or months forward (or back) from the current one, and the day opened from the grid.
+  let offset = $state(0);
+  let sheet = $state(null);
+  let lastView = '';
+  $effect.pre(() => { if (view !== lastView) { lastView = view; offset = 0; sheet = null; } });
   // Refetch when a calendar's state changes (its current / next event moved),
   // and every 5 minutes anyway.
   const stamp = $derived(cals.map((id) => states.get(id)?.last_updated || '').join('|'));
@@ -41,10 +54,9 @@
   });
   $effect(() => {
     refresh; stamp;
-    const list = cals, n = days;
+    const list = cals;
     if (!list.length) return void (events = []);
-    const from = new Date(); from.setHours(0, 0, 0, 0);
-    const to = new Date(from); to.setDate(to.getDate() + n);
+    const [from, to] = range.split('|').map((x) => new Date(Number(x)));
     const q = `?start=${encodeURIComponent(from.toISOString())}&end=${encodeURIComponent(to.toISOString())}`;
     let alive = true;
     Promise.all(list.map((id, i) => fetch(`ha/api/calendars/${id}${q}`).then((r) => (r.ok ? r.json() : Promise.reject(new Error(`${id}: ${r.status}`)))).then((evs) => evs.map((ev) => norm(ev, id, i)))))
@@ -87,12 +99,111 @@
   });
   const empty = $derived(cals.length && !error && !groups.length);
 
+  // Week and month: the first day of the week (from the setting, else the language).
+  const firstDay = $derived.by(() => {
+    if (props.week_start !== '' && props.week_start != null && !isNaN(Number(props.week_start))) return Number(props.week_start) % 7;
+    try {
+      const loc = new Intl.Locale(navigator.language);
+      const fd = (loc.getWeekInfo?.() || loc.weekInfo)?.firstDay;
+      if (fd) return fd % 7;
+    } catch {}
+    return 1;
+  });
+  const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+  const weekOf = (d) => addDays(day0(d), -((day0(d).getDay() - firstDay + 7) % 7));
+  const today = $derived(day0(now).getTime());
+  // The days on screen, as a "from|to" key so the calendars are only fetched again when it changes.
+  const span = $derived.by(() => {
+    const t0 = new Date(today);
+    if (view === 'week' || view === 'timeline') { const from = addDays(weekOf(t0), 7 * offset); return { from, to: addDays(from, 7), weeks: 1 }; }
+    if (view === 'month') {
+      const first = new Date(t0.getFullYear(), t0.getMonth() + offset, 1);
+      const from = weekOf(first);
+      const weeks = Math.ceil((Math.round((new Date(first.getFullYear(), first.getMonth() + 1, 1) - from) / 864e5)) / 7);
+      return { from, to: addDays(from, weeks * 7), weeks, first };
+    }
+    return { from: t0, to: addDays(t0, days), weeks: 0 };
+  });
+  const range = $derived(`${span.from.getTime()}|${span.to.getTime()}`);
+  const gridDays = $derived(view === 'list' ? [] : Array.from({ length: span.weeks * 7 }, (_, i) => addDays(span.from, i)));
+  const onDate = (date) => {
+    const next = addDays(date, 1);
+    return events.filter((e) => e.start < next && (e.end > date || (+e.end === +e.start && e.start >= date)));
+  };
+  const byDay = $derived(new Map(gridDays.map((d) => [d.getTime(), onDate(d)])));
+  const period = $derived.by(() => {
+    if (view === 'month') return span.first.toLocaleDateString(lang, { month: 'long', year: 'numeric' });
+    const end = addDays(span.from, 6);
+    const same = end.getMonth() === span.from.getMonth();
+    return `${span.from.toLocaleDateString(lang, same ? { day: 'numeric' } : { day: 'numeric', month: 'short' })} – ${end.toLocaleDateString(lang, { day: 'numeric', month: 'short' })}`;
+  });
+  const weekdays = $derived(Array.from({ length: 7 }, (_, i) => addDays(span.from, i).toLocaleDateString(lang, { weekday: w >= 420 ? 'short' : 'narrow' })));
+  // Week view: columns when there's room for them, otherwise a row per day.
+  const rows = $derived(w < 420);
+  // Month view: how many event titles fit in a cell (0 = coloured dots instead).
+  const cellH = $derived(span.weeks ? (h - (show('head') && !small ? 34 : 0) - 22 - (span.weeks - 1) * 3) / span.weeks : 0);
+  const lines = $derived(w / 7 >= 58 ? Math.max(0, Math.floor((cellH - 22) / 17)) : 0);
+  const openDay = (d, key = null) => { sheet = d.getTime(); open = key; };
+
+  // Week with hours: an hour scale down the side and a column per day, each
+  // timed event a block from its start to its end. All-day events (and timed
+  // ones covering the whole day) sit in a row above, as in Google Calendar.
+  const num = (v, def) => (v === '' || v == null || isNaN(Number(v)) ? def : Number(v));
+  // Hours on the clock face, so a day with a daylight-saving change still lines up.
+  const clockH = (t, d) => (t <= d ? 0 : t >= addDays(d, 1) ? 24 : t.getHours() + t.getMinutes() / 60);
+  const wholeDay = (e) => e.allDay || e.end - e.start >= 864e5;
+  // All-day bars, each stretching across the days it covers, stacked in lanes.
+  const allDayBars = $derived.by(() => {
+    if (view !== 'timeline') return [];
+    const col = (t) => Math.round((day0(t) - span.from) / 864e5);
+    const lanes = [], out = [];
+    for (const e of events) {
+      if (!wholeDay(e) || e.start >= span.to || e.end <= span.from) continue;
+      const a = Math.max(0, col(e.start));
+      // End is exclusive: an all-day event's end date, or the day after a timed one ends (unless at midnight).
+      const b = Math.max(a + 1, Math.min(7, col(e.end) + (!e.allDay && +e.end !== +day0(e.end) ? 1 : 0)));
+      let lane = lanes.findIndex((x) => x <= a);
+      if (lane < 0) { lane = lanes.length; lanes.push(b); } else lanes[lane] = b;
+      out.push({ e, a, b, lane });
+    }
+    return out;
+  });
+  // Timed events of a day, with side-by-side columns for ones that overlap.
+  const layout = (d) => {
+    const out = (byDay.get(d.getTime()) || []).filter((e) => !wholeDay(e))
+      .map((ev) => { const s = clockH(ev.start, d); return { ev, s, end: Math.max(clockH(ev.end, d), s) }; })
+      .sort((a, b) => a.s - b.s || b.end - a.end);
+    let cluster = [], cols = [], clusterEnd = -1;
+    const flush = () => { for (const p of cluster) p.n = cols.length; cluster = []; cols = []; };
+    for (const p of out) {
+      const end = Math.max(p.end, p.s + 0.5); // short events still get room for their title
+      if (p.s >= clusterEnd) { flush(); clusterEnd = -1; }
+      let c = cols.findIndex((x) => x <= p.s);
+      if (c < 0) { c = cols.length; cols.push(end); } else cols[c] = end;
+      p.col = c; cluster.push(p); clusterEnd = Math.max(clusterEnd, end);
+    }
+    flush();
+    return out;
+  };
+  const timedByDay = $derived(view === 'timeline' ? new Map(gridDays.map((d) => [d.getTime(), layout(d)])) : new Map());
+  // The hours shown: the card's setting, widened to fit the week's events so none are hidden.
+  const hourSpan = $derived.by(() => {
+    let a = Math.min(23, Math.max(0, Math.floor(num(props.day_start, 7))));
+    let b = Math.min(24, Math.max(a + 1, Math.ceil(num(props.day_end, 22))));
+    for (const ps of timedByDay.values()) for (const p of ps) { a = Math.min(a, Math.floor(p.s)); b = Math.max(b, Math.ceil(p.end)); }
+    return [a, Math.max(b, a + 1)];
+  });
+  const hourLabel = (hr) => new Date(2000, 0, 1, hr).toLocaleTimeString(lang, h12 ? { hour: 'numeric', hour12: true } : { hour: '2-digit', minute: '2-digit', hour12: false });
+  const nowH = $derived(new Date(now).getHours() + new Date(now).getMinutes() / 60);
+  const pct = (x) => `${((x - hourSpan[0]) / (hourSpan[1] - hourSpan[0])) * 100}%`;
+
   const lang = undefined;
   const dayName = (d) => {
     const diff = Math.round((day0(d) - day0(now)) / 864e5);
     return diff === 0 ? 'Today' : diff === 1 ? 'Tomorrow' : d.toLocaleDateString(lang, { weekday: diff < 7 ? 'long' : 'short', ...(diff < 7 ? {} : { day: 'numeric', month: 'short' }) });
   };
-  const hm = (d) => d.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit', hour12: false });
+  const h12 = $derived(!!props.hour12);
+  const hm = (d) => d.toLocaleTimeString(lang, h12 ? { hour: 'numeric', minute: '2-digit', hour12: true } : { hour: '2-digit', minute: '2-digit', hour12: false });
   const when = (e, date) => {
     if (e.allDay) return 'All day';
     const next = new Date(date); next.setDate(next.getDate() + 1);
@@ -106,15 +217,23 @@
   const calName = (id) => (states.get(id)?.attributes.friendly_name || id.slice(9)).replace(/\s*calendar$/i, '');
   let open = $state(null);
   const small = $derived(h < 170);
-  const title = $derived(t(props.title) || new Date(now).toLocaleDateString(lang, { weekday: 'long', day: 'numeric', month: 'long' }));
+  const title = $derived(view !== 'list' ? [t(props.title), period].filter(Boolean).join(' · ') : t(props.title) || new Date(now).toLocaleDateString(lang, { weekday: 'long', day: 'numeric', month: 'long' }));
+  const past = (e) => !e.allDay && e.end < now;
 </script>
 
-<div class="cal" class:small>
+<div class="cal" class:small class:h12>
   {#if show('head') && !small}
     <div class="head">
       <Icon icon="mdi:calendar-month-outline" size="1.2em" />
       <span class="t">{title}</span>
-      {#if show('legend') && cals.length > 1 && w >= 300}
+      {#if view !== 'list'}
+        <span class="nav" data-stop>
+          {#if offset}<button class="today-btn" onclick={() => { offset = 0; sheet = null; }}>Today</button>{/if}
+          <button onclick={() => { offset--; sheet = null; }} aria-label="Previous"><Icon icon="mdi:chevron-left" size="1.2em" /></button>
+          <button onclick={() => { offset++; sheet = null; }} aria-label="Next"><Icon icon="mdi:chevron-right" size="1.2em" /></button>
+        </span>
+      {/if}
+      {#if show('legend') && cals.length > 1 && w >= (view === 'list' ? 300 : 460)}
         <span class="legend">{#each cals as id, i}<i style="background:{COLORS[i % COLORS.length]}" title={calName(id)}></i>{/each}</span>
       {/if}
     </div>
@@ -124,30 +243,110 @@
     <div class="msg">Pick one or more calendars in the card's settings.</div>
   {:else if error}
     <div class="msg">{error}</div>
+  {:else if view === 'week' && !sheet}
+    <div class="week" class:rows data-stop>
+      {#each gridDays as d (d.getTime())}
+        {@const evs = byDay.get(d.getTime()) || []}
+        <div class="wday" class:today={d.getTime() === today} class:gone={d.getTime() < today}>
+          <button class="dh" onclick={() => openDay(d)}><span>{d.toLocaleDateString(lang, { weekday: rows ? 'short' : w >= 560 ? 'short' : 'narrow' })}</span><b>{d.getDate()}</b></button>
+          <div class="chips">
+            {#each evs as e (e.key)}
+              <button class="chip" class:all={e.allDay} class:past={past(e)} style="--c:{e.color}" onclick={() => openDay(d, e.key)} title={e.title}>
+                {#if !e.allDay && e.start >= d && (rows || w >= 640)}<span class="tm">{hm(e.start)}</span>{/if}<span class="ct">{e.title}</span>
+              </button>
+            {/each}
+          </div>
+        </div>
+      {/each}
+    </div>
+  {:else if view === 'timeline' && !sheet}
+    {@const [h0, h1] = hourSpan}
+    <div class="tl" class:narrow={w < 420} data-stop style="--hours:{h1 - h0}">
+      <div class="tl-row">
+        <span></span>
+        {#each gridDays as d (d.getTime())}
+          <button class="tl-dh" class:today={d.getTime() === today} class:gone={d.getTime() < today} onclick={() => openDay(d)}><span>{d.toLocaleDateString(lang, { weekday: w >= 420 ? 'short' : 'narrow' })}</span><b>{d.getDate()}</b></button>
+        {/each}
+      </div>
+      {#if allDayBars.length}
+        <div class="tl-row tl-all">
+          {#each allDayBars as { e, a, b, lane } (e.key)}
+            <button class="tl-allev" style="--c:{e.color};grid-column:{a + 2} / {b + 2};grid-row:{lane + 1}" onclick={() => openDay(addDays(span.from, a), e.key)} title={e.title}>{e.title}</button>
+          {/each}
+        </div>
+      {/if}
+      <div class="tl-body">
+        <div class="tl-grid">
+          <div class="tl-hours">
+            {#each Array.from({ length: h1 - h0 - 1 }, (_, i) => h0 + i + 1) as hr}<span style="top:{pct(hr)}">{hourLabel(hr)}</span>{/each}
+          </div>
+          {#each gridDays as d (d.getTime())}
+            <div class="tl-col" class:today={d.getTime() === today}>
+              {#each timedByDay.get(d.getTime()) || [] as p (p.ev.key)}
+                {@const e = p.ev}
+                <button class="tl-ev" class:past={past(e)} class:now={isNow(e)} style="--c:{e.color};top:{pct(p.s)};height:{((Math.max(p.end, p.s + 0.25) - p.s) / (h1 - h0)) * 100}%;left:calc({(p.col / p.n) * 100}% + 1px);width:calc({100 / p.n}% - 3px)" onclick={() => openDay(d, e.key)} title={e.title}>
+                  <span class="tl-ti">{e.title}</span>
+                  <span class="tl-tm">{hm(e.start)} – {hm(e.end)}</span>
+                  {#if e.location && show('location')}<span class="tl-loc">{e.location}</span>{/if}
+                </button>
+              {/each}
+              {#if d.getTime() === today && nowH >= h0 && nowH <= h1}<i class="tl-now" style="top:{pct(nowH)}"></i>{/if}
+            </div>
+          {/each}
+        </div>
+      </div>
+    </div>
+  {:else if view === 'month' && !sheet}
+    <div class="month" data-stop style="--weeks:{span.weeks}">
+      {#each weekdays as wd}<span class="wd">{wd}</span>{/each}
+      {#each gridDays as d (d.getTime())}
+        {@const evs = byDay.get(d.getTime()) || []}
+        <button class="cell" class:other={d.getMonth() !== span.first.getMonth()} class:today={d.getTime() === today} onclick={() => openDay(d)} aria-label={d.toLocaleDateString(lang, { weekday: 'long', day: 'numeric', month: 'long' }) + (evs.length ? `, ${evs.length} events` : '')}>
+          <span class="dn">{d.getDate()}</span>
+          {#if lines}
+            {#each evs.slice(0, evs.length > lines ? lines - 1 : lines) as e (e.key)}<span class="mchip" class:all={e.allDay} style="--c:{e.color}">{e.title}</span>{/each}
+            {#if evs.length > lines}<span class="more">+{evs.length - lines + 1}</span>{/if}
+          {:else if evs.length}
+            <span class="dots">{#each evs.slice(0, 4) as e (e.key)}<i style="background:{e.color}"></i>{/each}</span>
+          {/if}
+        </button>
+      {/each}
+    </div>
+  {:else if sheet}
+    {@const d = new Date(sheet)}
+    {@const evs = onDate(d)}
+    <div class="sheet">
+      <button class="back" onclick={() => { sheet = null; open = null; }}><Icon icon="mdi:arrow-left" size="1.1em" />{d.toLocaleDateString(lang, { weekday: 'long', day: 'numeric', month: 'long' })}</button>
+      {#if evs.length}
+        <div class="list" data-stop>{#each evs as e (e.key)}{@render row(e, d)}{/each}</div>
+      {:else}<div class="msg">Nothing on</div>{/if}
+    </div>
   {:else if empty}
     <div class="msg">Nothing on in the next {days === 1 ? 'day' : `${days} days`}</div>
   {:else}
     <div class="list" data-stop>
       {#each groups as g (g.date.getTime())}
         <div class="day" class:today={dayName(g.date) === 'Today'}>{dayName(g.date)}</div>
-        {#each g.evs as e (e.key)}
-          <button class="ev" class:now={isNow(e)} class:open={open === e.key} style="--c:{e.color}" onclick={() => (open = open === e.key ? null : e.key)}>
-            <span class="bar"></span>
-            <span class="when">{when(e, g.date)}</span>
-            <span class="what">
-              <span class="ti">{e.title}</span>
-              {#if open === e.key}
-                {#if e.location}<span class="sub"><Icon icon="mdi:map-marker-outline" size="1em" />{e.location}</span>{/if}
-                {#if e.description}<span class="desc">{e.description}</span>{/if}
-                {#if show('legend') && cals.length > 1}<span class="sub"><Icon icon="mdi:calendar" size="1em" />{calName(e.cal)}</span>{/if}
-              {:else if e.location && show('location') && !small}<span class="sub">{e.location}</span>{/if}
-            </span>
-          </button>
-        {/each}
+        {#each g.evs as e (e.key)}{@render row(e, g.date)}{/each}
       {/each}
     </div>
   {/if}
 </div>
+
+{#snippet row(e, date)}
+  <button class="ev" class:now={isNow(e)} class:open={open === e.key} style="--c:{e.color}" onclick={() => (open = open === e.key ? null : e.key)}>
+    <span class="bar"></span>
+    <span class="when">{when(e, date)}</span>
+    <span class="what">
+      <span class="ti">{e.title}</span>
+      {#if open === e.key}
+        {#if e.location}<span class="sub"><Icon icon="mdi:map-marker-outline" size="1em" />{e.location}</span>{/if}
+        {#if e.description}<span class="desc">{e.description}</span>{/if}
+        {#if show('legend') && cals.length > 1}<span class="sub"><Icon icon="mdi:calendar" size="1em" />{calName(e.cal)}</span>{/if}
+      {:else if e.location && show('location') && !small}<span class="sub">{e.location}</span>{/if}
+    </span>
+  </button>
+{/snippet}
 
 <style>
   .cal { height: 100%; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
@@ -174,6 +373,76 @@
   .small .day:not(.today) { margin-top: 2px; }
   .small .ev { padding-top: 5px; padding-bottom: 5px; }
   .small .when { width: 3.6em; }
+  .h12 .when { width: 9.4em; }
+  .small.h12 .when { width: 4.9em; }
+  .nav { display: flex; align-items: center; gap: 2px; flex: none; }
+  .nav button { display: grid; place-items: center; min-width: 28px; height: 28px; padding: 0 4px; border: 0; border-radius: 8px; background: rgba(255,255,255,.06); color: inherit; font: inherit; }
+  .nav .today-btn { font-size: .75em; font-weight: 600; padding: 0 9px; margin-right: 2px; }
+  /* Week: a column per day, or a row per day on narrow cards. */
+  .week { flex: 1; min-height: 0; overflow-y: auto; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; align-content: start; scrollbar-width: thin; }
+  .wday { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .dh { display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 4px 0; border: 0; border-radius: 8px; background: rgba(255,255,255,.04); color: var(--muted); font: inherit; font-size: .72em; text-transform: uppercase; letter-spacing: .04em; }
+  .dh b { font-size: 1.45em; color: var(--text); letter-spacing: 0; font-weight: 600; }
+  .wday.today .dh { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }
+  .wday.gone .dh b { color: var(--muted); }
+  .chips { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .chip { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%; min-width: 0; padding: 4px 6px; border: 0; border-left: 3px solid var(--c); border-radius: 6px; background: rgba(255,255,255,.05); color: inherit; font: inherit; font-size: .74em; text-align: left; line-height: 1.25; }
+  .chip.all { background: color-mix(in srgb, var(--c) 22%, transparent); }
+  .chip.past { opacity: .5; }
+  .tm { color: var(--muted); font-size: .9em; font-variant-numeric: tabular-nums; }
+  .ct { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .week.rows { grid-template-columns: 1fr; gap: 5px; }
+  .week.rows .wday { flex-direction: row; align-items: flex-start; gap: 8px; }
+  .week.rows .dh { flex: none; width: 3.4em; padding: 3px 0; }
+  .week.rows .dh b { font-size: 1.2em; }
+  .week.rows .chips { flex: 1; flex-direction: row; flex-wrap: wrap; padding-top: 2px; }
+  .week.rows .chip { width: auto; max-width: 100%; flex-direction: row; gap: 5px; align-items: baseline; }
+  /* Week with hours: a time scale on the left, a column per day, events as blocks. */
+  .tl { flex: 1; min-height: 0; display: flex; flex-direction: column; --gut: 3.4em; }
+  .h12 .tl { --gut: 3.8em; }
+  .tl-row, .tl-grid { display: grid; grid-template-columns: var(--gut) repeat(7, minmax(0, 1fr)); }
+  .tl-dh { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 2px 0 6px; border: 0; background: none; color: var(--muted); font: inherit; font-size: .72em; text-transform: uppercase; letter-spacing: .06em; }
+  .tl-dh b { display: grid; place-items: center; min-width: 1.9em; height: 1.9em; border-radius: 50%; font-size: 1.6em; font-weight: 500; color: var(--text); letter-spacing: 0; }
+  .tl-dh.today { color: var(--accent); }
+  .tl-dh.today b { background: var(--accent); color: #0b1220; }
+  .tl-dh.gone b { color: var(--muted); }
+  .tl-all { row-gap: 2px; border-bottom: 1px solid rgba(255,255,255,.1); padding-bottom: 4px; }
+  .tl-allev { min-width: 0; margin: 0 2px; padding: 2px 8px; border: 0; border-radius: 5px; background: color-mix(in srgb, var(--c) 70%, #000); color: #fff; font: inherit; font-size: .74em; font-weight: 500; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tl-body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; padding-top: 6px; }
+  .tl-grid { position: relative; height: max(100%, calc(var(--hours) * 32px)); background: repeating-linear-gradient(to bottom, rgba(255,255,255,.08) 0 1px, transparent 1px calc(100% / var(--hours))); }
+  .tl-hours { position: relative; }
+  .tl-hours span { position: absolute; right: 8px; transform: translateY(-50%); font-size: .66em; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .tl-col { position: relative; border-left: 1px solid rgba(255,255,255,.07); min-width: 0; }
+  .tl-col.today { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+  .tl-ev { position: absolute; display: flex; flex-direction: column; gap: 1px; min-height: 1.4em; overflow: hidden; padding: 3px 7px; border: 0; border-radius: 6px; background: color-mix(in srgb, var(--c) 72%, #000); color: #fff; font: inherit; font-size: .74em; line-height: 1.25; text-align: left; box-shadow: 0 0 0 1px rgba(0,0,0,.35); }
+  .tl-ev.now { box-shadow: 0 0 0 2px var(--c); }
+  .tl-ev.past { opacity: .5; }
+  .tl-ti { font-weight: 600; }
+  .tl-tm, .tl-loc { opacity: .85; font-size: .92em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  /* Phone-sized cards: just the titles, in tighter blocks. */
+  .tl.narrow { --gut: 2.6em; }
+  .tl.narrow .tl-ev { padding: 2px 3px; font-size: .64em; border-radius: 4px; }
+  .tl.narrow .tl-tm, .tl.narrow .tl-loc { display: none; }
+  .tl.narrow .tl-allev { padding: 1px 4px; font-size: .64em; }
+  .tl.narrow .tl-dh b { font-size: 1.25em; }
+  .tl-now { position: absolute; left: -1px; right: 0; height: 2px; background: #ff5b5b; z-index: 2; pointer-events: none; }
+  .tl-now::before { content: ''; position: absolute; left: -5px; top: -4px; width: 10px; height: 10px; border-radius: 50%; background: #ff5b5b; }
+  /* Month: a grid of days with titles, or dots when the cells are small. */
+  .month { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-template-rows: auto repeat(var(--weeks), minmax(0, 1fr)); gap: 3px; }
+  .wd { font-size: .68em; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); text-align: center; }
+  .cell { display: flex; flex-direction: column; align-items: stretch; gap: 2px; min-width: 0; min-height: 0; overflow: hidden; padding: 3px; border: 0; border-radius: 7px; background: rgba(255,255,255,.04); color: inherit; font: inherit; text-align: left; }
+  .cell.other { opacity: .4; }
+  .cell.today { box-shadow: inset 0 0 0 1.5px var(--accent); }
+  .dn { font-size: .72em; font-weight: 600; padding-left: 2px; }
+  .cell.today .dn { color: var(--accent); }
+  .mchip { font-size: .64em; line-height: 1.35; padding: 0 4px; border-radius: 4px; border-left: 2px solid var(--c); background: rgba(255,255,255,.05); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: none; }
+  .mchip.all { background: color-mix(in srgb, var(--c) 24%, transparent); }
+  .more { font-size: .62em; color: var(--muted); padding-left: 4px; }
+  .dots { display: flex; gap: 2px; padding-left: 2px; flex-wrap: wrap; }
+  .dots i { width: 5px; height: 5px; border-radius: 50%; }
+  /* A day opened from the week or month. */
+  .sheet { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+  .back { display: flex; align-items: center; gap: 6px; align-self: flex-start; padding: 4px 10px 4px 6px; border: 0; border-radius: 8px; background: rgba(255,255,255,.06); color: inherit; font: inherit; font-size: .85em; font-weight: 600; }
   /* Fade out at the bottom when there's more to scroll to. */
-  .list { mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent); }
+  .list, .week { mask-image: linear-gradient(to bottom, #000 calc(100% - 18px), transparent); }
 </style>

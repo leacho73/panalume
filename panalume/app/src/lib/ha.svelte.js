@@ -6,6 +6,8 @@ import { SvelteMap } from 'svelte/reactivity';
 export const states = new SvelteMap();
 export const templates = new SvelteMap();
 export const conn = $state({ connected: false, haVersion: '', problem: '' });
+// The Home Assistant user looking at the dashboard (from ingress); empty on the direct port.
+export const me = $state({ id: '', name: '', known: false });
 
 let ws;
 let nextId = 1;
@@ -109,7 +111,7 @@ function apply(ev) {
 }
 
 /** Home Assistant's own rule for a valid entity ID (e.g. `sensor._status` isn't one). */
-export const validEntityId = (id) => /^(?!.+__)(?!_)[\da-z_]+(?<!_)\.(?!_)[\da-z_]+(?<!_)$/.test(id);
+export const validEntityId = (id) => /^(?!.*__)[\da-z](?:[\da-z_]*[\da-z])?\.[\da-z](?:[\da-z_]*[\da-z])?$/.test(id);
 
 let entitySub = null;
 let watchedKey = '';

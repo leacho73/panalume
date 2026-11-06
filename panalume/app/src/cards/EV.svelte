@@ -7,8 +7,8 @@
   function cars() {
     const out = [];
     for (const id of states.keys()) {
-      let m = /^sensor\.((?!octopus)[a-z0-9_]+)(?<!_target)_state_of_charge$/.exec(id);
-      if (m) out.push({ p: m[1], soc: id, make: 'vw' });
+      let m = /^sensor\.((?!octopus)[a-z0-9_]+)_state_of_charge$/.exec(id);
+      if (m && !m[1].endsWith('_target')) out.push({ p: m[1], soc: id, make: 'vw' });
       m = /^sensor\.([a-z0-9_]+)_battery_autonomy$/.exec(id);
       if (m && states.has(`sensor.${m[1]}_battery`)) out.push({ p: m[1], soc: `sensor.${m[1]}_battery`, make: 'renault' });
       // MySkoda (Enyaq, Elroq…): …_battery_percentage next to …_range or …_charger_connected.
@@ -178,4 +178,6 @@
   .chip.on { color: #5bd88f; background: rgba(91,216,143,.14); }
   .chip.warn { color: #ffc861; }
   .car { position: absolute; right: -10px; bottom: -10px; height: 70%; opacity: .9; pointer-events: none; }
+  /* Older Safari doesn't size text by the card (container units). */
+  @supports not (font-size: 1cqmin) { .pct { font-size: 1.6em; } }
 </style>

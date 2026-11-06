@@ -2,6 +2,8 @@
   // Generic settings field, bound to obj[key]. Text fields accept HA templates.
   import EntityPicker from './EntityPicker.svelte';
   import IconPicker from './IconPicker.svelte';
+  import MediaFolderPicker from './MediaFolderPicker.svelte';
+  import HaViewPicker from './HaViewPicker.svelte';
   import Icon from './Icon.svelte';
   import { states } from '../lib/ha.svelte.js';
   import { changed, app } from '../lib/config.svelte.js';
@@ -17,7 +19,11 @@
 <div class="field" class:wide={f.type === 'textarea' || f.type === 'entities' || f.type === 'cards'}>
   {#if f.type !== 'bool'}<label for={f.key}>{f.label}{#if isTpl(obj[f.key])}<span class="tpl">template</span>{/if}
     {#if ontoggle}<button type="button" class="eye" class:off={hide} title={hide ? 'Hidden on the card — click to show' : 'Shown on the card — click to hide'} onclick={ontoggle}><Icon icon={hide ? 'mdi:eye-off-outline' : 'mdi:eye'} size="15px" /></button>{/if}</label>{/if}
-  {#if f.type === 'entity'}
+  {#if f.type === 'media-folder'}
+    <MediaFolderPicker value={obj[f.key] || ''} title={obj[f.key + '_title'] || ''} onpick={(id, title) => { obj[f.key + '_title'] = title; set(id); }} />
+  {:else if f.type === 'ha-view'}
+    <HaViewPicker value={obj[f.key] || ''} onpick={set} />
+  {:else if f.type === 'entity'}
     <EntityPicker bind:value={() => obj[f.key] || '', set} domain={f.domain} />
   {:else if f.type === 'entities'}
     <div class="ents">
@@ -45,7 +51,7 @@
     <label class="chk"><input type="checkbox" checked={!!obj[f.key]} onchange={(e) => set(e.currentTarget.checked)} /> {f.label}</label>
   {:else if f.type === 'select'}
     <select id={f.key} value={obj[f.key] ?? ''} onchange={(e) => set(e.currentTarget.value)}>
-      {#if !f.options.includes(obj[f.key] ?? '')}<option value="">—</option>{/if}
+      {#if !f.options.some((o) => (typeof o === 'string' ? o : o.value) === (obj[f.key] ?? ''))}<option value="">—</option>{/if}
       {#each f.options as o}<option value={typeof o === 'string' ? o : o.value}>{typeof o === 'string' ? o : o.label}</option>{/each}
     </select>
   {:else if f.type === 'number'}
@@ -72,11 +78,13 @@
   {:else}
     <input id={f.key} type="text" value={obj[f.key] ?? ''} placeholder={f.placeholder || ''} oninput={(e) => set(e.currentTarget.value)} />
   {/if}
+  {#if f.hint}<div class="hint">{f.hint}</div>{/if}
 </div>
 
 <style>
   .field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
   label { font-size: 12px; color: var(--muted); display: flex; gap: 6px; align-items: center; }
+  .hint { font-size: 11px; color: var(--muted); opacity: .8; line-height: 1.35; }
   .eye { margin-left: auto; background: none; border: 0; color: var(--accent); padding: 0 2px; display: grid; }
   .eye.off { color: var(--muted); opacity: .6; }
   .field:has(.eye.off) :global(input) { opacity: .5; }
