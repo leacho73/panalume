@@ -2,8 +2,14 @@
 # version (panalume/config.yaml) is one that hasn't been released yet, tags it
 # and publishes a GitHub release with that version's CHANGELOG section.
 # Home Assistant itself updates from config.yaml; releases are the human record.
-# Each release also publishes the standalone Docker image (docker/Dockerfile) to
-# ghcr.io/<owner>/panalume, for Home Assistant installs without the app store.
+#
+# Two kinds of image:
+# - Home Assistant downloads ready-made images (ghcr.io/<owner>/{arch}-panalume:<version>,
+#   built from panalume/Dockerfile) rather than building Panalume itself. They're pushed
+#   by the release pull request, so they exist before the new version reaches main and
+#   anyone's Home Assistant.
+# - The standalone Docker image (ghcr.io/<owner>/panalume, docker/Dockerfile) for Home
+#   Assistant installs without the app store, published with each release.
 name: Build and release
 
 on:
@@ -13,7 +19,6 @@ on:
 
 permissions:
   contents: write
-  packages: write
 
 jobs:
   build:
@@ -30,8 +35,8 @@ jobs:
       - run: npm run build
         working-directory: panalume/app
       # Check the standalone Docker image still builds for every platform it's
-      # published for (not published here), then start it and check it serves
-      # the dashboard and explains a missing token.
+      # published for (not published here), then start it and check it refuses
+      # to run without a password, and serves the sign-in page with one.
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
@@ -50,16 +55,65 @@ jobs:
           cache-from: type=gha
       - name: Start the image
         run: |
-          docker run -d --name pan -p 8099:8099 panalume:test
+          # No password: it must refuse to start and say why.
+          if docker run --rm panalume:test 2>&1 | tee /dev/stderr | grep -q 'PANALUME_PASSWORD'; then echo "refuses without a password: ok"; else exit 1; fi
+          docker run -d --name pan -p 8099:8099 -e PANALUME_PASSWORD=ci-test-password panalume:test
           for i in $(seq 1 20); do curl -fs -o /dev/null http://localhost:8099/ && break; sleep 1; done
-          curl -fs http://localhost:8099/ | grep -qi '<script'
+          curl -fs http://localhost:8099/ | grep -qi 'sign in'
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8099/api/config)" = 401
           docker logs pan 2>&1 | tee /dev/stderr | grep -q 'No Home Assistant token'
           docker rm -f pan
 
-  release:
+  image:
     needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Work out the version, and whether to publish it
+        id: v
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SAME_REPO: ${{ github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository }}
+        run: |
+          V=$(sed -n 's/^version: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' panalume/config.yaml)
+          if [ -z "$V" ]; then echo "No version found"; exit 1; fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "repo=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+          # Only a version that isn't released yet, and never from a fork.
+          if [ "$SAME_REPO" = true ] && ! gh release view "v$V" >/dev/null 2>&1; then echo "push=true" >> "$GITHUB_OUTPUT"; else echo "push=false" >> "$GITHUB_OUTPUT"; fi
+      - run: docker buildx create --use
+      - if: steps.v.outputs.push == 'true'
+        run: echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+      - name: Build both Home Assistant images (and push them for a new version)
+        run: |
+          for a in amd64:linux/amd64 aarch64:linux/arm64; do
+            docker buildx build panalume --platform "${a#*:}" \
+              --build-arg BUILD_VERSION=${{ steps.v.outputs.version }} --build-arg BUILD_ARCH="${a%%:*}" \
+              -t "${{ steps.v.outputs.repo }}/${a%%:*}-panalume:${{ steps.v.outputs.version }}" \
+              $([ "${{ steps.v.outputs.push }}" = true ] && echo --push)
+          done
+      - name: Check anyone can download them
+        if: steps.v.outputs.push == 'true'
+        run: |
+          for a in amd64 aarch64; do
+            r="${{ steps.v.outputs.repo }}/$a-panalume"; r="${r#ghcr.io/}"
+            tok=$(curl -fsS "https://ghcr.io/token?scope=repository:$r:pull" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+            if ! curl -fsS -o /dev/null -H "Authorization: Bearer $tok" -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json" "https://ghcr.io/v2/$r/manifests/${{ steps.v.outputs.version }}"; then
+              echo "::error::$r can't be downloaded without logging in. Make the package public: GitHub → Packages → $a-panalume → Package settings → Change visibility."
+              exit 1
+            fi
+          done
+
+  release:
+    needs: [build, image]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
     steps:
       - uses: actions/checkout@v7
       - name: Release the version in config.yaml if it's new

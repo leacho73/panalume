@@ -5,11 +5,13 @@
 # can't affect each other.
 #
 #   docker run -d --name panalume -p 8099:8099 -v panalume:/data \
-#     -e HA_URL=http://192.168.1.10:8123 -e HA_TOKEN=<long-lived token> \
+#     -e HA_URL=http://homeassistant.local:8123 -e HA_TOKEN=<long-lived token> \
+#     -e PANALUME_PASSWORD=<a password for the dashboard> \
 #     ghcr.io/leacho73/panalume
 #
-# There's no login: anyone who can reach the port can use (and edit) the
-# dashboard with the token's access. Only run it on a network you trust.
+# It won't start without PANALUME_PASSWORD: there's no Home Assistant login in
+# front of it, so the dashboard has its own. PANALUME_NO_LOGIN=1 runs it without
+# one (anyone who can reach the port can use and edit it), for trusted networks.
 
 # The build output is plain JavaScript, so it's built once on the build
 # machine and copied into each architecture's image.
@@ -22,7 +24,7 @@ RUN npm run build && npm prune --omit=dev
 
 FROM node:22-alpine
 WORKDIR /app
-ENV NODE_ENV=production PORT=8099 DATA_DIR=/data
+ENV NODE_ENV=production PORT=8099 DATA_DIR=/data PANALUME_REQUIRE_LOGIN=1
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/server ./server
