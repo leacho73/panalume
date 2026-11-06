@@ -15,7 +15,7 @@
   export const meta = {
     type: 'meal-plan', name: 'Meal plan', icon: 'mdi:silverware-fork-knife', category: 'Info',
     size: { w: 360, h: 320 }, tap: 'none',
-    defaults: { calendar: '', extras: [], days: 7, max: 6, type: true, recipes: '' },
+    defaults: { calendar: '', extras: [], days: 7, max: 6, recipes: '' },
     // Mealie's calendars are the ones named after a meal type; fall back to any
     // calendar that looks like a meal plan.
     autofill: () => {
@@ -36,7 +36,6 @@
       { key: 'extras', label: 'Other meal calendars (listed under tonight\'s)', type: 'entities', domain: 'calendar' },
       { key: 'days', label: 'Days ahead', type: 'number' },
       { key: 'max', label: 'Most meals listed', type: 'number' },
-      { key: 'type', label: 'Show the meal type', type: 'bool', section: 'type' },
       { key: 'recipes', label: 'Recipe count sensor', type: 'entity', domain: 'sensor', section: 'recipe_count', hint: 'Shown when nothing is planned. Mealie publishes one as sensor.mealie_recipes.' },
     ],
   };
@@ -131,12 +130,14 @@
     const next = addDays(date, 1);
     return e.start < next && (e.end > date || (+e.end === +e.start && e.start >= date));
   };
-  const tonight = $derived(events.filter((e) => onDay(e, today)).sort((a, b) => a.hero - b.hero || a.start - b.start));
+  // Tonight's meal comes from the main calendar first, whatever it's called.
+  const mainCal = $derived(String(props.calendar || '').trim());
+  const tonight = $derived(events.filter((e) => onDay(e, today)).sort((a, b) => (b.cal === mainCal) - (a.cal === mainCal) || a.hero - b.hero || a.start - b.start));
   const hero = $derived(tonight[0]);
   const also = $derived(tonight.slice(1, 4));
   const upcoming = $derived.by(() => {
     const out = [];
-    for (let d = 1; d < days; d++) {
+    for (let d = 1; d <= days; d++) {
       const date = addDays(today, d);
       const meals = events.filter((e) => onDay(e, date)).sort((a, b) => a.order - b.order || a.start - b.start);
       for (const e of meals) out.push({ ...e, date, dayLabel: dayLabel(date) });
@@ -150,7 +151,8 @@
     return `${date.toLocaleDateString(lang, { weekday: 'short' })} ${date.getDate()}`;
   }
   const hm = (d) => d.toLocaleTimeString(lang, { hour: '2-digit', minute: '2-digit' });
-  const when = (e) => (e.allDay ? 'Tonight' : hm(e.start));
+  // An all-day dinner is "Tonight"; an all-day breakfast or lunch is just "Today".
+  const when = (e) => (e.allDay ? (['breakfast', 'lunch', 'snack'].includes(mealKey(e.cal)) ? 'Today' : 'Tonight') : hm(e.start));
 
   // The list is cut to what the card actually measures: rows are a fixed height,
   // one row is reserved for the "and N more" line.
