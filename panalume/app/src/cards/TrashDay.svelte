@@ -63,7 +63,9 @@
   function parseDate(v) {
     const s = String(v ?? '').trim();
     if (!s || /^\d{1,2}:\d{2}(:\d{2})?$/.test(s)) return null;
-    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+    // A bare date (or a date and time with no offset) is the local day as written; a
+    // timestamp with an offset (HA reports them in UTC) goes through Date for the local day.
+    const m = /^(\d{4})-(\d{2})-(\d{2})(?:$|[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$)/.exec(s);
     if (m) return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
     if (/^\d{9,}$/.test(s)) {
       const d = new Date(Number(s) * (s.length <= 10 ? 1000 : 1));
@@ -146,9 +148,9 @@
 
 {#if !props.entity}
   <div class="trash"><div class="note">Pick the collection date in the card’s settings.</div></div>
-{:else if gone(dateEnt)}
+{:else if !binsOn && gone(dateEnt)}
   <div class="trash"><div class="note">{title} · collection date unavailable</div></div>
-{:else if !target}
+{:else if !binsOn && !target}
   <div class="trash"><div class="note">{title} · the date entity carries no date</div></div>
 {:else if hot}
   <div class="trash">
@@ -161,7 +163,7 @@
         {#if (show('type') && typeLabel) || show('date')}
           <span class="sub">
             {#if show('type') && typeLabel}<span class="tag">{typeLabel}</span>{/if}
-            {#if show('date')}<span class="when">{binsOn && away !== 0 && away !== 1 ? fmt(target) : away === 1 ? 'Tomorrow' : away === 0 ? 'Today' : fmt(target)}</span>{/if}
+            {#if show('date') && target}<span class="when">{binsOn && away !== 0 && away !== 1 ? fmt(target) : away === 1 ? 'Tomorrow' : away === 0 ? 'Today' : fmt(target)}</span>{/if}
           </span>
         {/if}
       </span>
