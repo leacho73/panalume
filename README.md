@@ -146,7 +146,7 @@ e.g. `…/panalume?view=Upstairs&return=5&noedit&fit=screen&kiosk`
 
 ### Without the App Store (Home Assistant Container or Core)
 
-If your Home Assistant runs in Docker or as Core, run Panalume as its own container. It needs three things: your Home Assistant address, a **long-lived access token** (your HA profile → **Security** → *Long-lived access tokens*), and a **password** for the dashboard itself, because there's no Home Assistant login in front of it.
+If your Home Assistant runs in Docker or as Core, run Panalume as its own container (the Docker image is available from 0.40.0, out on 13 November). It needs three things: your Home Assistant address, a **long-lived access token** (your HA profile → **Security** → *Long-lived access tokens*), and a **password** for the dashboard itself, because there's no Home Assistant login in front of it.
 
 ```sh
 docker run -d --name panalume --restart unless-stopped -p 8099:8099 \

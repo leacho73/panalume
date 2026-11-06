@@ -129,10 +129,14 @@ jobs:
         run: |
           V=$(sed -n 's/^version: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' panalume/config.yaml)
           if [ -z "$V" ]; then echo "No version found"; exit 1; fi
-          # The standalone image is published unless it's already there, so re-running
-          # a release whose image push failed still publishes it.
-          if ! docker manifest inspect "ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/panalume:$V" >/dev/null 2>&1; then echo "version=$V" >> "$GITHUB_OUTPUT"; fi
-          if gh release view "v$V" >/dev/null 2>&1; then echo "v$V is already released"; exit 0; fi
+          if gh release view "v$V" >/dev/null 2>&1; then
+            # Already released. Only a re-run on the released commit itself publishes the
+            # standalone image (when its first push failed); later commits never do, as
+            # they aren't that release.
+            if [ "$(gh api "repos/$GITHUB_REPOSITORY/commits/v$V" -q .sha)" = "$GITHUB_SHA" ] && ! docker manifest inspect "ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/panalume:$V" >/dev/null 2>&1; then echo "version=$V" >> "$GITHUB_OUTPUT"; fi
+            echo "v$V is already released"; exit 0
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
           # This version's section of the changelog, without its heading.
           awk -v v="## $V" '$0 == v { f = 1; next } /^## / && f { exit } f' panalume/CHANGELOG.md > notes.md
           if [ ! -s notes.md ]; then echo "- See CHANGELOG.md" > notes.md; fi
@@ -161,3 +165,11 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/panalume:${{ steps.rel.outputs.version }}
             ghcr.io/${{ github.repository_owner }}/panalume:latest
+      - name: Check anyone can download the standalone image
+        if: steps.rel.outputs.version
+        run: |
+          r="${GITHUB_REPOSITORY_OWNER,,}/panalume"
+          tok=$(curl -fsS "https://ghcr.io/token?scope=repository:$r:pull" | sed -n 's/.*"token":"\([^"]*\)".*/\1/p' || true)
+          if ! curl -fsS -o /dev/null -H "Authorization: Bearer $tok" -H "Accept: application/vnd.oci.image.index.v1+json" "https://ghcr.io/v2/$r/manifests/${{ steps.rel.outputs.version }}"; then
+            echo "::warning::ghcr.io/$r is private, so Docker users can't download it. Make it public: GitHub → Packages → panalume → Package settings → Change visibility."
+          fi
