@@ -17,7 +17,10 @@ const TOKEN = SUP || process.env.HA_TOKEN || (process.env.HA_TOKEN_FILE && fs.re
 const DATA = process.env.DATA_DIR || (SUP ? '/data' : path.resolve('data'));
 const DIST = path.resolve(process.env.DIST_DIR || 'dist');
 const CONFIG = path.join(DATA, 'dashboard.json');
-fs.mkdirSync(DATA, { recursive: true });
+try { fs.mkdirSync(DATA, { recursive: true }); fs.accessSync(DATA, fs.constants.W_OK); } catch (e) {
+  console.error(`Panalume can't write to ${DATA} (${e.code || e.message}). Give it a writable folder or volume there.`);
+  process.exit(1);
+}
 
 // Sign-in, for the standalone Docker image, where there's no Home Assistant login in
 // front of Panalume. The image sets PANALUME_REQUIRE_LOGIN, so it won't start without
@@ -40,8 +43,10 @@ const SESSION = LOGIN ? (() => {
 })() : '';
 const same = (a, b) => { const x = crypto.createHash('sha256').update(String(a)).digest(), y = crypto.createHash('sha256').update(String(b)).digest(); return crypto.timingSafeEqual(x, y); };
 const signedIn = (req) => !LOGIN || (req.headers.cookie || '').split(/;\s*/).some((c) => c.startsWith('panalume=') && same(c.slice(9), SESSION));
-// Wrong passwords: a second's wait each, and after 10 in a row a minute's lock-out for that address.
+// Wrong passwords: a second's wait each; after 10 in a row a minute's lock-out for that
+// address, and at most 30 wrong ones a minute in all (so changing address doesn't help).
 const tries = new Map();
+let failsAll = { n: 0, since: Date.now() };
 const LOGIN_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Panalume — sign in</title>
 <style>html,body{height:100%;margin:0}body{display:grid;place-items:center;background:radial-gradient(1200px 800px at 10% -10%,#1d2a4a 0%,transparent 60%),#0b0f17;color:#eef2f8;font:16px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 form{width:min(320px,calc(100% - 32px));padding:28px;border-radius:22px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:14px}
@@ -56,20 +61,23 @@ async function gate(req, res, p) {
   if (signedIn(req)) return true;
   if (p.endsWith('/api/login') && req.method === 'POST') {
     const ip = req.socket.remoteAddress || '';
+    const now = Date.now();
+    if (now - failsAll.since > 60e3) { failsAll = { n: 0, since: now }; for (const [k, v] of tries) if (v.until < now) tries.delete(k); }
     const t = tries.get(ip) || { n: 0, until: 0 };
-    if (Date.now() < t.until) { send(res, 429, '{"error":"Too many tries"}'); return false; }
+    if (now < t.until || failsAll.n >= 30) { send(res, 429, '{"error":"Too many tries"}'); return false; }
+    // Count the try before reading the password, so a burst of them at once can't slip past.
+    t.n++; failsAll.n++; tries.set(ip, t);
     let body = '';
     for await (const c of req) { body += c; if (body.length > 4096) break; }
     let pw = '';
     try { pw = JSON.parse(body).password || ''; } catch {}
     if (pw && same(pw, PASSWORD)) {
-      tries.delete(ip);
+      tries.delete(ip); failsAll.n--;
       const secure = req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : '';
       res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Set-Cookie': `panalume=${SESSION}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${secure}` });
       res.end('{"ok":true}');
       return false;
     }
-    t.n++;
     if (t.n >= 10) { t.n = 0; t.until = Date.now() + 60e3; console.warn(`Sign-in: 10 wrong passwords from ${ip}; locked out for a minute.`); }
     tries.set(ip, t);
     await new Promise((ok) => setTimeout(ok, 1000));
@@ -302,6 +310,13 @@ async function camStream(ws, entity) {
 
 server.on('upgrade', (req, socket, head) => {
   if (!signedIn(req)) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); return socket.destroy(); }
+  // Standalone: only pages served from this address may open a connection, not another
+  // site or app on the same machine (which the sign-in cookie would otherwise reach).
+  if (!SUP && req.headers.origin) {
+    let from = '';
+    try { from = new URL(req.headers.origin).host; } catch {}
+    if (from !== req.headers.host) { socket.write('HTTP/1.1 403 Forbidden\r\n\r\n'); return socket.destroy(); }
+  }
   if (req.url.split('?')[0].endsWith('/api/camera')) {
     const entity = new URL(req.url, 'http://x').searchParams.get('entity') || '';
     if (!/^camera\.[a-z0-9_]+$/.test(entity)) return socket.destroy();

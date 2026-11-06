@@ -7,7 +7,8 @@
 # - Home Assistant downloads ready-made images (ghcr.io/<owner>/{arch}-panalume:<version>,
 #   built from panalume/Dockerfile) rather than building Panalume itself. They're pushed
 #   by the release pull request, so they exist before the new version reaches main and
-#   anyone's Home Assistant.
+#   anyone's Home Assistant. (panalume/config.yaml's image: line, which points Home
+#   Assistant at them, goes in with the version bump of the first release that has them.)
 # - The standalone Docker image (ghcr.io/<owner>/panalume, docker/Dockerfile) for Home
 #   Assistant installs without the app store, published with each release.
 name: Build and release
@@ -18,11 +19,12 @@ on:
   pull_request:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -55,8 +57,10 @@ jobs:
           cache-from: type=gha
       - name: Start the image
         run: |
-          # No password: it must refuse to start and say why.
-          if docker run --rm panalume:test 2>&1 | tee /dev/stderr | grep -q 'PANALUME_PASSWORD'; then echo "refuses without a password: ok"; else exit 1; fi
+          # No password: it must refuse to start (exit non-zero, quickly) and say why.
+          set +e; out=$(timeout 30 docker run --rm panalume:test 2>&1); code=$?; set -e
+          echo "$out"
+          if [ "$code" -eq 0 ] || [ "$code" -eq 124 ] || ! echo "$out" | grep -q 'PANALUME_PASSWORD'; then echo "::error::the image should refuse to start without PANALUME_PASSWORD"; exit 1; fi
           docker run -d --name pan -p 8099:8099 -e PANALUME_PASSWORD=ci-test-password panalume:test
           for i in $(seq 1 20); do curl -fs -o /dev/null http://localhost:8099/ && break; sleep 1; done
           curl -fs http://localhost:8099/ | grep -qi 'sign in'
@@ -67,6 +71,7 @@ jobs:
   image:
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
@@ -111,6 +116,7 @@ jobs:
     needs: [build, image]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
       packages: write
@@ -123,8 +129,10 @@ jobs:
         run: |
           V=$(sed -n 's/^version: *"\{0,1\}\([^"]*\)"\{0,1\} *$/\1/p' panalume/config.yaml)
           if [ -z "$V" ]; then echo "No version found"; exit 1; fi
+          # The standalone image is published unless it's already there, so re-running
+          # a release whose image push failed still publishes it.
+          if ! docker manifest inspect "ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/panalume:$V" >/dev/null 2>&1; then echo "version=$V" >> "$GITHUB_OUTPUT"; fi
           if gh release view "v$V" >/dev/null 2>&1; then echo "v$V is already released"; exit 0; fi
-          echo "version=$V" >> "$GITHUB_OUTPUT"
           # This version's section of the changelog, without its heading.
           awk -v v="## $V" '$0 == v { f = 1; next } /^## / && f { exit } f' panalume/CHANGELOG.md > notes.md
           if [ ! -s notes.md ]; then echo "- See CHANGELOG.md" > notes.md; fi

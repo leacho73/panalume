@@ -179,7 +179,7 @@ Then open `http://<that machine>:8099` and sign in. Each browser stays signed in
 - **Use a token from a non-admin user.** Make a Home Assistant user just for Panalume (not an administrator) and create the token from that user's profile. Panalume can then only do what that user can.
 - **Keep it on your own network.** Don't forward the port to the internet; use your usual VPN or remote access instead.
 - `HA_TOKEN_FILE` can point at a file holding the token instead, e.g. a Docker secret.
-- `PANALUME_NO_LOGIN=1` runs it without a password. Anyone who can reach the port can then use and edit the dashboard, so only do that on a network you fully trust.
+- `PANALUME_NO_LOGIN=1` runs it without a password. Anyone who can reach the port can then use and edit the dashboard, and so can a web page open on a computer on that network, so we don't recommend it.
 
 ## Develop
 
