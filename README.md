@@ -144,6 +144,43 @@ Wall tablet tips: set **Layout → Tablet → Sizing** to *Fit the whole view on
 
 e.g. `…/panalume?view=Upstairs&return=5&noedit&fit=screen&kiosk`
 
+### Without the App Store (Home Assistant Container or Core)
+
+If your Home Assistant runs in Docker or as Core, run Panalume as its own container. It needs three things: your Home Assistant address, a **long-lived access token** (your HA profile → **Security** → *Long-lived access tokens*), and a **password** for the dashboard itself, because there's no Home Assistant login in front of it.
+
+```sh
+docker run -d --name panalume --restart unless-stopped -p 8099:8099 \
+  -v panalume:/data \
+  -e HA_URL=http://homeassistant.local:8123 \
+  -e HA_TOKEN=your-long-lived-token \
+  -e PANALUME_PASSWORD=a-password-for-the-dashboard \
+  ghcr.io/leacho73/panalume
+```
+
+Or with Docker Compose:
+
+```yaml
+services:
+  panalume:
+    image: ghcr.io/leacho73/panalume
+    restart: unless-stopped
+    ports: ["8099:8099"]
+    volumes: [panalume:/data]
+    environment:
+      HA_URL: http://homeassistant.local:8123
+      HA_TOKEN: your-long-lived-token
+      PANALUME_PASSWORD: a-password-for-the-dashboard
+volumes:
+  panalume:
+```
+
+Then open `http://<that machine>:8099` and sign in. Each browser stays signed in (a wall tablet only needs it once); changing the password signs everyone out. Your dashboard is saved in the `/data` volume. Update with `docker pull ghcr.io/leacho73/panalume` and recreate the container; images are published for each release (64-bit PCs, and 64-bit and 32-bit Raspberry Pi).
+
+- **Use a token from a non-admin user.** Make a Home Assistant user just for Panalume (not an administrator) and create the token from that user's profile. Panalume can then only do what that user can.
+- **Keep it on your own network.** Don't forward the port to the internet; use your usual VPN or remote access instead.
+- `HA_TOKEN_FILE` can point at a file holding the token instead, e.g. a Docker secret.
+- `PANALUME_NO_LOGIN=1` runs it without a password. Anyone who can reach the port can then use and edit the dashboard, and so can a web page open on a computer on that network, so we don't recommend it.
+
 ## Develop
 
 ```sh
