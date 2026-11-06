@@ -16,6 +16,7 @@
       { key: 'name', label: 'Title (blank = the list\'s name)', type: 'text' },
       { key: 'add', label: 'Add items from the card', type: 'bool' },
       { key: 'staples', label: 'Quick-add items', type: 'text', hint: 'Comma separated, shown as one-tap chips: Milk, Eggs, Bread' },
+      { key: 'badges', label: 'Show quantities as badges', type: 'bool', hint: '"2 x Milk" or "Milk x2" shows as Milk with a small ×2.' },
       { key: 'done', label: 'Show ticked items (under "Done")', type: 'bool' },
     ],
   };
@@ -28,6 +29,7 @@
   import { t, ent } from '../lib/tpl.js';
   import { subscribe, callService, conn } from '../lib/ha.svelte.js';
   import { name } from '../lib/entity.js';
+  import { SvelteSet } from 'svelte/reactivity';
   let { props, h = 360 } = $props();
   const show = (k) => !props.hide?.[k];
 
@@ -59,13 +61,22 @@
     call('update_item', { item: item.uid || item.summary, status });
   }
   let text = $state('');
-  // Duplicates are the list's job to show, not the card's to add again.
-  const same = (a, b) => String(a).trim().toLowerCase() === String(b).trim().toLowerCase();
   function add(want) {
     const s = String(want ?? '').trim();
     if (!s || !canAdd) return;
-    if (items.some((i) => same(i.summary, s))) return;
     call('add_item', { item: s });
+  }
+  // A quick-add chip: an item already in Done comes back rather than being added twice.
+  // Once tapped it hides at once, so a double tap can't add it twice.
+  const tapped = new SvelteSet();
+  function quick(s) {
+    const key = s.toLowerCase();
+    if (tapped.has(key)) return;
+    tapped.add(key);
+    setTimeout(() => tapped.delete(key), 5000);
+    const old = done.find((i) => split(i).label.toLowerCase() === key || (i.summary || '').trim().toLowerCase() === key);
+    if (old && canTick) call('update_item', { item: old.uid || old.summary, status: 'needs_action' });
+    else add(s);
   }
   function submit(ev) {
     ev?.preventDefault();
@@ -75,9 +86,10 @@
   const clearDone = () => call('remove_completed_items', {});
 
   // "2 x milk" and "milk x2" both mean two of them; anything else keeps its name whole.
+  // The x needs a space on its far side, so "6x4 frames", "Firefox 3" and "1 xmas card" stay whole.
   function split(item) {
     const s = item.summary || '';
-    const m = s.match(/^(\d+(?:[.,]\d+)?)\s*[x×]\s*(.+)$/i) || s.match(/^(.+?)\s*[x×]\s*(\d+(?:[.,]\d+)?)$/i);
+    const m = s.match(/^(\d+(?:[.,]\d+)?)\s*[x×]\s+(.+)$/i) || s.match(/^(.+?)\s+[x×]\s*(\d+(?:[.,]\d+)?)$/i);
     if (!m) return { qty: '', label: s };
     const [qty, label] = /^\d/.test(m[1]) ? [m[1], m[2]] : [m[2], m[1]];
     return { qty: `×${qty}`, label: label.trim() };
@@ -85,12 +97,12 @@
 
   // A regular already on the list is not a chip; "2 x Milk" counts as Milk.
   const staples = $derived.by(() => {
-    const have = new Set(open.flatMap((i) => [i.summary.trim().toLowerCase(), split(i).label.toLowerCase()]));
+    const have = new Set(open.flatMap((i) => [(i.summary || '').trim().toLowerCase(), split(i).label.toLowerCase()]));
     return String(props.staples || '')
       .split(',')
       .map((s) => s.trim())
       .filter(Boolean)
-      .filter((s) => !have.has(s.toLowerCase()));
+      .filter((s) => !have.has(s.toLowerCase()) && !tapped.has(s.toLowerCase()));
   });
 
   const today = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
@@ -125,7 +137,7 @@
       {#if show('add') && staples.length}
         <div class="chips" data-stop>
           {#each staples as s (s)}
-            <button class="chip" onclick={() => add(s)}>{s}</button>
+            <button class="chip" onclick={() => quick(s)}>{s}</button>
           {/each}
         </div>
       {/if}
@@ -139,10 +151,11 @@
     <div class="list" data-stop>
       {#each open as item (item.uid || item.summary)}
         {@const d = due(item)}
-        {@const q = split(item)}
+        {@const q = props.badges ? split(item) : { qty: '' }}
         <button class="it" onclick={() => tick(item)} disabled={!canTick}>
           <span class="box"></span>
-          <span class="tx"><span class="nm"><span class="l">{q.label}</span>{#if q.qty}<span class="qty">{q.qty}</span>{/if}</span>{#if d}<small class:late={d.late}>{d.label}</small>{/if}</span>
+          <!-- Without a badge the row is plain text, exactly as before. -->
+          <span class="tx">{#if q.qty}<span class="nm"><span class="l">{q.label}</span><span class="qty">{q.qty}</span></span>{:else}{item.summary}{/if}{#if d}<small class:late={d.late}>{d.label}</small>{/if}</span>
         </button>
       {:else}
         {#if loaded}<div class="empty"><Icon icon="mdi:check-all" size="1.3em" />All done</div>{/if}
