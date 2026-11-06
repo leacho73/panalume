@@ -6,6 +6,8 @@ import { SvelteMap } from 'svelte/reactivity';
 export const states = new SvelteMap();
 export const templates = new SvelteMap();
 export const conn = $state({ connected: false, haVersion: '' });
+// The Home Assistant user looking at the dashboard (from ingress); empty on the direct port.
+export const me = $state({ id: '', name: '', known: false });
 
 let ws;
 let nextId = 1;

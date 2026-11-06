@@ -15,6 +15,17 @@
   const ghost = (e) => {
     if (app.popup && performance.now() - openedAt < 400) { e.stopPropagation(); e.preventDefault(); }
   };
+  // Close by itself after this device's "Close pop-ups after" seconds without a touch.
+  $effect(() => {
+    const secs = Math.max(0, Number(app.config?.layouts[app.device]?.popup_secs) || 0);
+    if (!app.popup || !secs || app.editing) return;
+    let timer;
+    const arm = () => { clearTimeout(timer); timer = setTimeout(close, secs * 1000); };
+    arm();
+    const evs = ['pointerdown', 'keydown', 'wheel'];
+    for (const ev of evs) addEventListener(ev, arm, { capture: true, passive: true });
+    return () => { clearTimeout(timer); for (const ev of evs) removeEventListener(ev, arm, { capture: true }); };
+  });
 </script>
 
 <svelte:window onkeydown={(e) => e.key === 'Escape' && close()} onclickcapture={ghost} />

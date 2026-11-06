@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.39.0
+
+- **Map card** (thanks, j4mesw2). Shows where people and trackers are on a map, with their pictures, your home zone and its radius, and a pop-up when you tap one. It zooms to fit everyone, and markers that overlap merge into one badge with a count, which splits apart again as you zoom in. Choose a light or dark map, or your own map tiles.
+- **Countdown card** (thanks, mrclean5953). The next date on a calendar (birthdays, holidays, trips) with how many days are left, plus the dates after it in a short list underneath. It shows Today and Tomorrow instead of 0 and 1 days.
+- **Now playing card** (thanks, mrclean5953). A square tile for a media player: artwork filling the card, the track and artist over it, a progress bar, and previous, play/pause and next.
+- **Batteries card** (thanks, mrclean5953). Every battery in the house, emptiest first, with a count of how many are low. New devices appear without editing the card, or you can pick the batteries yourself.
+- **Screensaver.** **Layout → Screensaver after** covers the dashboard with a dim clock, or a slideshow from a Home Assistant media folder or album, after that many minutes without a touch. A tap brings the dashboard back (thanks, Vadimys19).
+- **Pop-ups can close by themselves.** **Layout → Close pop-ups after** shuts a pop-up after that many seconds without a touch, per device (thanks, DaveCBr).
+- **Light card: button-style layouts** (thanks, theadd668). Vertical, horizontal or icon, the same shapes as the Button card, so the two match on a dashboard. Tap switches the light; hold for brightness and colours.
+- **Glance: icon colours** (thanks, jandamf). Each item's icon can have its own colour, including from a template run for each entity, e.g. `{{ 'red' if is_state(entity_id, 'on') else 'green' }}`.
+- **Your name in templates** (thanks, CykloneFij). Templates can use `user` (the Home Assistant user's ID) and `user_name`, so a card can show on one tablet only, or say "Good morning, Sam" to whoever is looking.
+- **No grey strip on iPad and iPhone.** In the Home Assistant app, Panalume now fills the screen to the edges itself instead of leaving a grey strip along the bottom (thanks, stevelup, who also worked out the fix).
+- **Dishwasher card: more detail** (thanks, mrclean5953). Time left, which now works whether your dishwasher reports minutes or a finish time, salt and rinse aid levels, whether the load inside is clean, and the door when it's left open. LG ThinQ dishwashers are found automatically too.
+- **Upcoming media: how it's released** (thanks, mrclean5953). Films now say whether they're out in cinemas, online or on disc.
+- **Navigation card: tile icons** (thanks, mrclean5953). An Android-style rounded square behind each icon, with the view you're on filled in. The default stays as it was.
+- **Pictures for views** (thanks, mrclean5953). A view can have an image (a logo, a photo, your own icon) in place of its icon, in the views menu and on the Navigation card.
+- Cards that haven't been set up yet now say what they need (pick a camera, give a web address…) instead of showing an empty card, and a new Camera card picks the first working camera by itself (thanks, mrclean5953).
+
 ## 0.38.0
 
 - **Fan card.** For fans and air purifiers: on / off, a speed slider, the fan's modes (auto, sleep, turbo…), and oscillate and direction when it has them. Add a **light** for a ceiling fan's light (on / off and brightness on the same card), or **sensors** such as PM2.5, humidity or filter life for an air purifier.

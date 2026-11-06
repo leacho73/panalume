@@ -273,7 +273,7 @@
       <button class="snd" data-stop onclick={toggleSound} aria-label={muted ? 'Turn sound on' : 'Mute'} title={muted ? 'Turn sound on' : 'Mute'}><Icon icon={muted ? 'mdi:volume-off' : 'mdi:volume-high'} size="1.3em" /></button>
     {/if}
   {:else if shown}<img src={shown} alt="" style="object-fit:{fit}" class:broken onerror={() => { broken = true; failed++; }} onload={(ev) => { broken = false; ratio = ev.currentTarget.naturalWidth / ev.currentTarget.naturalHeight || 0; }} />{/if}
-  {#if !e}<div class="msg">Pick a camera in the card's settings.</div>{:else if !video && (broken || (!shown && failed >= 2))}<div class="msg">No picture from this camera</div>{/if}
+  {#if !props.entity}<div class="msg">Pick a camera in the card's settings.</div>{:else if !video && (broken || (!shown && failed >= 2))}<div class="msg">No picture from this camera</div>{/if}
   {#if props.show_name}<div class="lbl">{t(props.name) || name(e)}</div>{/if}
 </div>
 

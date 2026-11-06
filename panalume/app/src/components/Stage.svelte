@@ -1,6 +1,7 @@
 <script>
   import { untrack } from 'svelte';
   import { param } from '../lib/params.js';
+  import { safe } from '../lib/safearea.svelte.js';
   // The dashboard canvas. Laid out at the layout's design width and scaled
   // (CSS zoom) to fit the screen. In edit mode cards can be dragged anywhere
   // (including between the sidebar and main area) and resized from any edge or
@@ -11,7 +12,9 @@
   import { app, layout, GRID, changed, zoneList, ensureEditable, selectionSet, fitOverflow, usualGap, cardHidden, sideWidth, topHeight } from '../lib/config.svelte.js';
 
   let { available, autoDevice, offset = 0 } = $props(); // offset: space taken on the left (the editor panel when docked left)
-  let vh = $state(innerHeight);
+  // The window height, less the screen edges Panalume pads itself (safearea.svelte.js).
+  let winH = $state(innerHeight);
+  const vh = $derived(winH - safe.top - safe.bottom);
   let scrollY = $state(0);
   let sbEl = $state();
   let topEl = $state();
@@ -504,7 +507,7 @@
   }
 </script>
 
-<svelte:window bind:innerHeight={vh} bind:scrollY />
+<svelte:window bind:innerHeight={winH} bind:scrollY />
 
 {#snippet zone(name, list)}
   {#each list as p, i (p.card + ':' + i)}

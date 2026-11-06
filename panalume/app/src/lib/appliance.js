@@ -40,7 +40,9 @@ export const AUTOFILL = {
   // LG ThinQ dishwasher: "<x>_current_status" + "<x>_current_cycle", the time left
   // as the clock time it ends, a clean indicator light and a rinse aid level.
   dishLG() {
-    const p = keys().map((k) => k.match(/^sensor\.(.+)_current_status$/)?.[1]).find((x) => x && states.has(`sensor.${x}_current_cycle`));
+    // An LG washer has the same two sensors, so it also needs something only a dishwasher has.
+    const dishy = (x) => /dish/.test(x) || [`sensor.${x}_rinse_aid_dispenser_level`, `binary_sensor.${x}_clean_indicator_light`, `binary_sensor.${x}_rinse_refill_needed`, `binary_sensor.${x}_salt_refill_needed`].some((id) => states.has(id));
+    const p = keys().map((k) => k.match(/^sensor\.(.+)_current_status$/)?.[1]).find((x) => x && states.has(`sensor.${x}_current_cycle`) && dishy(x));
     if (!p) return {};
     return {
       name: device(`sensor.${p}_current_status`, /current status$/i),
