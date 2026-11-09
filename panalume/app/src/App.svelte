@@ -5,7 +5,7 @@
   import Screensaver from './components/Screensaver.svelte';
   import Icon from './components/Icon.svelte';
   import ViewIcon from './components/ViewIcon.svelte';
-  import { app, load, save, layout, setPanelSide, DEVICES, MODE_SHORT, detectDevice, setView, removeSelected, duplicateSelected, selectedPlacement, changed, undo, undoLast, selectionSet, ensureEditable, zoneList, groupSelected } from './lib/config.svelte.js';
+  import { app, load, save, layout, fillsBottom, setPanelSide, DEVICES, MODE_SHORT, detectDevice, setView, removeSelected, duplicateSelected, selectedPlacement, changed, undo, undoLast, selectionSet, ensureEditable, zoneList, groupSelected } from './lib/config.svelte.js';
   import { conn, toasts, watchEntities, states, subscribe, me } from './lib/ha.svelte.js';
   import { loadMoney } from './lib/money.svelte.js';
   import { HUB_CHARGING, MYENERGI_OWN } from './lib/octopus.js';
@@ -97,7 +97,7 @@
     `--radius:${th.cardRadius}px`, `--pad:${th.cardPadding}px`, `--blur:${th.cardBlur}px`, `--sidebar-bg:${th.sidebarBg}`,
     `--font:${th.font}`, `--page-bg:${th.background}`,
   ].join(';') : '');
-  $effect(() => { document.documentElement.style.cssText = rootStyle + `; --sa-top: ${safe.top}px; --sa-right: ${safe.right}px; --sa-bottom: ${safe.bottom}px; --sa-left: ${safe.left}px;`; });
+  $effect(() => { document.documentElement.style.cssText = rootStyle + `; --sa-top: ${safe.top}px; --sa-right: ${safe.right}px; --sa-bottom: ${safe.bottom}px; --sa-left: ${safe.left}px; --sa-pad-bottom: ${fillsBottom() ? 0 : safe.bottom}px;`; });
 
   function toggleEdit() {
     app.editing = !app.editing;
@@ -201,7 +201,7 @@
 {#if app.config}<Screensaver />{/if}
 
 <style>
-  .app { min-height: 100dvh; padding: var(--sa-top) var(--sa-right) var(--sa-bottom) var(--sa-left); }
+  .app { min-height: 100dvh; padding: var(--sa-top) var(--sa-right) var(--sa-pad-bottom) var(--sa-left); }
   .app.editing { padding-bottom: calc(var(--bar-h) + 12px + var(--sa-bottom)); } /* room to scroll the last cards clear of the toolbar */
   .app.editing.sheet { padding-bottom: calc(var(--bar-h) + 45dvh + 12px + var(--sa-bottom)); } /* …and of the panel when it's docked along the bottom */
   .noblur :global(.card) { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }

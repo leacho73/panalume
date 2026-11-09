@@ -9,12 +9,13 @@
   // Shift/Ctrl-click or drag a box on empty space to select several.
   // Positions snap to a 10px grid (hold Shift while dragging for 1px).
   import CardFrame from './CardFrame.svelte';
-  import { app, layout, GRID, changed, zoneList, ensureEditable, selectionSet, fitOverflow, usualGap, cardHidden, sideWidth, topHeight } from '../lib/config.svelte.js';
+  import { app, layout, GRID, changed, zoneList, ensureEditable, selectionSet, fitOverflow, usualGap, cardHidden, sideWidth, topHeight, fillsBottom } from '../lib/config.svelte.js';
 
   let { available, autoDevice, offset = 0 } = $props(); // offset: space taken on the left (the editor panel when docked left)
   // The window height, less the screen edges Panalume pads itself (safearea.svelte.js).
   let winH = $state(innerHeight);
-  const vh = $derived(winH - safe.top - safe.bottom);
+  const padBottom = $derived(fillsBottom() ? 0 : safe.bottom);
+  const vh = $derived(winH - safe.top - padBottom);
   let scrollY = $state(0);
   let sbEl = $state();
   let topEl = $state();
@@ -563,7 +564,10 @@
       <div class="inner" role="presentation" style="height:{tb}px" onpointerdown={(e) => bgDown(e, 'sidebar')} onpointermove={move} onpointerup={end}>{@render zone('sidebar', sideList)}</div>
     </header>
   {:else if sb}
-    <aside class="zone sidebar" bind:this={sbEl} style="width:{sb}px;height:{vh / scale / sideZ}px;zoom:{sideZ}" onscroll={() => { if (!op) sbScroll = sbEl.scrollTop; }}>
+    <!-- Its background carries on down through the bottom screen edge (the
+         iPad / iPhone home bar), taken back off with a negative margin so the
+         page doesn't grow by it; its cards still stop above the edge. -->
+    <aside class="zone sidebar" bind:this={sbEl} style="width:{sb}px;height:{(vh + padBottom) / scale / sideZ}px;padding-bottom:{padBottom / scale / sideZ}px;margin-bottom:{-padBottom / scale / sideZ}px;zoom:{sideZ}" onscroll={() => { if (!op) sbScroll = sbEl.scrollTop; }}>
       <div class="inner" role="presentation" style="height:{sideH}px;--sb-scroll:{sbScroll}" onpointerdown={(e) => bgDown(e, 'sidebar')} onpointermove={move} onpointerup={end}>{@render zone('sidebar', sideList)}</div>
     </aside>
   {/if}
