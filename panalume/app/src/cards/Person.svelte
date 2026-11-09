@@ -2,12 +2,15 @@
   export const meta = {
     type: 'person', name: 'People', icon: 'mdi:account-group', category: 'Info',
     size: { w: 320, h: 110 }, tap: 'none',
-    defaults: { entities: [] },
+    defaults: { entities: [], open: 'details' },
     fields: [
       { key: 'entities', label: 'People', type: 'entities', domain: ['person', 'device_tracker'] },
       { key: 'status', label: 'Status line (template; entity_id is each person, blank shows home / away / zone)', type: 'text', placeholder: "{{ states('sensor.' ~ entity_id.split('.')[1] ~ '_travel_time') }} min away" },
       { key: 'label', label: 'Name (template; entity_id is each person, blank shows their name)', type: 'text' },
+      { key: 'open', label: 'Tapping a person opens', type: 'select', options: [{ value: 'details', label: 'Their details' }, { value: 'map', label: 'A map of where they are' }] },
     ],
+    // The map shows your home zone, so make sure it is being watched.
+    watch: (p) => (p.open === 'map' ? ['zone.home'] : []),
   };
 </script>
 
@@ -16,7 +19,11 @@
   import { app } from '../lib/config.svelte.js';
   import { stateText } from '../lib/entity.js';
   import { t } from '../lib/tpl.js';
+  import { personTap } from '../lib/location.js';
   let { props } = $props();
+  const nameOf = (id, e) => (props.label && t(props.label, { entity_id: id })) || e?.attributes.friendly_name || id;
+  // Their map if chosen and they report a location; otherwise their details.
+  const open = (id, e) => (app.popup = personTap(props, e) === 'map' ? { map: id, title: nameOf(id, e) } : { entity: id });
 </script>
 
 <div class="ppl">
@@ -26,11 +33,11 @@
   {#each props.entities || [] as id}
     {@const e = states.get(id)}
     {@const home = e?.state === 'home'}
-    <button class="p" data-stop onclick={() => (app.popup = { entity: id })}>
+    <button class="p" data-stop onclick={() => open(id, e)}>
       <div class="av" class:home>
         {#if e?.attributes.entity_picture}<img src={haImage(e.attributes.entity_picture)} alt="" />{:else}{(e?.attributes.friendly_name || '?')[0]}{/if}
       </div>
-      <span class="n">{(props.label && t(props.label, { entity_id: id })) || e?.attributes.friendly_name || id}</span>
+      <span class="n">{nameOf(id, e)}</span>
       <span class="s">{props.status ? t(props.status, { entity_id: id }) : stateText(e)}</span>
     </button>
   {/each}

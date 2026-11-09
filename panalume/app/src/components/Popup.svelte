@@ -5,6 +5,7 @@
   import { app } from '../lib/config.svelte.js';
   import { cards } from '../lib/registry.js';
   import Camera from '../cards/Camera.svelte';
+  import MapCard from '../cards/Map.svelte';
   let vw = $state(0), vh = $state(0);
   const close = () => (app.popup = null);
   // On phones the click from the tap that opened the pop-up arrives a moment later and lands
@@ -41,6 +42,9 @@
       <button class="x" onclick={close} aria-label="Close"><Icon icon="mdi:close" size="1.3em" /></button>
       {#if app.popup.entity}
         <MoreInfo entity={app.popup.entity} />
+      {:else if app.popup.map}
+        {#if app.popup.title}<h2>{app.popup.title}</h2>{/if}
+        <div class="mapbox"><MapCard props={{ ...cards.map.meta.defaults, entities: [app.popup.map], zoom: 15, show_names: false }} /></div>
       {:else}
         {#if app.popup.title}<h2>{app.popup.title}</h2>{/if}
         <div class="cards">
@@ -63,6 +67,7 @@
   .x { position: absolute; top: 14px; right: 14px; background: rgba(255,255,255,.08); border: 0; color: inherit; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; z-index: 2; }
   .full { position: fixed; inset: 0; z-index: 900; background: #000; color: #fff; animation: fade .18s ease; }
   .full .x { top: max(16px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); width: 48px; height: 48px; background: rgba(0,0,0,.5); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .mapbox { position: relative; height: min(380px, 60dvh); border-radius: 16px; overflow: hidden; }
   h2 { margin: 0 0 14px; font-weight: 600; }
   .cards { display: flex; flex-direction: column; gap: 12px; }
   @keyframes fade { from { opacity: 0; } }
