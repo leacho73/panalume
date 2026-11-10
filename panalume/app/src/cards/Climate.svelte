@@ -2,13 +2,15 @@
   export const meta = {
     type: 'climate', name: 'Thermostat', icon: 'mdi:thermostat', category: 'Controls',
     size: { w: 300, h: 340 }, tap: 'none', hold: 'more-info',
-    defaults: { entity: '', show_modes: true },
+    defaults: { entity: '', show_modes: true, grow: true },
+    grow: true,
     sections: [
       { key: 'dial', label: 'Dial' }, { key: 'current', label: 'Current temp' }, { key: 'action', label: 'Heating / cooling status' },
       { key: 'humidity', label: 'Humidity' }, { key: 'modes', label: 'Modes' }, { key: 'presets', label: 'Presets' }, { key: 'fan', label: 'Fan' },
     ],
     fields: [
       { key: 'entity', label: 'Climate / water heater', type: 'entity', domain: ['climate', 'water_heater'] },
+      { key: 'grow', label: 'Grow with the card', type: 'bool', hint: 'Make the card bigger and its buttons, text and dial grow with it, up to 1.6×. The − / + under the card (Content size) still works on top.' },
       { key: 'name', label: 'Name', type: 'text' },
       { key: 'icon', label: 'Icon', type: 'icon' },
     ],
