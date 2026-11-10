@@ -17,6 +17,8 @@
   import { useHistory } from '../lib/history.svelte.js';
   let { entity } = $props();
   const e = $derived(states.get(entity));
+  // Blinds whose slats tilt get a taller cover box, to fit the tilt row.
+  const tilts = $derived(!!((+e?.attributes.supported_features || 0) & 176) || e?.attributes.current_tilt_position != null);
   const d = $derived(domain(entity));
   const a = $derived(e?.attributes || {});
   const numeric = $derived(e && e.state !== '' && !isNaN(+e.state));
@@ -57,7 +59,7 @@
   {:else if d === 'climate' || d === 'water_heater'}
     <div class="box" style="height:220px"><Climate props={{ entity, show_modes: true }} /></div>
   {:else if d === 'cover'}
-    <div class="box" style="height:120px"><Cover props={{ entity }} /></div>
+    <div class="box" style="height:{tilts ? 180 : 120}px"><Cover props={{ entity }} w={360} h={tilts ? 180 : 120} /></div>
   {:else if d === 'camera' || d === 'image'}
     <div class="box cam" style="height:300px"><Camera props={{ entity, mode: 'live', fit: 'contain' }} /></div>
   {:else if d === 'weather'}
