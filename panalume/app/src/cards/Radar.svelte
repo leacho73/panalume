@@ -19,6 +19,7 @@
       { key: 'smooth', label: 'Smooth the radar', type: 'bool' },
       { key: 'snow', label: 'Show snow', type: 'bool' },
       { key: 'credit', label: 'RainViewer credit', type: 'bool', section: 'credit' },
+      { key: 'pinch', label: 'Pinch or scroll to zoom in', type: 'bool', hint: 'Zoom into the radar on the card, then drag to move around. On a phone, one finger still scrolls the dashboard until you zoom in.' },
     ],
   };
 
@@ -48,6 +49,8 @@
   import Icon from '../components/Icon.svelte';
   import { t } from '../lib/tpl.js';
   import { states, haImage } from '../lib/ha.svelte.js';
+  import { zoomable } from '../lib/zoom.js';
+  import { app } from '../lib/config.svelte.js';
   let { props, w = 420, h = 300 } = $props();
   const show = (k) => !props.hide?.[k];
   const TILE = 256;
@@ -162,7 +165,7 @@
 <div class="radar" bind:clientWidth={mw} bind:clientHeight={mh}>
   {#if imgMode}
     {#if shot}
-      <img class="shot" src={shot} alt="" />
+      <div class="zm" use:zoomable={{ on: !!props.pinch && !app.editing }}><img class="shot" src={shot} alt="" /></div>
       {#if show('time') && shotAt}
         <div class="when"><Icon icon="mdi:clock-outline" size=".9em" />{shotAt}</div>
       {/if}
@@ -187,6 +190,8 @@
   {:else if !map || !centre}
     <div class="off"><Icon icon="mdi:progress-clock" size="1.7em" /><span>Loading radar…</span></div>
   {:else}
+    <!-- The map and the home marker zoom together; the time and credits stay put. -->
+    <div class="zm" use:zoomable={{ on: !!props.pinch && !app.editing }}>
     {#if baseLayer.length}
       <div class="base">
         {#each baseLayer as b (b.key)}
@@ -202,6 +207,7 @@
     {#if props.marker !== false}
       <div class="home"><span class="dot"></span>{#if t(props.label) || !props.center}<span class="lbl">{t(props.label) || 'Home'}</span>{/if}</div>
     {/if}
+    </div>
     {#if show('time') && stamp}
       <div class="when"><Icon icon="mdi:clock-outline" size=".9em" />{hhmm}</div>
     {/if}
@@ -228,6 +234,7 @@
       #0e1524;
     container-type: size;
   }
+  .zm { position: absolute; inset: 0; }
   .base { position: absolute; inset: 0; }
   .base img { position: absolute; width: 256px; height: 256px; filter: saturate(.95) brightness(.95) contrast(1.03); }
   /* A wash over the aerial so the radar colours and the white marker still read on a bright photo. */
