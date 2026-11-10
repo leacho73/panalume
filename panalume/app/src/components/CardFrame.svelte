@@ -12,8 +12,15 @@
   const def = $derived(cards[card.type]);
   const s = $derived(card.style || {});
   const vars = $derived({ entity_id: card.props?.entity });
-  // Content size: dashboard-wide card size × this card's own size (both %).
-  const z = $derived(((Number(app.config.theme.cardScale) || 100) / 100) * ((Number(s.scale) || 100) / 100));
+  // Content size: dashboard-wide card size × this card's own size (both %), × how much
+  // bigger than its usual size the card has been made, for card types that grow with
+  // it (meta.grow) when the card's "Grow with the card" is on (up to 1.6×).
+  const grow = $derived.by(() => {
+    const m = def?.meta;
+    if (!m?.grow || !card.props?.grow || !m.size || inPopup) return 1;
+    return Math.min(1.6, Math.max(1, Math.min(w / m.size.w, h / m.size.h)));
+  });
+  const z = $derived(((Number(app.config.theme.cardScale) || 100) / 100) * ((Number(s.scale) || 100) / 100) * grow);
   const visible = $derived(!card.visible || truthy(t(card.visible, vars)));
 
   const cssParts = $derived(s.css ? splitCss(t(s.css, vars), `[data-card="${card.id}"][data-card]`) : { decls: '', rules: '' });
