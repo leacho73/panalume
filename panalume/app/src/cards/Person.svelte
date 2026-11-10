@@ -20,7 +20,10 @@
   import { stateText } from '../lib/entity.js';
   import { t } from '../lib/tpl.js';
   import { personTap } from '../lib/location.js';
-  let { props } = $props();
+  let { props, card } = $props();
+  // When the card has its own tap action (a pop-up of other cards, say), tapping a
+  // person does that too, so the whole card behaves the same wherever it's tapped.
+  const cardTap = $derived(!!card?.tap?.action && card.tap.action !== 'none');
   const nameOf = (id, e) => (props.label && t(props.label, { entity_id: id })) || e?.attributes.friendly_name || id;
   // Their map if chosen and they report a location; otherwise their details.
   const open = (id, e) => (app.popup = personTap(props, e) === 'map' ? { map: id, title: nameOf(id, e) } : { entity: id });
@@ -33,13 +36,13 @@
   {#each props.entities || [] as id}
     {@const e = states.get(id)}
     {@const home = e?.state === 'home'}
-    <button class="p" data-stop onclick={() => open(id, e)}>
+    <svelte:element this={cardTap ? 'div' : 'button'} class="p" data-stop={cardTap ? undefined : ''} onclick={cardTap ? undefined : () => open(id, e)} role={cardTap ? 'presentation' : undefined}>
       <div class="av" class:home>
         {#if e?.attributes.entity_picture}<img src={haImage(e.attributes.entity_picture)} alt="" />{:else}{(e?.attributes.friendly_name || '?')[0]}{/if}
       </div>
       <span class="n">{nameOf(id, e)}</span>
       <span class="s">{props.status ? t(props.status, { entity_id: id }) : stateText(e)}</span>
-    </button>
+    </svelte:element>
   {/each}
 </div>
 
