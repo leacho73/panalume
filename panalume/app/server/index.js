@@ -133,6 +133,12 @@ async function haUsers() {
   users = { at: Date.now(), admins: new Set(list.filter((u) => u.is_owner || u.group_ids?.includes('system-admin')).map((u) => u.id)) };
   return users.admins;
 }
+// The app's slug in Home Assistant, so the page can ask Home Assistant for a fresh
+// ingress session when its old one has run out (see ha.svelte.js).
+let slugP;
+const appSlug = () => (SUP ? (slugP ??= fetch('http://supervisor/addons/self/info', { headers: { Authorization: `Bearer ${SUP}` } })
+  .then((r) => r.json()).then((j) => j?.data?.slug || null).catch(() => (slugP = null))) : null);
+
 async function isAdmin(req) {
   const id = req.headers['x-remote-user-id'];
   if (!id) return true;
@@ -161,7 +167,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, '{"ok":true}');
       }
     }
-    if (p === '/api/me') return send(res, 200, JSON.stringify({ admin: await isAdmin(req), id: req.headers['x-remote-user-id'] || null, name: req.headers['x-remote-user-display-name'] || null }));
+    if (p === '/api/me') return send(res, 200, JSON.stringify({ admin: await isAdmin(req), id: req.headers['x-remote-user-id'] || null, name: req.headers['x-remote-user-display-name'] || null, slug: await appSlug() }));
     if (p === '/api/icons') {
       const out = {};
       for (const n of (url.searchParams.get('n') || '').split(',').slice(0, 200)) if (n) out[n] = iconPath(n);
