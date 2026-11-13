@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.40.0
+
+- **Run it in Docker** (thanks, mbijker, for asking). If your Home Assistant runs in Docker or as Core, Panalume now has its own image, `ghcr.io/leacho73/panalume`, for PCs and 64-bit / 32-bit Raspberry Pi. It talks to Home Assistant with a long-lived token and has its own sign-in, as there's no Home Assistant login in front of it: set `PANALUME_PASSWORD`. See **Without the App Store** in the README.
+- **Quicker updates.** Home Assistant now downloads Panalume ready-made instead of building it on your machine, so updates take seconds, especially on a Raspberry Pi.
+- **Timers card** (thanks, 8ctvfhjs59-ctrl). Every running Home Assistant timer, found by itself, with a live countdown, a progress bar, and pause and cancel. It can also show finish times, such as a washing machine's. A Button card for a timer now shows its countdown too.
+- **Guest WiFi card** (thanks, mrclean5953). A QR code guests scan to join, with the password behind a tap.
+- **Music hub card** (thanks, mrclean5953). Every speaker at once: what's playing, its volume, and which ones are grouped.
+- **Chalkboard card** (thanks, mrclean5953). Draw or write with a finger; it's kept on that screen and can be saved as a picture.
+- **Weather radar card** (thanks, mrclean5953). Live rain radar from RainViewer over a map, or a radar picture from a camera. It's off until you turn on **Load radar tiles**, as it loads from the internet.
+- **Circuit energy card** (thanks, mrclean5953). What each circuit or device used today, this week or this month, priced at what you actually paid, including on time-of-use tariffs like Octopus Agile.
+- **Network status card** (thanks, mrclean5953). Whether the internet is up, your speed test results, and devices that have dropped off the network.
+- **Trash day card** (thanks, mrclean5953). Quiet most of the week, bright the evening before the bins go out.
+- **Meal plan card** (thanks, mrclean5953). Tonight's meal and the days after it, from Mealie or any meal calendar.
+- **Zoom into cameras** (thanks, TRORMUH). Pinch or scroll to zoom in and drag to move around, in the full-screen camera view and, as an option, on the camera card. The Weather radar card can zoom the same way (thanks, DaveCBr).
+- **Blind tilt** (thanks, UserUnclassified). Blinds whose slats tilt get tilt buttons and a tilt slider, on the Cover card and in its pop-up.
+- **Bigger thermostat buttons** (thanks, pedromfa). **Grow with the card** makes a thermostat's buttons and text grow as you make the card bigger, and the thermostat pop-up is bigger on tablets.
+- **People card: a map of where someone is** (thanks, mgf909). Choose to open a map when you tap a person. And when the card has its own tap action, tapping a person now does that too (thanks, DaveCBr).
+- **To-do card: quick-add chips** (thanks, mrclean5953). One tap adds the regulars, like Milk or Bread; an optional badge shows quantities like "2 x Milk".
+- **Media activity and Recently watched** (thanks, mrclean5953). Several sensors in one card, and optional posters.
+- **Weather services without a daily forecast** (thanks, DaveCBr). Services like the US National Weather Service, which only give day and night forecasts, now show a proper daily forecast, and there's a **Twice daily** choice.
+- **iPad and iPhone: the dashboard reaches the bottom of the screen** (thanks, stevelup). The sidebar now runs right to the bottom edge, and **Use the screen right down to the bottom edge** lets a wall iPad use the space kept for the home bar.
+- **Home Assistant dashboards in the web page card**: swiping up or down over one now scrolls Panalume instead of bouncing the page inside (thanks, h5mk2mtnhc-ux).
+- **Back from the background on a phone**: Panalume no longer gets stuck on "Connecting to Home Assistant…" when you return to the Home Assistant app; it reconnects by itself (thanks, 8ctvfhjs59-ctrl).
+
 ## 0.39.0
 
 - **Map card** (thanks, j4mesw2). Shows where people and trackers are on a map, with their pictures, your home zone and its radius, and a pop-up when you tap one. It zooms to fit everyone, and markers that overlap merge into one badge with a count, which splits apart again as you zoom in. Choose a light or dark map, or your own map tiles.
