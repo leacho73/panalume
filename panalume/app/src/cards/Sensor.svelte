@@ -23,7 +23,7 @@
   import Icon from '../components/Icon.svelte';
   import Chart from '../components/Chart.svelte';
   import { t, ent } from '../lib/tpl.js';
-  import { name, entityIcon, formatNumber, stateText } from '../lib/entity.js';
+  import { name, entityIcon, formatNumber, formatMoney, stateText } from '../lib/entity.js';
   import { useHistory } from '../lib/history.svelte.js';
   let { props } = $props();
   const show = (k) => !props.hide?.[k];
@@ -31,13 +31,18 @@
   const raw = $derived(props.value ? t(props.value) : e?.state);
   const numeric = $derived(raw !== '' && raw != null && !Number.isNaN(Number(raw)));
   const unit = $derived(props.unit != null && props.unit !== '' ? t(props.unit) : e?.attributes.unit_of_measurement || '');
-  const display = $derived(numeric ? formatNumber(raw, props.digits === '' || props.digits == null ? undefined : Number(props.digits)) : props.value ? raw : stateText(e));
+  const digits = $derived(props.digits === '' || props.digits == null ? undefined : Number(props.digits));
+  // A money sensor (device class monetary, a currency code as its unit) shows as money,
+  // "£3.61", unless the card sets its own value or unit.
+  const money = $derived(numeric && !props.value && !(props.unit != null && props.unit !== '') && e?.attributes.device_class === 'monetary' && /^[A-Z]{3}$/.test(unit) ? formatMoney(raw, unit, digits) : null);
+  const display = $derived(money ?? (numeric ? formatNumber(raw, digits) : props.value ? raw : stateText(e)));
   const hist = useHistory(() => (props.graph && e ? [e.entity_id] : []), () => Number(props.hours) || 24);
   const pts = $derived(e ? hist.series[e.entity_id] || [] : []);
   // The value shrinks to fit the card (so a long state like "Detected" isn't cut
   // off), unless a size is set.
   const vs = $derived(Number(props.value_size) || 0);
-  const chars = $derived(Math.max(2, String(display ?? '').length + (numeric && unit && show('unit') ? String(unit).length * 0.5 + 0.3 : 0)));
+  const showUnit = $derived(numeric && !money && unit && show('unit'));
+  const chars = $derived(Math.max(2, String(display ?? '').length + (showUnit ? String(unit).length * 0.5 + 0.3 : 0)));
 </script>
 
 <div class="sensor" style="--n:{chars}">
@@ -48,7 +53,7 @@
     </div>
   {/if}
   {#if show('state')}
-    <div class="val" class:fixed={vs} style={vs ? `font-size:${vs}%` : ''}><span class="num">{display}</span>{#if numeric && unit && show('unit')}<span class="unit">{unit}</span>{/if}</div>
+    <div class="val" class:fixed={vs} style={vs ? `font-size:${vs}%` : ''}><span class="num">{display}</span>{#if showUnit}<span class="unit">{unit}</span>{/if}</div>
   {/if}
   {#if props.graph && pts.length > 1}
     <div class="graph"><Chart series={[{ points: pts, color: t(props.graph_color) || 'var(--accent)' }]} hours={Number(props.hours) || 24} /></div>
