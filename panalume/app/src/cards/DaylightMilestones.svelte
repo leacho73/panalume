@@ -209,7 +209,8 @@
   .node.done small, .node.done .lbl { color: var(--gold); opacity: .7; }
   .node.done .mark { width: 1em; height: 1em; border: none; background: var(--gold); color: var(--ink); }
 
-  .list { display: flex; flex-direction: column; gap: 9px; padding-top: 10px; margin-top: 4px; border-top: 1px solid rgba(255,255,255,.07); overflow: auto; min-height: 0; }
+  .tall .track { margin-top: 10px; }
+  .list { flex: 1; display: flex; flex-direction: column; gap: 9px; padding-top: 10px; margin-top: 4px; border-top: 1px solid rgba(255,255,255,.07); overflow: auto; min-height: 0; }
   .row { display: flex; align-items: center; gap: 10px; }
   .row.done { opacity: .55; }
   .dot { flex: none; width: 1.65em; height: 1.65em; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.08); color: var(--muted); }
