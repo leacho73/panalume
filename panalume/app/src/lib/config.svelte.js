@@ -287,11 +287,25 @@ export function setScreenDevice(d) {
   app.multi = [];
 }
 
+// Views visited on this screen, newest last, for a Back button.
+const visited = [];
 export function setView(id) {
+  if (app.view && app.view !== id) {
+    visited.push(app.view);
+    if (visited.length > 20) visited.shift();
+  }
   app.view = id;
   app.selected = null;
   app.multi = [];
   history.replaceState(null, '', '#' + id);
+}
+
+export function viewBack() {
+  let id;
+  while ((id = visited.pop()) && !app.config.views.some((v) => v.id === id));
+  if (!id) return;
+  setView(id);
+  visited.pop(); // setView put the view we left on the list; Back again goes further back
 }
 
 export function zoneList(zone, l = layout()) {
