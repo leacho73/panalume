@@ -18,7 +18,7 @@
   const hex = (v) => (/^#[0-9a-f]{6}$/i.test(v || '') ? v : '#7aa2ff');
 </script>
 
-<div class="field" class:wide={f.type === 'textarea' || f.type === 'entities' || f.type === 'cards' || f.type === 'people'}>
+<div class="field" class:wide={f.type === 'textarea' || f.type === 'entities' || f.type === 'cards' || f.type === 'people' || f.type === 'views'}>
   {#if f.type !== 'bool'}<label for={f.key}>{f.label}{#if isTpl(obj[f.key])}<span class="tpl">template</span>{/if}
     {#if ontoggle}<button type="button" class="eye" class:off={hide} title={hide ? 'Hidden on the card — click to show' : 'Shown on the card — click to hide'} onclick={ontoggle}><Icon icon={hide ? 'mdi:eye-off-outline' : 'mdi:eye'} size="15px" /></button>{/if}</label>{/if}
   {#if f.type === 'media-folder'}
@@ -50,6 +50,14 @@
         <option value="">Add card…</option>
         {#each Object.values(app.config.cards) as c}<option value={c.id}>{c.type} · {c.props?.name || c.props?.entity || c.props?.title || c.id}</option>{/each}
       </select>
+    </div>
+  {:else if f.type === 'views'}
+    <!-- A tick list of the dashboard's views; nothing ticked means all of them. -->
+    <div class="views">
+      {#each app.config.views as v (v.id)}
+        <label class="chk"><input type="checkbox" checked={(obj[f.key] || []).includes(v.id)}
+          onchange={(e) => { const on = e.currentTarget.checked, ids = (obj[f.key] || []).filter((x) => x !== v.id); set(on ? app.config.views.map((x) => x.id).filter((x) => x === v.id || ids.includes(x)) : ids); }} /> {v.name}</label>
+      {/each}
     </div>
   {:else if f.type === 'people'}
     <PeopleEditor values={obj[f.key] || []} onupdate={set} />
@@ -99,6 +107,7 @@
   .pc.on { border-color: #fff; box-shadow: 0 0 0 2px rgba(0,0,0,.4); }
   .tpl { background: rgba(122,162,255,.2); color: #a9c1ff; border-radius: 6px; padding: 0 5px; font-size: 10px; }
   .chk { color: var(--text); font-size: 13px; cursor: pointer; }
+  .views { display: flex; flex-wrap: wrap; gap: 6px 14px; }
   .color { display: flex; gap: 6px; }
   .color input[type='color'] { width: 34px; padding: 0; flex: none; height: 34px; border: 0; background: none; }
   .ents { display: flex; flex-direction: column; gap: 4px; }
