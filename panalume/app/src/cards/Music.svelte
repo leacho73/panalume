@@ -189,7 +189,7 @@
         <div class="row">
           <div class="label">{row.label}</div>
           <div class="grid">
-            {#each row.tiles as tile (tile.uri)}
+            {#each row.tiles as tile, i (`${tile.type}:${tile.uri || i}:${i}`)}
               <button class="tile" onclick={() => play(tile)} title={tile.name}>
                 <div class="art">
                   {#if tile.image && !broken[tile.uri]}
