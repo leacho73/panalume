@@ -15,15 +15,17 @@
 
 <script>
   import ViewIcon from '../components/ViewIcon.svelte';
-  import { app, setView } from '../lib/config.svelte.js';
+  import { app, setView, shownViews } from '../lib/config.svelte.js';
   let { props, w = 0, h = 0 } = $props();
   // A wide, short nav card lays out horizontally whatever its setting (e.g. on phones).
   const dir = $derived(w > h * 3 ? 'horizontal' : props.direction);
   const tiles = $derived(props.icon_style === 'tile');
-  // Only the views picked for this card, if any (and all of them if those have since been deleted).
+  // Only the views picked for this card, if any (and all of them if those have since been
+  // deleted), of those this screen and person can see.
   const views = $derived.by(() => {
+    const all = shownViews();
     const own = props.views?.length ? app.config.views.filter((v) => props.views.includes(v.id)) : [];
-    return own.length ? own : app.config.views;
+    return own.length ? all.filter((v) => own.includes(v)) : all;
   });
 </script>
 

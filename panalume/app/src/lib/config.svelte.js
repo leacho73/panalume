@@ -6,7 +6,7 @@ import { toast, validEntityId } from './ha.svelte.js';
 // Each layout has a design width (the stage is scaled to fit the screen), an
 // optional sidebar, and per-zone placements ('sidebar' or a view id).
 import { reflow } from './reflow.js';
-import { t, truthy } from './tpl.js';
+import { t, truthy, isTpl, rendered } from './tpl.js';
 import { clientId } from './live.js';
 
 export const DEVICES = {
@@ -186,12 +186,32 @@ export function screenHome() {
 export function setScreenHome(id) {
   try { id ? localStorage.setItem('hd-home-view', id) : localStorage.removeItem('hd-home-view'); } catch {}
 }
+// Views this screen leaves out (Layout tab), kept in this browser only.
+const screen = $state({ hidden: (() => { try { return JSON.parse(localStorage.getItem('hd-hidden-views') || '[]'); } catch { return []; } })() });
+export const screenHidden = () => screen.hidden;
+export function setScreenHidden(ids) {
+  screen.hidden = ids;
+  try { ids.length ? localStorage.setItem('hd-hidden-views', JSON.stringify(ids)) : localStorage.removeItem('hd-hidden-views'); } catch {}
+}
+// Whether a view is offered on this screen: not left out here, and its "Shown when"
+// template (Views panel; it can use user / user_name) true. Undefined while that
+// template is still on its way, which counts as hidden in menus. In edit mode every
+// view is offered. This tidies what each screen offers; it isn't a lock.
+export function viewOn(v) {
+  if (app.editing) return true;
+  if (!v || screen.hidden.includes(v.id)) return false;
+  if (!v.visible) return true;
+  const r = isTpl(v.visible) ? rendered(v.visible) : v.visible;
+  return r === undefined ? undefined : !String(r).startsWith('⚠') && truthy(r);
+}
+export const shownViews = () => app.config.views.filter((v) => viewOn(v));
 // The view this screen opens on and goes back to: ?view= in the address first, then
-// this screen's own setting, then this device's Home view (Layout tab), then the first view.
+// this screen's own setting, then this device's Home view (Layout tab), then the first
+// view; skipping views not offered on this screen.
 export const startView = () => {
-  const ok = (id) => !!id && app.config.views.some((v) => v.id === id);
+  const ok = (id) => !!id && viewOn(app.config.views.find((v) => v.id === id)) !== false;
   const own = app.config.layouts[app.device]?.home_view;
-  return [homeView, screenHome(), own].find(ok) ?? app.config.views[0]?.id;
+  return [homeView, screenHome(), own].find(ok) ?? shownViews()[0]?.id ?? app.config.views[0]?.id;
 };
 function init(cfg) {
   for (const [dev, d] of Object.entries(DEVICES)) {

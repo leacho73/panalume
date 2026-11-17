@@ -15,7 +15,7 @@
   import { connectLive } from './lib/live.js';
   import { param, setParentHash } from './lib/params.js';
   import { cards as cardTypes } from './lib/registry.js';
-  import { reloadFromServer, startView } from './lib/config.svelte.js';
+  import { reloadFromServer, startView, shownViews, viewOn } from './lib/config.svelte.js';
 
   let vw = $state(innerWidth);
   const autoDevice = detectDevice();
@@ -83,9 +83,9 @@
   // No sidebar and no Navigation card on this view: a small views menu instead,
   // so there's always a way to switch views.
   let viewsOpen = $state(false);
-  const needViews = $derived(!app.editing && app.config?.views.length > 1 && !layout().sidebar.enabled && !(layout().zones[app.view] || []).some((p) => app.config.cards[p.card]?.type === 'nav'));
+  const needViews = $derived(!app.editing && app.config && shownViews().length > 1 && !layout().sidebar.enabled && !(layout().zones[app.view] || []).some((p) => app.config.cards[p.card]?.type === 'nav'));
   // A dot on the closed views menu while any view has a badge up.
-  const menuBadge = $derived(needViews ? app.config.views.map(viewBadge).find(Boolean) : null);
+  const menuBadge = $derived(needViews ? shownViews().map(viewBadge).find(Boolean) : null);
   $effect(() => {
     if (!app.config) return;
     const on = kioskParam != null ? kioskParam !== '0' : !!app.config.layouts[app.device]?.kiosk;
@@ -145,6 +145,13 @@
     if (home && app.view !== home) setView(home);
   }, 10e3);
 
+  // A view this screen or person isn't offered (left out in Layout, or its Shown when is
+  // false), e.g. from a bookmark: go to this screen's own view instead.
+  $effect(() => {
+    if (!app.config || app.editing) return;
+    if (viewOn(app.config.views.find((v) => v.id === app.view)) === false) { const home = startView(); if (home && home !== app.view) setView(home); }
+  });
+
   // Keep the current view in Home Assistant's address bar (…/panalume#energy) for bookmarks and links.
   $effect(() => { if (app.config) setParentHash(app.view); });
 
@@ -187,7 +194,7 @@
       <button class="vf" class:badged={menuBadge} onclick={() => (viewsOpen = !viewsOpen)} aria-label="Views"><Icon icon={viewsOpen ? 'mdi:close' : 'mdi:menu'} size="1.1em" />{#if menuBadge && !viewsOpen}<i class="vfb" style={menuBadge.color ? `background:${menuBadge.color}` : ''}></i>{/if}</button>
       {#if viewsOpen}
         <div class="vlist">
-          {#each app.config.views as v (v.id)}<button class:on={app.view === v.id} onclick={() => { setView(v.id); viewsOpen = false; }}><span class="vmark"><ViewIcon view={v} size="1.1em" box badge /></span> {v.name}</button>{/each}
+          {#each shownViews() as v (v.id)}<button class:on={app.view === v.id} onclick={() => { setView(v.id); viewsOpen = false; }}><span class="vmark"><ViewIcon view={v} size="1.1em" box badge /></span> {v.name}</button>{/each}
         </div>
       {/if}
     </div>
