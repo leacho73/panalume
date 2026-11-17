@@ -11,6 +11,7 @@
       { key: 'entity', label: 'Light', type: 'entity', domain: 'light' },
       { key: 'name', label: 'Name', type: 'text' },
       { key: 'icon', label: 'Icon', type: 'icon' },
+      { key: 'layout', label: 'Layout', type: 'select', options: [{ value: '', label: 'Full (slider and colours)' }, { value: 'vertical', label: 'Vertical (like a button)' }, { value: 'horizontal', label: 'Horizontal (like a button)' }, { value: 'icon', label: 'Icon (like a button)' }], hint: 'The button-style layouts match Button cards beside them. Tap to switch the light, hold for brightness and colours.' },
       { key: 'simple_off', label: 'Simple when off', type: 'bool', hint: "When the light's off the card shows just its name and icon (tap to turn it on); the rest appears once it's on." },
       { key: 'colours', label: 'Colour buttons (pick up to 6, or type colours)', type: 'swatches', section: 'colours', placeholder: '#ff4d4d, #ffc861, #5bd88f, #4fb4ff, #b48cff' },
     ],
@@ -52,7 +53,22 @@
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
   }
   const compact = $derived(h < 150);
+  // Button-style layouts, to sit alongside Button cards.
+  const tile = $derived(['vertical', 'horizontal', 'icon'].includes(props.layout) ? props.layout : '');
+  const stateLine = $derived(on ? (dimmable ? `${pct}%` : stateWord('light', null, 'on') || 'On') : e?.state === 'off' ? stateWord('light', null, 'off') || 'Off' : e?.state || '—');
 </script>
+
+{#if tile}
+<div class="tile {tile}" class:on style="--lc:{color}">
+  <div class="tic"><Icon icon={t(props.icon) || entityIcon(e)} size={tile === 'icon' ? '2.4em' : '1.6em'} /></div>
+  {#if tile !== 'icon'}
+    <div class="txt">
+      <div class="name">{t(props.name) || name(e)}</div>
+      {#if show('state')}<div class="state">{stateLine}{#if show('members') && members}<span class="mem">{' · '}{membersOn}/{members.length} on</span>{/if}</div>{/if}
+    </div>
+  {/if}
+</div>
+{:else}
 
 <div class="light" class:simple={props.simple_off && !on} class:on class:compact style="--lc:{color}">
   {#if show('glow')}<div class="glow" style="opacity:{on ? 0.25 + (pct / 100) * 0.75 : 0}"></div>{/if}
@@ -64,7 +80,7 @@
       <div class="name">{t(props.name) || name(e)}</div>
       {#if show('state')}
         <div class="state">
-          {on ? (dimmable ? `${pct}%` : stateWord('light', null, 'on') || 'On') : e?.state === 'off' ? stateWord('light', null, 'off') || 'Off' : e?.state || '—'}
+          {stateLine}
           {#if show('members') && members}<span class="mem">{' · '}{membersOn}/{members.length} on</span>{/if}
         </div>
       {/if}
@@ -95,6 +111,7 @@
     </div>
   {/if}
 </div>
+{/if}
 
 <style>
   .light { position: relative; height: 100%; display: flex; flex-direction: column; justify-content: space-between; gap: 10px; isolation: isolate; }
@@ -112,5 +129,14 @@
   .quick button { flex: 1 1 0; min-width: 0; max-width: 1.9em; aspect-ratio: 1; border-radius: 50%; border: 2px solid rgba(255,255,255,.15); padding: 0; transition: transform .15s; }
   .quick button:active { transform: scale(.88); }
   .warm { background: #ffb46b; } .neutral { background: #fff1dc; } .cool { background: #cfe3ff; }
+  /* The button-style layouts: the same shapes as the Button card. */
+  .tile { position: relative; height: 100%; display: flex; flex-direction: column; justify-content: space-between; gap: 8px; min-width: 0; }
+  .tile.horizontal { flex-direction: row; align-items: center; justify-content: flex-start; gap: 14px; }
+  .tile.icon { align-items: center; justify-content: center; }
+  .tic { width: 2.6em; height: 2.6em; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.08); color: var(--muted); transition: all .25s; flex: none; }
+  .tile.icon .tic { width: auto; height: auto; background: none; }
+  .tile.on .tic { background: color-mix(in srgb, var(--lc) 22%, transparent); color: var(--lc); }
+  .tile.icon.on .tic { background: none; }
+  .tile .state { font-size: .88em; margin-top: 2px; }
   .sep { flex: none; width: 1px; height: 1.4em; background: rgba(255,255,255,.12); margin: 0 2px; }
 </style>

@@ -23,8 +23,8 @@ Panalume is a Home Assistant **app** that gives you a dashboard you design in th
 - **Sidebar** — an optional sidebar on the left, the right or across the top that stays put (and keeps its size) while you switch views; cards move freely between sidebar and main area. Turn it off and its cards are kept for later.
 - **One layout, every screen** — design once for your wall tablet; desktops show it scaled, phones get an automatic single-column version. Give any device its own custom layout if you want.
 - **Quick start for a room** — *Add a view for an area* fills a view from one of Home Assistant's areas; any card can be changed to another type later without starting again.
-- **Made for wall tablets** — *fit the whole view on screen* (no scrolling), a kiosk mode that hides Home Assistant's header bar, and **live updates**: save on your laptop and every tablet updates within a second. After an app update, open screens reload themselves.
-- **Templates everywhere** — any text, icon, colour or style can be a live Home Assistant template (`{{ states('sensor.x') }}`), and any card can be shown or hidden by a template.
+- **Made for wall tablets** — *fit the whole view on screen* (no scrolling), a kiosk mode that hides Home Assistant's header bar, a **screensaver** (a dim clock or your photos), pop-ups that close by themselves, camera zoom, a Timers card, and **live updates**: save on your laptop and every tablet updates within a second. After an app update, open screens reload themselves.
+- **Templates everywhere** — any text, icon, colour or style can be a live Home Assistant template (`{{ states('sensor.x') }}`), and any card can be shown or hidden by a template, including by who's looking (`user`, `user_name`), so a card can show on one tablet only.
 - **Style anything** — background, colours, radius, border, shadow, glass blur, fonts, custom CSS, per card or for the whole theme, plus a **− / +** to scale everything inside a card.
 - **Pop-ups & actions** — tap / hold to toggle, open a detailed pop-up, open a pop-up of other cards, change view, call a service or open a URL.
 - **Groups & multi-select** — rooms move as one; select several cards to group, align, size or space them evenly, or show / hide the same part on all of them at once. Copy cards to another view. Undo, duplicate, keyboard nudging.
@@ -112,7 +112,7 @@ Phones get an automatic single-column version of your tablet layout: navigation 
 
 ### All the cards
 
-Button / tile · Light · Hue light with scenes · Thermostat (draggable dial) · Humidifier · Kettle · Climate group (several thermostats / AC units at once) · Fan (and air purifiers, ceiling fans with lights) · Door lock · 3D printer · Hot tub · Washing machine · Tumble dryer · Dishwasher · Air fryer · Robot vacuum · Lawn mower · Media player (artwork, volume, source, speaker grouping) · Upcoming media (Sonarr / Radarr) · Plex activity and recently watched (Tautulli) · Cover / blind · Slider · Option picker · Entities list · Glance · Sensor with graph · Gauge · History graph (smooth, straight or stepped lines) · Weather (feels like, wind, gusts, UV, rain) · Calendar (upcoming events, week, week with hours or month) · Clock · Sun & moon (sunrise / sunset, moon phase, moonrise / moonset) · Text / Markdown · Template lines · To-do list · People · Photo frame (Immich and local albums) · Camera (tap for full-screen live view; plays the video stream for cameras whose pictures fail, e.g. Tapo) · Web page (or one of Home Assistant's own dashboards) · Image · Navigation · Divider · Alarm panel · Updates & notifications · Football (Soccer Live) · Propane tank (Mopeka) · and the energy cards above.
+Button / tile · Light (full, or button-style layouts) · Hue light with scenes · Thermostat (draggable dial) · Humidifier · Kettle · Climate group (several thermostats / AC units at once) · Fan (and air purifiers, ceiling fans with lights) · Door lock · 3D printer · Hot tub · Washing machine · Tumble dryer · Dishwasher · Air fryer · Robot vacuum · Lawn mower · Trash day · Meal plan (Mealie) · Timers · Media player (artwork, volume, source, speaker grouping) · Now playing tile · Music hub (every speaker and group) · Upcoming media (Sonarr / Radarr) · Plex activity and recently watched (Tautulli) · Cover / blind · Slider · Option picker · Entities list · Glance · Sensor with graph · Gauge · Network status · Circuit energy · Batteries (every battery, emptiest first) · History graph (smooth, straight or stepped lines) · Weather (feels like, wind, gusts, UV, rain) · Weather radar · Calendar (upcoming events, week, week with hours or month) · Countdown (birthdays, holidays, trips) · Clock · Sun & moon (sunrise / sunset, moon phase, moonrise / moonset) · Text / Markdown · Template lines · To-do list · People · Map (people and trackers, with clustering) · Photo frame (Immich and local albums) · Camera (tap for full-screen live view; plays the video stream for cameras whose pictures fail, e.g. Tapo) · Web page (or one of Home Assistant's own dashboards) · Image · Guest WiFi (QR code) · Chalkboard · Navigation · Divider · Alarm panel · Updates & notifications · Football (Soccer Live) · Propane tank (Mopeka) · and the energy cards above.
 
 ### Coming from ha-fusion?
 
@@ -143,6 +143,43 @@ Wall tablet tips: set **Layout → Tablet → Sizing** to *Fit the whole view on
 | `?noedit` | Hide the edit pencil and the E shortcut |
 
 e.g. `…/panalume?view=Upstairs&return=5&noedit&fit=screen&kiosk`
+
+### Without the App Store (Home Assistant Container or Core)
+
+If your Home Assistant runs in Docker or as Core, run Panalume as its own container. It needs three things: your Home Assistant address, a **long-lived access token** (your HA profile → **Security** → *Long-lived access tokens*), and a **password** for the dashboard itself, because there's no Home Assistant login in front of it.
+
+```sh
+docker run -d --name panalume --restart unless-stopped -p 8099:8099 \
+  -v panalume:/data \
+  -e HA_URL=http://homeassistant.local:8123 \
+  -e HA_TOKEN=your-long-lived-token \
+  -e PANALUME_PASSWORD=a-password-for-the-dashboard \
+  ghcr.io/leacho73/panalume
+```
+
+Or with Docker Compose:
+
+```yaml
+services:
+  panalume:
+    image: ghcr.io/leacho73/panalume
+    restart: unless-stopped
+    ports: ["8099:8099"]
+    volumes: [panalume:/data]
+    environment:
+      HA_URL: http://homeassistant.local:8123
+      HA_TOKEN: your-long-lived-token
+      PANALUME_PASSWORD: a-password-for-the-dashboard
+volumes:
+  panalume:
+```
+
+Then open `http://<that machine>:8099` and sign in. Each browser stays signed in (a wall tablet only needs it once); changing the password signs everyone out. Your dashboard is saved in the `/data` volume. Update with `docker pull ghcr.io/leacho73/panalume` and recreate the container; images are published for each release (64-bit PCs, and 64-bit and 32-bit Raspberry Pi).
+
+- **Use a token from a non-admin user.** Make a Home Assistant user just for Panalume (not an administrator) and create the token from that user's profile. Panalume can then only do what that user can.
+- **Keep it on your own network.** Don't forward the port to the internet; use your usual VPN or remote access instead.
+- `HA_TOKEN_FILE` can point at a file holding the token instead, e.g. a Docker secret.
+- `PANALUME_NO_LOGIN=1` runs it without a password. Anyone who can reach the port can then use and edit the dashboard, and so can a web page open on a computer on that network, so we don't recommend it.
 
 ## Develop
 

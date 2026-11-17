@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.40.0
+
+- **Run it in Docker** (thanks, mbijker, for asking). If your Home Assistant runs in Docker or as Core, Panalume now has its own image, `ghcr.io/leacho73/panalume`, for PCs and 64-bit / 32-bit Raspberry Pi. It talks to Home Assistant with a long-lived token and has its own sign-in, as there's no Home Assistant login in front of it: set `PANALUME_PASSWORD`. See **Without the App Store** in the README.
+- **Quicker updates.** Home Assistant now downloads Panalume ready-made instead of building it on your machine, so updates take seconds, especially on a Raspberry Pi.
+- **Timers card** (thanks, 8ctvfhjs59-ctrl). Every running Home Assistant timer, found by itself, with a live countdown, a progress bar, and pause and cancel. It can also show finish times, such as a washing machine's. A Button card for a timer now shows its countdown too.
+- **Guest WiFi card** (thanks, mrclean5953). A QR code guests scan to join, with the password behind a tap.
+- **Music hub card** (thanks, mrclean5953). Every speaker at once: what's playing, its volume, and which ones are grouped.
+- **Chalkboard card** (thanks, mrclean5953). Draw or write with a finger; it's kept on that screen and can be saved as a picture.
+- **Weather radar card** (thanks, mrclean5953). Live rain radar from RainViewer over a map, or a radar picture from a camera. It's off until you turn on **Load radar tiles**, as it loads from the internet.
+- **Circuit energy card** (thanks, mrclean5953). What each circuit or device used today, this week or this month, priced at what you actually paid, including on time-of-use tariffs like Octopus Agile.
+- **Network status card** (thanks, mrclean5953). Whether the internet is up, your speed test results, and devices that have dropped off the network.
+- **Trash day card** (thanks, mrclean5953). Quiet most of the week, bright the evening before the bins go out.
+- **Meal plan card** (thanks, mrclean5953). Tonight's meal and the days after it, from Mealie or any meal calendar.
+- **Zoom into cameras** (thanks, TRORMUH). Pinch or scroll to zoom in and drag to move around, in the full-screen camera view and, as an option, on the camera card. The Weather radar card can zoom the same way (thanks, DaveCBr).
+- **Blind tilt** (thanks, UserUnclassified). Blinds whose slats tilt get tilt buttons and a tilt slider, on the Cover card and in its pop-up.
+- **Bigger thermostat buttons** (thanks, pedromfa). **Grow with the card** makes a thermostat's buttons and text grow as you make the card bigger, and the thermostat pop-up is bigger on tablets.
+- **People card: a map of where someone is** (thanks, mgf909). Choose to open a map when you tap a person. And when the card has its own tap action, tapping a person now does that too (thanks, DaveCBr).
+- **To-do card: quick-add chips** (thanks, mrclean5953). One tap adds the regulars, like Milk or Bread; an optional badge shows quantities like "2 x Milk".
+- **Media activity and Recently watched** (thanks, mrclean5953). Several sensors in one card, and optional posters.
+- **Weather services without a daily forecast** (thanks, DaveCBr). Services like the US National Weather Service, which only give day and night forecasts, now show a proper daily forecast, and there's a **Twice daily** choice.
+- **iPad and iPhone: the dashboard reaches the bottom of the screen** (thanks, stevelup). The sidebar now runs right to the bottom edge, and **Use the screen right down to the bottom edge** lets a wall iPad use the space kept for the home bar.
+- **Home Assistant dashboards in the web page card**: swiping up or down over one now scrolls Panalume instead of bouncing the page inside (thanks, h5mk2mtnhc-ux).
+- **Back from the background on a phone**: Panalume no longer gets stuck on "Connecting to Home Assistant…" when you return to the Home Assistant app; it reconnects by itself (thanks, 8ctvfhjs59-ctrl).
+
+## 0.39.0
+
+- **Map card** (thanks, j4mesw2). Shows where people and trackers are on a map, with their pictures, your home zone and its radius, and a pop-up when you tap one. It zooms to fit everyone, and markers that overlap merge into one badge with a count, which splits apart again as you zoom in. Choose a light or dark map, or your own map tiles.
+- **Countdown card** (thanks, mrclean5953). The next date on a calendar (birthdays, holidays, trips) with how many days are left, plus the dates after it in a short list underneath. It shows Today and Tomorrow instead of 0 and 1 days.
+- **Now playing card** (thanks, mrclean5953). A square tile for a media player: artwork filling the card, the track and artist over it, a progress bar, and previous, play/pause and next.
+- **Batteries card** (thanks, mrclean5953). Every battery in the house, emptiest first, with a count of how many are low. New devices appear without editing the card, or you can pick the batteries yourself.
+- **Screensaver.** **Layout → Screensaver after** covers the dashboard with a dim clock, or a slideshow from a Home Assistant media folder or album, after that many minutes without a touch. A tap brings the dashboard back (thanks, Vadimys19).
+- **Pop-ups can close by themselves.** **Layout → Close pop-ups after** shuts a pop-up after that many seconds without a touch, per device (thanks, DaveCBr).
+- **Light card: button-style layouts** (thanks, theadd668). Vertical, horizontal or icon, the same shapes as the Button card, so the two match on a dashboard. Tap switches the light; hold for brightness and colours.
+- **Glance: icon colours** (thanks, jandamf). Each item's icon can have its own colour, including from a template run for each entity, e.g. `{{ 'red' if is_state(entity_id, 'on') else 'green' }}`.
+- **Your name in templates** (thanks, CykloneFij). Templates can use `user` (the Home Assistant user's ID) and `user_name`, so a card can show on one tablet only, or say "Good morning, Sam" to whoever is looking.
+- **No grey strip on iPad and iPhone.** In the Home Assistant app, Panalume now fills the screen to the edges itself instead of leaving a grey strip along the bottom (thanks, stevelup, who also worked out the fix).
+- **Dishwasher card: more detail** (thanks, mrclean5953). Time left, which now works whether your dishwasher reports minutes or a finish time, salt and rinse aid levels, whether the load inside is clean, and the door when it's left open. LG ThinQ dishwashers are found automatically too.
+- **Upcoming media: how it's released** (thanks, mrclean5953). Films now say whether they're out in cinemas, online or on disc.
+- **Navigation card: tile icons** (thanks, mrclean5953). An Android-style rounded square behind each icon, with the view you're on filled in. The default stays as it was.
+- **Pictures for views** (thanks, mrclean5953). A view can have an image (a logo, a photo, your own icon) in place of its icon, in the views menu and on the Navigation card.
+- Cards that haven't been set up yet now say what they need (pick a camera, give a web address…) instead of showing an empty card, and a new Camera card picks the first working camera by itself (thanks, mrclean5953).
+
 ## 0.38.0
 
 - **Fan card.** For fans and air purifiers: on / off, a speed slider, the fan's modes (auto, sleep, turbo…), and oscillate and direction when it has them. Add a **light** for a ceiling fan's light (on / off and brightness on the same card), or **sensors** such as PM2.5, humidity or filter life for an air purifier.

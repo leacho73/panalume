@@ -74,7 +74,7 @@
     if (!s || /^(unknown|unavailable|none|no program)$/i.test(s)) return '';
     return s.replace(/^.*program(me)?_/i, '').replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
   });
-  const status = $derived(error ? 'Needs attention' : paused ? 'Paused' : delayed ? 'Delayed start' : running ? (phase || 'Running') : finished ? 'Finished' : /ready/.test(raw) ? 'Ready' : /^(power_off|off|inactive|stop|standby)$/.test(raw) ? 'Off' : se || minW ? 'Idle' : '—');
+  const status = $derived(error ? 'Needs attention' : paused ? 'Paused' : delayed ? 'Delayed start' : running ? (phase || 'Running') : finished ? 'Finished' : /ready/.test(raw) ? 'Ready' : /^(power_off|off|inactive|stop)$/.test(raw) ? 'Off' : se || minW ? 'Idle' : '—');
 
   // A short card keeps only the consumable that is running out, without the bars;
   // the full salt and rinse aid row needs the height.
@@ -118,10 +118,10 @@
       { name: 'Rinse aid', pct: props.rinse ? levelPct(props.rinse) : null },
     ].filter((l) => l.pct != null),
   );
-  // The dishwasher shows its door all the time (open, closed); the washer and dryer
-  // keep theirs as a warning while a cycle is on, as before.
+  // An open door is a warning while a cycle is on; the dishwasher also says so
+  // when it's left open afterwards.
   const alerts = $derived([
-    ...(kind !== 'dishwasher' && active && doorOpen ? [['Door open', 'mdi:door-open']] : []),
+    ...(active && doorOpen ? [['Door open', 'mdi:door-open']] : []),
     ...(props.alerts || []).filter((id) => isOn(ent(id)?.state)).map((id) => [label(id).replace(/\s*nearly empty$/i, ' low'), 'mdi:alert-circle-outline']),
   ]);
   const leaking = $derived(ent(props.leak)?.state === 'on');
@@ -211,7 +211,7 @@
       <div class="chips">
         {#if show('options')}{#each (props.options || []).filter((id) => optVal(id)) as id}<span><small>{label(id)}</small>{optVal(id)}</span>{/each}{/if}
         {#if show('power') && running && Number.isFinite(watts) && watts > 0}<span><Icon icon="mdi:flash" size="1em" />{watts >= 1000 ? (watts / 1000).toFixed(1) + ' kW' : Math.round(watts) + ' W'}</span>{/if}
-        {#if kind === 'dishwasher' && props.door}<span class="door" class:open={doorOpen}><Icon icon={doorOpen ? 'mdi:door-open' : 'mdi:door-closed'} size="1em" />{doorOpen ? 'Door open' : 'Door closed'}</span>{/if}
+        {#if kind === 'dishwasher' && doorOpen && !active}<span class="door open"><Icon icon="mdi:door-open" size="1em" />Door open</span>{/if}
 
       </div>
     {/if}

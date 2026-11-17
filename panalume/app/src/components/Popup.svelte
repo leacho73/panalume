@@ -5,6 +5,7 @@
   import { app } from '../lib/config.svelte.js';
   import { cards } from '../lib/registry.js';
   import Camera from '../cards/Camera.svelte';
+  import MapCard from '../cards/Map.svelte';
   let vw = $state(0), vh = $state(0);
   const close = () => (app.popup = null);
   // On phones the click from the tap that opened the pop-up arrives a moment later and lands
@@ -15,13 +16,24 @@
   const ghost = (e) => {
     if (app.popup && performance.now() - openedAt < 400) { e.stopPropagation(); e.preventDefault(); }
   };
+  // Close by itself after this device's "Close pop-ups after" seconds without a touch.
+  $effect(() => {
+    const secs = Math.max(0, Number(app.config?.layouts[app.device]?.popup_secs) || 0);
+    if (!app.popup || !secs || app.editing) return;
+    let timer;
+    const arm = () => { clearTimeout(timer); timer = setTimeout(close, secs * 1000); };
+    arm();
+    const evs = ['pointerdown', 'keydown', 'wheel'];
+    for (const ev of evs) addEventListener(ev, arm, { capture: true, passive: true });
+    return () => { clearTimeout(timer); for (const ev of evs) removeEventListener(ev, arm, { capture: true }); };
+  });
 </script>
 
 <svelte:window onkeydown={(e) => e.key === 'Escape' && close()} onclickcapture={ghost} />
 
 {#if app.popup?.camera}
   <div class="full" role="dialog" aria-modal="true" bind:clientWidth={vw} bind:clientHeight={vh}>
-    <Camera props={{ entity: app.popup.camera, name: app.popup.name, mode: 'live', fit: 'contain', show_name: true, sound: true }} w={vw} h={vh} />
+    <Camera props={{ entity: app.popup.camera, name: app.popup.name, mode: 'live', fit: 'contain', show_name: true, sound: true, zoom: true, full: true }} w={vw} h={vh} />
     <button class="x" onclick={close} aria-label="Close"><Icon icon="mdi:close" size="1.5em" /></button>
   </div>
 {:else if app.popup}
@@ -30,6 +42,9 @@
       <button class="x" onclick={close} aria-label="Close"><Icon icon="mdi:close" size="1.3em" /></button>
       {#if app.popup.entity}
         <MoreInfo entity={app.popup.entity} />
+      {:else if app.popup.map}
+        {#if app.popup.title}<h2>{app.popup.title}</h2>{/if}
+        <div class="mapbox"><MapCard props={{ ...cards.map.meta.defaults, entities: [app.popup.map], zoom: 15, show_names: false }} /></div>
       {:else}
         {#if app.popup.title}<h2>{app.popup.title}</h2>{/if}
         <div class="cards">
@@ -52,6 +67,7 @@
   .x { position: absolute; top: 14px; right: 14px; background: rgba(255,255,255,.08); border: 0; color: inherit; width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; z-index: 2; }
   .full { position: fixed; inset: 0; z-index: 900; background: #000; color: #fff; animation: fade .18s ease; }
   .full .x { top: max(16px, env(safe-area-inset-top)); right: max(16px, env(safe-area-inset-right)); width: 48px; height: 48px; background: rgba(0,0,0,.5); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+  .mapbox { position: relative; height: min(380px, 60dvh); border-radius: 16px; overflow: hidden; }
   h2 { margin: 0 0 14px; font-weight: 600; }
   .cards { display: flex; flex-direction: column; gap: 12px; }
   @keyframes fade { from { opacity: 0; } }

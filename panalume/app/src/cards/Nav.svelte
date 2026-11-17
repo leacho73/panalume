@@ -13,7 +13,7 @@
 </script>
 
 <script>
-  import Icon from '../components/Icon.svelte';
+  import ViewIcon from '../components/ViewIcon.svelte';
   import { app, setView } from '../lib/config.svelte.js';
   let { props, w = 0, h = 0 } = $props();
   // A wide, short nav card lays out horizontally whatever its setting (e.g. on phones).
@@ -24,11 +24,11 @@
 <nav class="nav {dir}" class:tiles data-stop>
   {#each app.config.views as v}
     <button class:sel={app.view === v.id} onclick={() => setView(v.id)}>
-      {#if props.show_icons !== false && v.icon}
+      {#if props.show_icons !== false && (v.icon || v.image)}
         {#if tiles}
-          <span class="tile"><Icon icon={v.icon} size="1.15em" /></span>
+          <span class="tile"><ViewIcon view={v} size="1.15em" /></span>
         {:else}
-          <Icon icon={v.icon} size="1.3em" />
+          <ViewIcon view={v} size="1.3em" />
         {/if}
       {/if}
       {#if props.show_names !== false}<span class="name">{v.name}</span>{/if}

@@ -47,6 +47,19 @@
   const bBattery = $derived(be?.attributes.device_class === 'battery' || /battery/.test(props.badge || ''));
   const bColor = $derived(bBattery ? (bNum <= 15 ? '#ff6b6b' : bNum <= 30 ? '#ffb547' : '#5bd88f') : 'var(--accent)');
   const R = 15, C = 2 * Math.PI * R;
+
+  // A timer: its countdown as the state, and a thin progress bar along the bottom.
+  const isTimer = $derived(!!e && e.entity_id.startsWith('timer.') && ['active', 'paused'].includes(e.state));
+  const hms = (v) => { const m = String(v ?? '').match(/(?:(\d+) days?, )?(\d+):(\d{2}):(\d{2})/); return m ? Number(m[1] || 0) * 86400 + Number(m[2]) * 3600 + Number(m[3]) * 60 + Number(m[4]) : null; };
+  let tnow = $state(Date.now());
+  $effect(() => {
+    if (!isTimer || e.state !== 'active') return;
+    const i = setInterval(() => (tnow = Date.now()), 1000);
+    return () => clearInterval(i);
+  });
+  const tLeft = $derived(!isTimer ? null : e.state === 'active' && e.attributes.finishes_at ? Math.max(0, (Date.parse(e.attributes.finishes_at) - tnow) / 1000) : hms(e.attributes.remaining));
+  const tTotal = $derived(isTimer ? hms(e.attributes.duration) : null);
+  const tLabel = $derived(tLeft == null ? '' : (e.state === 'paused' ? 'Paused · ' : '') + (tLeft >= 3600 ? `${Math.floor(tLeft / 3600)}:${String(Math.floor((tLeft % 3600) / 60)).padStart(2, '0')}:${String(Math.round(tLeft % 60) % 60).padStart(2, '0')}` : `${Math.floor(tLeft / 60)}:${String(Math.round(tLeft % 60) % 60).padStart(2, '0')}`));
 </script>
 
 <div class="btn {props.layout}" class:wrap={props.wrap} class:on class:tinted={!!iconColor} class:badged={!!be} style="--ac:{color}">
@@ -62,9 +75,10 @@
   {#if props.layout !== 'icon'}
     <div class="txt">
       <div class="name">{String(t(props.name, v) || '').trim() || name(e)}</div>
-      {#if props.show_state !== false}<div class="state">{String(t(props.state, v) || '').trim() || (minW && !props.active ? (on ? 'Running' : idle ? 'Idle' : stateText(e)) : stateText(e))}</div>{/if}
+      {#if props.show_state !== false}<div class="state">{String(t(props.state, v) || '').trim() || (tLabel || (minW && !props.active ? (on ? 'Running' : idle ? 'Idle' : stateText(e)) : stateText(e)))}</div>{/if}
     </div>
   {/if}
+  {#if isTimer && tTotal}<div class="tbar"><i style="width:{Math.min(100, Math.max(0, (1 - tLeft / tTotal) * 100))}%"></i></div>{/if}
 </div>
 
 <style>
@@ -89,4 +103,6 @@
   .badge small { font-size: .7em; opacity: .7; }
   .badge .val { padding: 2px 7px; border-radius: 99px; background: rgba(255,255,255,.08); max-width: 7em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .badged.horizontal .txt { padding-right: 3.2em; }
+  .tbar { position: absolute; left: 0; right: 0; bottom: -4px; height: 4px; border-radius: 99px; background: rgba(255,255,255,.08); overflow: hidden; }
+  .tbar i { display: block; height: 100%; background: var(--ac); transition: width 1s linear; }
 </style>

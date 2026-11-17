@@ -53,8 +53,9 @@
 
   const markers = $derived(Array.isArray(props.markers) ? props.markers : []);
   const pct = (v, fallback) => {
-    const n = Number(String(v ?? '').trim());
-    return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : fallback;
+    const str = String(v ?? '').trim();
+    const n = Number(str);
+    return str !== '' && Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : fallback;
   };
   // Big markers shrink in short cards rather than swallowing the picture.
   const size = (m) => Math.round(Math.max(14, Math.min(Number(m.size) || 24, Math.max(20, (Number(ch0) || Number(h) || 320) * 0.22))));

@@ -21,7 +21,7 @@
 </script>
 
 <div class="sel">
-  {#if !e}
+  {#if !props.entity}
     <div class="hint">Pick an input in the card's settings.</div>
   {:else}
   <div class="n">{t(props.name) || name(e)}</div>

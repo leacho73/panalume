@@ -17,6 +17,7 @@
       { key: 'refresh', label: 'Snapshot refresh (s)', type: 'number' },
       { key: 'trigger', label: 'Take a new picture each refresh (Blink: on unless unticked; uses the camera battery)', type: 'bool' },
       { key: 'sound', label: 'Speaker button (live video from cameras with sound; full screen always has it)', type: 'bool' },
+      { key: 'zoom', label: 'Pinch or scroll to zoom in', type: 'bool', hint: 'Zoom into the picture on the card itself, then drag to move around. The full-screen view always zooms (double-tap there too). On a phone, one finger still scrolls the dashboard until you zoom in.' },
       { key: 'fit', label: 'Fit', type: 'select', options: [{ value: 'auto', label: 'Auto' }, { value: 'crop', label: 'Fill the card (crops edges)' }, { value: 'contain', label: 'Whole picture' }] },
     ],
   };
@@ -27,6 +28,8 @@
   import { t, ent } from '../lib/tpl.js';
   import { name } from '../lib/entity.js';
   import { haImage, send, callService, subscribe } from '../lib/ha.svelte.js';
+  import { zoomable } from '../lib/zoom.js';
+  import { app } from '../lib/config.svelte.js';
   let { props, w = 0, h = 0 } = $props();
   const e = $derived(ent(props.entity));
   // Just the id, so attribute updates (e.g. the rotating access token) don't restart streams.
@@ -266,22 +269,28 @@
 </script>
 
 <div class="cam">
+  <!-- The picture sits in its own box, so zooming leaves the name, buttons and messages put. -->
+  <div class="zm" use:zoomable={{ on: !!props.zoom && !app.editing, doubleTap: !!props.full }}>
   {#if video}
     <video bind:this={vid} {muted} autoplay playsinline poster={camId ? `ha/api/camera_proxy/${camId}` : undefined} style="object-fit:{fit}" onloadedmetadata={(ev) => (ratio = ev.currentTarget.videoWidth / ev.currentTarget.videoHeight || 0)}></video>
+  {:else if shown}<img src={shown} alt="" style="object-fit:{fit}" class:broken onerror={() => { broken = true; failed++; }} onload={(ev) => { broken = false; ratio = ev.currentTarget.naturalWidth / ev.currentTarget.naturalHeight || 0; }} />{/if}
+  </div>
+  {#if video}
     {#if vidErr}<div class="msg">{vidErr}</div>{:else if !playing}<div class="msg starting">Starting video…</div>{/if}
     {#if props.sound && playing && hasAudio !== false}
       <button class="snd" data-stop onclick={toggleSound} aria-label={muted ? 'Turn sound on' : 'Mute'} title={muted ? 'Turn sound on' : 'Mute'}><Icon icon={muted ? 'mdi:volume-off' : 'mdi:volume-high'} size="1.3em" /></button>
     {/if}
-  {:else if shown}<img src={shown} alt="" style="object-fit:{fit}" class:broken onerror={() => { broken = true; failed++; }} onload={(ev) => { broken = false; ratio = ev.currentTarget.naturalWidth / ev.currentTarget.naturalHeight || 0; }} />{/if}
-  {#if !e}<div class="msg">Pick a camera in the card's settings.</div>{:else if !video && (broken || (!shown && failed >= 2))}<div class="msg">No picture from this camera</div>{/if}
+  {/if}
+  {#if !props.entity}<div class="msg">Pick a camera in the card's settings.</div>{:else if !video && (broken || (!shown && failed >= 2))}<div class="msg">No picture from this camera</div>{/if}
   {#if props.show_name}<div class="lbl">{t(props.name) || name(e)}</div>{/if}
 </div>
 
 <style>
   .cam { position: absolute; inset: 0; background: #000; overflow: hidden; border-radius: inherit; }
+  .zm { position: absolute; inset: 0; will-change: transform; }
   img, video { width: 100%; height: 100%; display: block; }
   img.broken { visibility: hidden; }
-  .msg { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: .85em; padding: 12px; text-align: center; }
+  .msg { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: .85em; padding: 12px; text-align: center; pointer-events: none; } /* zoom still works under a message */
   .msg.starting { place-items: end center; padding-bottom: 2.4em; text-shadow: 0 1px 4px #000; }
   .snd { position: absolute; right: 12px; bottom: 12px; z-index: 2; width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(0,0,0,.5); color: #fff; display: grid; place-items: center; backdrop-filter: blur(6px); }
   .lbl { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 14px 10px; background: linear-gradient(transparent, rgba(0,0,0,.6)); font-weight: 600; font-size: .9em; }

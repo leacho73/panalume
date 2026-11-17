@@ -112,6 +112,11 @@ export function setPanelSide(side) {
 /** A card its "Visible when" template currently hides. */
 export const cardHidden = (c) => !!c?.visible && !truthy(t(c.visible, { entity_id: c.props?.entity }));
 
+/** This device lays the dashboard out right down to the bottom screen edge,
+ *  under the iPad / iPhone home bar, instead of keeping clear of it (Layout tab).
+ *  Never while editing: the toolbar docks along the bottom then. */
+export const fillsBottom = () => !!app.config?.layouts[app.device]?.fill_bottom && !app.editing;
+
 /** The layout a device actually shows (main, a reflow of main, or its own). */
 export function layout(dev = app.device) {
   const ls = app.config.layouts;

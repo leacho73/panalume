@@ -34,6 +34,15 @@ export function toggle(e) {
   return callService('homeassistant', 'toggle', {}, target);
 }
 
+/** Money in its own currency, e.g. 3.613 GBP → "£3.61" (two decimals unless told otherwise).
+ *  Returns null when the currency code isn't one the browser knows. */
+export function formatMoney(v, currency, digits) {
+  const n = Number(v);
+  if (v === '' || v == null || Number.isNaN(n)) return null;
+  const d = digits ?? 2;
+  try { return n.toLocaleString(undefined, { style: 'currency', currency, minimumFractionDigits: d, maximumFractionDigits: d }); } catch { return null; }
+}
+
 export function formatNumber(v, digits) {
   const n = Number(v);
   if (v === '' || v == null || Number.isNaN(n)) return v;

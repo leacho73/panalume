@@ -17,6 +17,10 @@
   import { useHistory } from '../lib/history.svelte.js';
   let { entity } = $props();
   const e = $derived(states.get(entity));
+  // Blinds whose slats tilt get a taller cover box, to fit the tilt row.
+  const tilts = $derived(!!((+e?.attributes.supported_features || 0) & 176) || e?.attributes.current_tilt_position != null);
+  let vw = $state(innerWidth);
+  const bigClimate = $derived(vw >= 700);
   const d = $derived(domain(entity));
   const a = $derived(e?.attributes || {});
   const numeric = $derived(e && e.state !== '' && !isNaN(+e.state));
@@ -26,6 +30,8 @@
   const attrs = $derived(Object.entries(a).filter(([k, v]) => !HIDE.has(k) && v != null && typeof v !== 'object'));
   const SWATCH = [[0, 0], [30, 90], [50, 80], [120, 70], [180, 70], [220, 80], [270, 70], [320, 70]];
 </script>
+
+<svelte:window bind:innerWidth={vw} />
 
 <div class="mi">
   <div class="hd">
@@ -55,9 +61,10 @@
   {:else if d === 'media_player'}
     <div class="box" style="height:240px"><Media props={{ entity, artwork: 'cover', show_volume: true, show_source: true, show_group: true }} h={240} /></div>
   {:else if d === 'climate' || d === 'water_heater'}
-    <div class="box" style="height:220px"><Climate props={{ entity, show_modes: true }} /></div>
+    <!-- On a tablet-sized screen the thermostat is shown bigger, buttons and all. -->
+    <div class="box" style="height:{bigClimate ? 330 : 220}px"><div style="zoom:{bigClimate ? 1.5 : 1};height:220px"><Climate props={{ entity, show_modes: true }} w={300} h={220} /></div></div>
   {:else if d === 'cover'}
-    <div class="box" style="height:120px"><Cover props={{ entity }} /></div>
+    <div class="box" style="height:{tilts ? 180 : 120}px"><Cover props={{ entity }} w={360} h={tilts ? 180 : 120} /></div>
   {:else if d === 'camera' || d === 'image'}
     <div class="box cam" style="height:300px"><Camera props={{ entity, mode: 'live', fit: 'contain' }} /></div>
   {:else if d === 'weather'}

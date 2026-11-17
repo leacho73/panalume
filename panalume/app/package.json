@@ -9,14 +9,14 @@
   },
   "dependencies": {
     "@mdi/js": "^7.4.47",
-    "hls.js": "^1.7.3",
+    "hls.js": "^1.7.4",
     "leaflet": "^1.9.4",
-    "ws": "^8.22.0"
+    "ws": "^8.22.1"
   },
   "devDependencies": {
     "@fontsource-variable/inter": "^5.3.0",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
-    "svelte": "^5.57.2",
+    "svelte": "^5.57.3",
     "vite": "^8.3.5"
   }
 }
