@@ -429,6 +429,8 @@
             <Field obj={v} f={{ key: 'icon', label: 'Icon', type: 'icon' }} />
             <Field obj={v} f={{ key: 'image', label: 'Image (URL or path — shown instead of the icon)', type: 'text' }} />
             <Field obj={v} f={{ key: 'background', label: 'Background (overrides theme)', type: 'text' }} />
+            <Field obj={v} f={{ key: 'badge', label: 'Badge (template)', type: 'text', placeholder: "{{ is_state('binary_sensor.kitchen_motion', 'on') }}", hint: 'Shown on the view\'s icon in the Navigation card and the views menu: a dot when this is true, or an icon if it gives an icon name (mdi:walk). Empty or false shows nothing.' }} />
+            {#if v.badge}<Field obj={v} f={{ key: 'badge_color', label: 'Badge colour (blank = accent)', type: 'color' }} />{/if}
           </div>
         </div>
       {/each}

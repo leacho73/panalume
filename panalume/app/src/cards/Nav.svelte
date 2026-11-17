@@ -32,9 +32,9 @@
     <button class:sel={app.view === v.id} onclick={() => setView(v.id)}>
       {#if props.show_icons !== false && (v.icon || v.image)}
         {#if tiles}
-          <span class="tile"><ViewIcon view={v} size="1.15em" /></span>
+          <span class="tile"><ViewIcon view={v} size="1.15em" badge /></span>
         {:else}
-          <ViewIcon view={v} size="1.3em" />
+          <ViewIcon view={v} size="1.3em" badge />
         {/if}
       {/if}
       {#if props.show_names !== false}<span class="name">{v.name}</span>{/if}
