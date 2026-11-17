@@ -5,7 +5,7 @@
   export const meta = {
     type: 'music', name: 'Music', icon: 'mdi:music-box-multiple', category: 'Media',
     size: { w: 640, h: 520 }, tap: 'none',
-    defaults: { players: [], default_players: [], show_playlist: true, show_album: true, show_radio: true, title: '' },
+    defaults: { players: [], default_players: [], show_playlist: true, show_album: true, show_radio: true, show_art: false, title: '' },
     fields: [
       { key: 'title', label: 'Title', type: 'text' },
       { key: 'players', label: 'Speakers to offer (Music Assistant players)', type: 'entities', domain: 'media_player' },
@@ -13,6 +13,9 @@
       { key: 'show_playlist', label: 'Show favourite playlists', type: 'bool' },
       { key: 'show_album', label: 'Show favourite albums', type: 'bool' },
       { key: 'show_radio', label: 'Show favourite radio stations', type: 'bool' },
+      // Off by default: the pictures come straight from the Music Assistant server or the
+      // music service (e.g. Spotify), not through Home Assistant like everything else.
+      { key: 'show_art', label: 'Show album art (loads from Music Assistant / the music service)', type: 'bool' },
       { key: 'config_entry', label: 'Music Assistant entry id (only if you have more than one)', type: 'text' },
     ],
     // Start with every Music Assistant speaker that's there, rather than an empty card.
@@ -192,7 +195,7 @@
             {#each row.tiles as tile, i (`${tile.type}:${tile.uri || i}:${i}`)}
               <button class="tile" onclick={() => play(tile)} title={tile.name}>
                 <div class="art">
-                  {#if tile.image && !broken[tile.uri]}
+                  {#if props.show_art === true && tile.image && !broken[tile.uri]}
                     <img src={haImage(tile.image)} alt="" loading="lazy" onerror={() => (broken[tile.uri] = true)} />
                   {:else}
                     <Icon icon={ICON[tile.type] || 'mdi:music'} size="2.4em" />
