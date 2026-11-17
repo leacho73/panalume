@@ -5,7 +5,8 @@
   export const meta = {
     type: 'climate-group', name: 'Climate group', icon: 'mdi:home-thermometer', category: 'Controls',
     size: { w: 440, h: 400 }, tap: 'none', hold: 'none',
-    defaults: { entities: [] },
+    defaults: { entities: [], grow: true },
+    grow: true,
     autofill: () => ({ entities: [...states.keys()].filter((id) => id.startsWith('climate.') && !SKIP.test(id)).sort().slice(0, 4) }),
     sections: [
       { key: 'target', label: 'Target − / +' }, { key: 'current', label: 'Average temp' }, { key: 'modes', label: 'Modes' },
@@ -13,6 +14,7 @@
     ],
     fields: [
       { key: 'entities', label: 'Thermostats / AC units', type: 'entities', domain: 'climate' },
+      { key: 'grow', label: 'Grow with the card', type: 'bool', hint: 'Make the card bigger and its buttons, text and dial grow with it, up to 1.6×. The − / + under the card (Content size) still works on top.' },
       { key: 'name', label: 'Name', type: 'text', placeholder: 'Air conditioning' },
       { key: 'icon', label: 'Icon', type: 'icon' },
     ],

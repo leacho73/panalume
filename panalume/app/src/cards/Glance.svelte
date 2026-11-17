@@ -8,6 +8,7 @@
       { key: 'entities', label: 'Entities', type: 'entities' },
       { key: 'show_name', label: 'Show names', type: 'bool' },
       { key: 'show_state', label: 'Show states', type: 'bool' },
+      { key: 'icon_color', label: 'Icon colour (template ok, entity_id is each entity)', type: 'color' },
       { key: 'tap', label: 'Tap', type: 'select', options: ['more-info', 'toggle'] },
     ],
   };
@@ -20,6 +21,9 @@
   import { name, stateText, entityIcon, isActive, toggle, lightColor } from '../lib/entity.js';
   import { app } from '../lib/config.svelte.js';
   let { props } = $props();
+  // Icon colour can be a template run for each entity, e.g.
+  // {{ 'red' if is_state(entity_id, 'on') else 'green' }}.
+  const iconColor = (id) => String(t(props.icon_color, { entity_id: id }) || '').trim();
 </script>
 
 <div class="gl">
@@ -30,8 +34,9 @@
     {/if}
     {#each props.entities || [] as id}
       {@const e = states.get(id)}
+      {@const c = iconColor(id) || lightColor(e)}
       <button class="it" data-stop onclick={() => (props.tap === 'toggle' && e ? toggle(e) : (app.popup = { entity: id }))}>
-        <span class="ic" class:on={isActive(e)} style={lightColor(e) ? `color:${lightColor(e)}` : ''}><Icon icon={entityIcon(e)} size="1.6em" /></span>
+        <span class="ic" class:on={isActive(e)} style={c ? `color:${c}` : ''}><Icon icon={entityIcon(e)} size="1.6em" /></span>
         {#if props.show_name}<span class="n">{name(e, null) || id}</span>{/if}
         {#if props.show_state}<span class="s">{stateText(e)}</span>{/if}
       </button>

@@ -2,11 +2,12 @@
   export const meta = {
     type: 'iframe', name: 'Web page', icon: 'mdi:web', category: 'Media',
     size: { w: 480, h: 320 }, tap: 'none',
-    defaults: { url: '', hide_ha: true },
+    defaults: { url: '', hide_ha: true, scroll_page: true },
     fields: [
       { key: 'url', label: 'URL', type: 'text', hint: 'For a page on Home Assistant, a path like /lovelace/0 works at home and away.' },
       { key: 'ha_view', label: 'Or one of Home Assistant\'s own dashboards', type: 'ha-view' },
       { key: 'hide_ha', label: 'Hide Home Assistant\'s header and sidebar', type: 'bool', hint: 'When the page is part of Home Assistant.' },
+      { key: 'scroll_page', label: 'Swiping over it scrolls the dashboard', type: 'bool', hint: 'For a Home Assistant page on a phone or tablet: an up or down swipe scrolls Panalume instead of the page inside, which stops it bouncing. Taps and sideways swipes still go to the page. Untick to scroll inside a long page.' },
     ],
   };
 
@@ -42,13 +43,43 @@
     };
     add(ms.querySelector('ha-drawer')?.shadowRoot, CSS.drawer);
     add(ms.querySelector('ha-panel-lovelace')?.shadowRoot?.querySelector('hui-root')?.shadowRoot, CSS.root);
+    swipes(doc);
+  }
+  // An up / down swipe over the page inside scrolls the dashboard instead (when the
+  // card says so): the page inside doesn't move or bounce, taps still reach it, and a
+  // sideways swipe (a slider, a carousel) is left to it.
+  function swipes(doc) {
+    if (doc.__panalumeSwipes) return;
+    doc.__panalumeSwipes = true;
+    const st = doc.createElement('style');
+    st.textContent = 'html,body{overscroll-behavior:none}';
+    doc.head?.appendChild(st);
+    let y0 = null, x0 = 0, last = 0, vertical = null;
+    doc.addEventListener('touchstart', (ev) => {
+      if (!props.scroll_page || ev.touches.length !== 1) return void (y0 = null);
+      y0 = last = ev.touches[0].clientY; x0 = ev.touches[0].clientX; vertical = null;
+    }, { passive: true });
+    doc.addEventListener('touchmove', (ev) => {
+      if (y0 == null || !props.scroll_page || ev.touches.length !== 1) return;
+      const y = ev.touches[0].clientY, x = ev.touches[0].clientX;
+      if (vertical == null) {
+        if (Math.abs(y - y0) < 6 && Math.abs(x - x0) < 6) return;
+        vertical = Math.abs(y - y0) > Math.abs(x - x0);
+      }
+      if (!vertical) return;
+      ev.preventDefault();
+      window.scrollBy(0, last - y);
+      last = y;
+    }, { passive: false });
+    doc.addEventListener('touchend', () => (y0 = null), { passive: true });
   }
   $effect(() => {
-    if (!props.hide_ha || !frame) return;
+    const f = frame;   // bind:this is cleared before this cleanup runs
+    if (!props.hide_ha || !f) return;
     const id = setInterval(tidy, 500);
     const load = () => { tidy(); setTimeout(tidy, 300); };
-    frame.addEventListener('load', load);
-    return () => { clearInterval(id); frame.removeEventListener('load', load); };
+    f.addEventListener('load', load);
+    return () => { clearInterval(id); f.removeEventListener('load', load); };
   });
 </script>
 

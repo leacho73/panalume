@@ -8,27 +8,35 @@
       { key: 'show_icons', label: 'Icons', type: 'bool' },
       { key: 'icon_style', label: 'Icon style', type: 'select', options: [{ value: 'plain', label: 'Plain' }, { value: 'tile', label: 'Tile (Android-style)' }], hint: 'A tile is a rounded, tinted square behind each icon, filled with the accent colour for the view you are on.' },
       { key: 'show_names', label: 'Names', type: 'bool' },
+      { key: 'views', label: 'Views shown (none ticked = all)', type: 'views', hint: 'Leave out views you reach another way, such as a room view opened from a button on a Rooms view.' },
     ],
   };
 </script>
 
 <script>
-  import Icon from '../components/Icon.svelte';
-  import { app, setView } from '../lib/config.svelte.js';
+  import ViewIcon from '../components/ViewIcon.svelte';
+  import { app, setView, shownViews } from '../lib/config.svelte.js';
   let { props, w = 0, h = 0 } = $props();
   // A wide, short nav card lays out horizontally whatever its setting (e.g. on phones).
   const dir = $derived(w > h * 3 ? 'horizontal' : props.direction);
   const tiles = $derived(props.icon_style === 'tile');
+  // Only the views picked for this card, if any (and all of them if those have since been
+  // deleted), of those this screen and person can see.
+  const views = $derived.by(() => {
+    const all = shownViews();
+    const own = props.views?.length ? app.config.views.filter((v) => props.views.includes(v.id)) : [];
+    return own.length ? all.filter((v) => own.includes(v)) : all;
+  });
 </script>
 
 <nav class="nav {dir}" class:tiles data-stop>
-  {#each app.config.views as v}
+  {#each views as v (v.id)}
     <button class:sel={app.view === v.id} onclick={() => setView(v.id)}>
-      {#if props.show_icons !== false && v.icon}
+      {#if props.show_icons !== false && (v.icon || v.image)}
         {#if tiles}
-          <span class="tile"><Icon icon={v.icon} size="1.15em" /></span>
+          <span class="tile"><ViewIcon view={v} size="1.15em" badge /></span>
         {:else}
-          <Icon icon={v.icon} size="1.3em" />
+          <ViewIcon view={v} size="1.3em" badge />
         {/if}
       {/if}
       {#if props.show_names !== false}<span class="name">{v.name}</span>{/if}

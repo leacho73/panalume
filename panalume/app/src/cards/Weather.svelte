@@ -10,7 +10,7 @@
     fields: [
       { key: 'entity', label: 'Weather', type: 'entity', domain: 'weather' },
       { key: 'name', label: 'Name', type: 'text' },
-      { key: 'forecast', label: 'Forecast', type: 'select', options: ['daily', 'hourly', 'none'] },
+      { key: 'forecast', label: 'Forecast', type: 'select', options: [{ value: 'daily', label: 'Daily' }, { value: 'twice_daily', label: 'Twice daily (day and night)' }, { value: 'hourly', label: 'Hourly' }, { value: 'none', label: 'None' }], hint: 'Some weather services (e.g. the US National Weather Service) have no daily forecast; the card then builds each day from the day and night parts.' },
       { key: 'days', label: 'Forecast items', type: 'number' },
       { key: 'hilo', label: "Show today's high and low", type: 'bool' },
     ],
@@ -27,12 +27,45 @@
   const show = (k) => !props.hide?.[k];
   const e = $derived(ent(props.entity));
   const a = $derived(e?.attributes || {});
+  // Which forecasts the weather entity offers (HA's feature bits: daily 1, hourly 2, twice daily 4).
+  // Older entities don't say, so they're taken to have daily and hourly.
+  const feats = $derived(a.supported_features == null ? 3 : Number(a.supported_features) || 0);
+  const hasDaily = $derived(!!(feats & 1) || !(feats & 4));
+  // A daily forecast from a service that only does day and night (the US NWS): one
+  // entry per day, the high and the condition from the day part, the low from the night.
+  function fold(list) {
+    const days = new Map();
+    for (const f of list) {
+      const k = new Date(f.datetime).toDateString();
+      const d = days.get(k) || { datetime: f.datetime, temps: [], lows: [], rain: null };
+      const day = f.is_daytime !== false;
+      if (day && !d.condition) d.condition = f.condition;
+      if (f.temperature != null) (day ? d.temps : d.lows).push(Number(f.temperature));
+      if (f.templow != null) d.lows.push(Number(f.templow));
+      // Rain only when the service reports an amount (NWS gives a chance, not millimetres).
+      if (f.precipitation != null) d.rain = (d.rain || 0) + (Number(f.precipitation) || 0);
+      d.condition ||= f.condition;
+      days.set(k, d);
+    }
+    return [...days.values()].map((d) => ({
+      datetime: d.datetime, condition: d.condition,
+      temperature: d.temps.length ? Math.max(...d.temps) : d.lows.length ? Math.max(...d.lows) : null,
+      templow: d.lows.length ? Math.min(...d.lows) : null,
+      precipitation: d.rain,
+    }));
+  }
+  // A forecast of the given kind, asking HA for day / night and folding it when the
+  // entity has no daily one.
+  function follow(id, type, set) {
+    const fallback = type === 'daily' && !hasDaily;
+    return subscribe({ type: 'weather/subscribe_forecast', entity_id: id, forecast_type: fallback ? 'twice_daily' : type }, (ev) => set(fallback ? fold(ev.forecast || []) : ev.forecast || []));
+  }
   let forecast = $state([]);
   $effect(() => {
     const id = e?.entity_id;
     const type = props.forecast;
     if (!id || type === 'none') return;
-    return subscribe({ type: 'weather/subscribe_forecast', entity_id: id, forecast_type: type }, (ev) => (forecast = ev.forecast || []));
+    return follow(id, type, (f) => (forecast = f));
   });
   // The daily forecast feeds today's high and low, and today's rain, whatever
   // the card itself shows.
@@ -41,7 +74,7 @@
     const id = e?.entity_id;
     if (!id || props.forecast === 'daily') return;
     if (!props.hilo && props.hide?.rain) return;
-    return subscribe({ type: 'weather/subscribe_forecast', entity_id: id, forecast_type: 'daily' }, (ev) => (daily = ev.forecast || []));
+    return follow(id, 'daily', (f) => (daily = f));
   });
   const day0 = $derived.by(() => {
     const list = props.forecast === 'daily' ? forecast : daily;
@@ -51,7 +84,8 @@
   const today = $derived(props.hilo ? day0 : null);
   const COND = { partlycloudy: 'Partly cloudy', 'clear-night': 'Clear', 'lightning-rainy': 'Thunderstorms', 'snowy-rainy': 'Sleet', 'windy-variant': 'Windy', exceptional: 'Severe weather' };
   const items = $derived(forecast.slice(0, Number(props.days) || 5));
-  const label = (f) => props.forecast === 'hourly' ? new Date(f.datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) : new Date(f.datetime).toLocaleDateString([], { weekday: 'short' });
+  const label = (f) => props.forecast === 'hourly' ? new Date(f.datetime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+    : new Date(f.datetime).toLocaleDateString([], { weekday: 'short' }) + (props.forecast === 'twice_daily' && f.is_daytime === false ? ' night' : '');
 
   // Conditions beside the temperature, in the space to its right, so they never add
   // height and push the forecast down. Only what this weather entity carries, and

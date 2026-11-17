@@ -5,7 +5,9 @@ import { SvelteMap } from 'svelte/reactivity';
 
 export const states = new SvelteMap();
 export const templates = new SvelteMap();
-export const conn = $state({ connected: false, haVersion: '' });
+export const conn = $state({ connected: false, haVersion: '', problem: '' });
+// The Home Assistant user looking at the dashboard (from ingress); empty on the direct port.
+export const me = $state({ id: '', name: '', known: false });
 
 let ws;
 let nextId = 1;
@@ -13,6 +15,8 @@ const pending = new Map();
 const subs = new Map(); // local key -> { msg, cb, id }
 let subKey = 0;
 let backoff = 500;
+let fails = 0;
+let retry;
 
 function wsUrl() {
   const base = location.pathname.replace(/[^/]*$/, '');
@@ -20,24 +24,83 @@ function wsUrl() {
 }
 
 function connect() {
-  ws = new WebSocket(wsUrl());
+  clearTimeout(retry);
+  const sock = (ws = new WebSocket(wsUrl()));
+  // A connection that never opens (the phone was asleep mid-connect) is dropped and tried again.
+  setTimeout(() => { if (sock.readyState === WebSocket.CONNECTING) sock.close(); }, 10000);
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
     if (Array.isArray(msg)) return msg.forEach(handle);
     handle(msg);
   };
   ws.onclose = () => {
+    if (sock !== ws) return;
     conn.connected = false;
     for (const p of pending.values()) p.reject(new Error('disconnected'));
     pending.clear();
-    setTimeout(connect, backoff);
+    // Failing again and again in the Home Assistant app usually means its session for
+    // Panalume ran out (the phone slept): get a fresh one before the next try.
+    if (++fails >= 2) refreshIngress();
+    retry = setTimeout(connect, backoff);
     backoff = Math.min(backoff * 2, 10000);
   };
 }
 
+// Inside Home Assistant, the page reaches Panalume through an "ingress session" that
+// Home Assistant's own page keeps alive. While a phone sleeps it can expire; reopening
+// Panalume from the sidebar makes a new one. This asks Home Assistant's page for a new
+// one the same way, so waking the phone is enough.
+let slug;
+let refreshing = null;
+function refreshIngress() {
+  if (refreshing || window.parent === window || !location.pathname.includes('/api/hassio_ingress/')) return refreshing;
+  refreshing = (async () => {
+    try {
+      const hass = window.parent.document.querySelector('home-assistant')?.hass;
+      if (!hass?.callWS) return;
+      slug ??= await fetch('api/me').then((r) => r.json()).then((m) => m.slug).catch(() => null);
+      const r = await (slug ? hass.callWS({ type: 'supervisor/ingress/session', slug }) : Promise.reject())
+        .catch(() => hass.callWS({ type: 'supervisor/api', endpoint: '/ingress/session', method: 'post' }));
+      if (r?.session) document.cookie = `ingress_session=${r.session};path=/api/hassio_ingress/;SameSite=Strict${location.protocol === 'https:' ? ';Secure' : ''}`;
+    } catch (e) {
+      console.warn('ingress session', e);
+    } finally {
+      refreshing = null;
+    }
+  })();
+  return refreshing;
+}
+
+// Coming back to the page (the phone woke, the app came to the front): check the
+// connection is really alive with a ping, and if it isn't, reconnect straight away
+// with a fresh session rather than waiting for the next timed retry.
+async function wake() {
+  if (document.visibilityState !== 'visible') return;
+  if (conn.connected && ws?.readyState === WebSocket.OPEN) {
+    const alive = await Promise.race([send({ type: 'ping' }).then(() => true, () => false), new Promise((ok) => setTimeout(() => ok(false), 4000))]);
+    if (alive) return;
+  }
+  await refreshIngress();
+  backoff = 500;
+  try { ws?.close(); } catch {}
+  if (!conn.connected) connect();
+}
+document.addEventListener('visibilitychange', wake);
+addEventListener('pageshow', (ev) => ev.persisted && wake());
+addEventListener('online', wake);
+
 function handle(msg) {
+  // Why it can't connect (wrong token, Home Assistant unreachable), for the banner.
+  if (msg.type === 'auth_invalid' || msg.type === 'unreachable') return void (conn.problem = msg.message || 'Home Assistant refused the connection');
+  if (msg.type === 'pong') {
+    const p = pending.get(msg.id);
+    if (p) { pending.delete(msg.id); p.resolve(true); }
+    return;
+  }
   if (msg.type === 'auth_ok') {
+    fails = 0;
     conn.connected = true;
+    conn.problem = '';
     conn.haVersion = msg.ha_version;
     backoff = 500;
     for (const s of subs.values()) startSub(s);

@@ -17,7 +17,77 @@ const TOKEN = SUP || process.env.HA_TOKEN || (process.env.HA_TOKEN_FILE && fs.re
 const DATA = process.env.DATA_DIR || (SUP ? '/data' : path.resolve('data'));
 const DIST = path.resolve(process.env.DIST_DIR || 'dist');
 const CONFIG = path.join(DATA, 'dashboard.json');
-fs.mkdirSync(DATA, { recursive: true });
+try { fs.mkdirSync(DATA, { recursive: true }); fs.accessSync(DATA, fs.constants.W_OK); } catch (e) {
+  console.error(`Panalume can't write to ${DATA} (${e.code || e.message}). Give it a writable folder or volume there.`);
+  process.exit(1);
+}
+
+// Sign-in, for the standalone Docker image, where there's no Home Assistant login in
+// front of Panalume. The image sets PANALUME_REQUIRE_LOGIN, so it won't start without
+// PANALUME_PASSWORD unless PANALUME_NO_LOGIN=1 says, deliberately, to leave it open.
+// Inside Home Assistant (SUP) its own login and ingress cover this.
+const PASSWORD = SUP ? '' : process.env.PANALUME_PASSWORD || '';
+const NO_LOGIN = !SUP && /^(1|true|yes)$/i.test(process.env.PANALUME_NO_LOGIN || '');
+if (!SUP && process.env.PANALUME_REQUIRE_LOGIN && !PASSWORD && !NO_LOGIN) {
+  console.error('Panalume needs a password: set PANALUME_PASSWORD (or PANALUME_NO_LOGIN=1 to run without one, only on a network you trust). See the README.');
+  process.exit(1);
+}
+const LOGIN = !!PASSWORD && !NO_LOGIN;
+// The sign-in cookie: a keyed hash of the password with a random secret kept in /data,
+// so it lasts across restarts and stops working when the password changes.
+const SESSION = LOGIN ? (() => {
+  const f = path.join(DATA, '.session-secret');
+  let secret;
+  try { secret = fs.readFileSync(f); } catch { secret = crypto.randomBytes(32); fs.writeFileSync(f, secret, { mode: 0o600 }); }
+  return crypto.createHmac('sha256', secret).update(PASSWORD).digest('hex');
+})() : '';
+const same = (a, b) => { const x = crypto.createHash('sha256').update(String(a)).digest(), y = crypto.createHash('sha256').update(String(b)).digest(); return crypto.timingSafeEqual(x, y); };
+const signedIn = (req) => !LOGIN || (req.headers.cookie || '').split(/;\s*/).some((c) => c.startsWith('panalume=') && same(c.slice(9), SESSION));
+// Wrong passwords: a second's wait each; after 10 in a row a minute's lock-out for that
+// address, and at most 30 wrong ones a minute in all (so changing address doesn't help).
+const tries = new Map();
+let failsAll = { n: 0, since: Date.now() };
+const LOGIN_PAGE = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Panalume — sign in</title>
+<style>html,body{height:100%;margin:0}body{display:grid;place-items:center;background:radial-gradient(1200px 800px at 10% -10%,#1d2a4a 0%,transparent 60%),#0b0f17;color:#eef2f8;font:16px system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+form{width:min(320px,calc(100% - 32px));padding:28px;border-radius:22px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;gap:14px}
+h1{margin:0;font-size:22px;font-weight:600}p{margin:0;color:rgba(238,242,248,.6);font-size:14px}input,button{font:inherit;padding:12px 14px;border-radius:12px;border:1px solid rgba(255,255,255,.12)}
+input{background:rgba(0,0,0,.25);color:inherit}button{background:#7aa2ff;color:#0b0f17;font-weight:600;border:0}#e{color:#ff8a8a;min-height:1.2em}</style></head>
+<body><form id="f"><h1>Panalume</h1><p>Sign in to open the dashboard.</p><input id="pw" type="password" autocomplete="current-password" placeholder="Password" autofocus required><button>Sign in</button><p id="e"></p></form>
+<script>f.onsubmit=async(ev)=>{ev.preventDefault();e.textContent='';const r=await fetch('api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw.value})}).catch(()=>null);if(r&&r.ok)return location.reload();e.textContent=r&&r.status===429?'Too many tries. Wait a minute and try again.':'That password isn\\'t right.';pw.select();};</script></body></html>`;
+
+// Requests before signing in: the sign-in page, and the sign-in itself. Returns true when
+// the request can go on.
+async function gate(req, res, p) {
+  if (signedIn(req)) return true;
+  if (p.endsWith('/api/login') && req.method === 'POST') {
+    const ip = req.socket.remoteAddress || '';
+    const now = Date.now();
+    if (now - failsAll.since > 60e3) { failsAll = { n: 0, since: now }; for (const [k, v] of tries) if (v.until < now) tries.delete(k); }
+    const t = tries.get(ip) || { n: 0, until: 0 };
+    if (now < t.until || failsAll.n >= 30) { send(res, 429, '{"error":"Too many tries"}'); return false; }
+    // Count the try before reading the password, so a burst of them at once can't slip past.
+    t.n++; failsAll.n++; tries.set(ip, t);
+    let body = '';
+    for await (const c of req) { body += c; if (body.length > 4096) break; }
+    let pw = '';
+    try { pw = JSON.parse(body).password || ''; } catch {}
+    if (pw && same(pw, PASSWORD)) {
+      tries.delete(ip); failsAll.n--;
+      const secure = req.headers['x-forwarded-proto'] === 'https' ? '; Secure' : '';
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'Set-Cookie': `panalume=${SESSION}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${secure}` });
+      res.end('{"ok":true}');
+      return false;
+    }
+    if (t.n >= 10) { t.n = 0; t.until = Date.now() + 60e3; console.warn(`Sign-in: 10 wrong passwords from ${ip}; locked out for a minute.`); }
+    tries.set(ip, t);
+    await new Promise((ok) => setTimeout(ok, 1000));
+    send(res, 401, '{"error":"Wrong password"}');
+    return false;
+  }
+  if (p.includes('/api/') || p.startsWith('/ha/')) { send(res, 401, '{"error":"Sign in first"}'); return false; }
+  send(res, 200, LOGIN_PAGE, 'text/html; charset=utf-8');
+  return false;
+}
 
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.json': 'application/json', '.woff2': 'font/woff2', '.ico': 'image/x-icon' };
 
@@ -63,6 +133,12 @@ async function haUsers() {
   users = { at: Date.now(), admins: new Set(list.filter((u) => u.is_owner || u.group_ids?.includes('system-admin')).map((u) => u.id)) };
   return users.admins;
 }
+// The app's slug in Home Assistant, so the page can ask Home Assistant for a fresh
+// ingress session when its old one has run out (see ha.svelte.js).
+let slugP;
+const appSlug = () => (SUP ? (slugP ??= fetch('http://supervisor/addons/self/info', { headers: { Authorization: `Bearer ${SUP}` } })
+  .then((r) => r.json()).then((j) => j?.data?.slug || null).catch(() => (slugP = null))) : null);
+
 async function isAdmin(req) {
   const id = req.headers['x-remote-user-id'];
   if (!id) return true;
@@ -73,6 +149,11 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   const p = url.pathname;
   try {
+    if (LOGIN && !(await gate(req, res, p))) return;
+    if (LOGIN && p.endsWith('/api/logout') && req.method === 'POST') {
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': 'panalume=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0' });
+      return res.end('{"ok":true}');
+    }
     if (p === '/api/config') {
       if (req.method === 'GET') return send(res, 200, fs.existsSync(CONFIG) ? fs.readFileSync(CONFIG) : 'null');
       if (req.method === 'PUT') {
@@ -86,7 +167,7 @@ const server = http.createServer(async (req, res) => {
         return send(res, 200, '{"ok":true}');
       }
     }
-    if (p === '/api/me') return send(res, 200, JSON.stringify({ admin: await isAdmin(req), name: req.headers['x-remote-user-display-name'] || null }));
+    if (p === '/api/me') return send(res, 200, JSON.stringify({ admin: await isAdmin(req), id: req.headers['x-remote-user-id'] || null, name: req.headers['x-remote-user-display-name'] || null, slug: await appSlug() }));
     if (p === '/api/icons') {
       const out = {};
       for (const n of (url.searchParams.get('n') || '').split(',').slice(0, 200)) if (n) out[n] = iconPath(n);
@@ -127,6 +208,14 @@ const server = http.createServer(async (req, res) => {
     else res.end();
   }
 });
+
+// Log a problem once a minute at most, not on every reconnect.
+const said = {};
+function once(key, text) {
+  if (Date.now() - (said[key] || 0) < 60e3) return;
+  said[key] = Date.now();
+  console.error(text);
+}
 
 // Websocket proxy: authenticate to HA server-side, then tell the browser auth_ok
 // and pipe frames both ways. The browser never sees the token.
@@ -226,6 +315,14 @@ async function camStream(ws, entity) {
 }
 
 server.on('upgrade', (req, socket, head) => {
+  if (!signedIn(req)) { socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n'); return socket.destroy(); }
+  // Standalone: only pages served from this address may open a connection, not another
+  // site or app on the same machine (which the sign-in cookie would otherwise reach).
+  if (!SUP && req.headers.origin) {
+    let from = '';
+    try { from = new URL(req.headers.origin).host; } catch {}
+    if (from !== req.headers.host) { socket.write('HTTP/1.1 403 Forbidden\r\n\r\n'); return socket.destroy(); }
+  }
   if (req.url.split('?')[0].endsWith('/api/camera')) {
     const entity = new URL(req.url, 'http://x').searchParams.get('entity') || '';
     if (!/^camera\.[a-z0-9_]+$/.test(entity)) return socket.destroy();
@@ -236,7 +333,13 @@ server.on('upgrade', (req, socket, head) => {
   }
   if (!req.url.split('?')[0].endsWith('/api/websocket')) return socket.destroy();
   wss.handleUpgrade(req, socket, head, (client) => {
-    const ha = new WebSocket(HA_URL.replace(/^http/, 'ws') + '/api/websocket', { perMessageDeflate: true });
+    // Running on its own without a token: nothing to connect with, so say so.
+    if (!SUP && !TOKEN) {
+      client.send(JSON.stringify({ type: 'unreachable', message: 'Panalume has no Home Assistant token: set HA_TOKEN (see the README)' }));
+      return client.close();
+    }
+    // Give up after 10 s, so a wrong address shows a message instead of "Connecting…" for minutes.
+    const ha = new WebSocket(HA_URL.replace(/^http/, 'ws') + '/api/websocket', { perMessageDeflate: true, handshakeTimeout: 10000 });
     const queue = [];
     let ready = false;
     ha.on('message', (data, isBinary) => {
@@ -249,10 +352,19 @@ server.on('upgrade', (req, socket, head) => {
           queue.splice(0).forEach((m) => ha.send(m));
           return;
         }
+        if (msg.type === 'auth_invalid') {
+          once('auth', 'Home Assistant rejected the token. Check HA_TOKEN is a current long-lived access token.');
+          msg.message = 'Home Assistant rejected Panalume\'s access token';
+        }
         client.send(JSON.stringify(msg));
         return client.close();
       }
       client.send(data, { binary: isBinary });
+    });
+    // Can't reach Home Assistant at all: say so (in the log and on the screen).
+    ha.on('error', (e) => {
+      once('reach', `Can't reach Home Assistant at ${HA_URL}: ${e.message || e.code || 'connection refused'}`);
+      if (client.readyState === WebSocket.OPEN) client.send(JSON.stringify({ type: 'unreachable', message: `Can't reach Home Assistant at ${HA_URL}` }));
     });
     client.on('message', (data) => (ready ? ha.send(data.toString()) : queue.push(data.toString())));
     const close = () => { client.close(); ha.close(); };
@@ -289,5 +401,12 @@ async function refreshPanel() {
   }
 }
 
-server.listen(PORT, () => console.log(`Panalume on :${PORT} -> ${HA_URL}`));
+server.listen(PORT, () => {
+  console.log(`Panalume on :${PORT} -> ${HA_URL}`);
+  if (LOGIN) console.log('Sign-in is on (PANALUME_PASSWORD).');
+  else if (NO_LOGIN) console.warn('PANALUME_NO_LOGIN is set: there is no sign-in, so anyone who can reach this port can use and edit the dashboard with the token\'s access. Only do this on a network you trust.');
+  // Outside Home Assistant OS (e.g. the Docker image) it needs an address and a token.
+  if (!SUP && !TOKEN) console.error('No Home Assistant token. Set HA_URL (e.g. http://homeassistant.local:8123) and HA_TOKEN (a long-lived access token from your HA profile → Security), or HA_TOKEN_FILE.');
+  else if (!SUP && !process.env.HA_URL) console.warn('HA_URL is not set, so Panalume is trying http://localhost:8123. Set HA_URL to your Home Assistant address.');
+});
 refreshPanel();

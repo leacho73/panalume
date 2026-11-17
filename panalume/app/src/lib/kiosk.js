@@ -1,7 +1,7 @@
 // Kiosk mode: hide Home Assistant's header bar around this add-on page.
 // Ingress serves us from HA's own origin, so we can reach the parent page,
 // find our <iframe> (through HA's shadow DOM) and hide the header above it.
-function findFrame(root) {
+export function findFrame(root) {
   for (const el of root.querySelectorAll('*')) {
     if (el.tagName === 'IFRAME' && el.contentWindow === window) return el;
     if (el.shadowRoot) {

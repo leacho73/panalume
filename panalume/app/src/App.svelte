@@ -2,18 +2,20 @@
   import Stage from './components/Stage.svelte';
   import Editor from './components/Editor.svelte';
   import Popup from './components/Popup.svelte';
+  import Screensaver from './components/Screensaver.svelte';
   import Icon from './components/Icon.svelte';
-  import ViewIcon from './components/ViewIcon.svelte';
-  import { app, load, save, layout, setPanelSide, DEVICES, MODE_SHORT, detectDevice, setView, removeSelected, duplicateSelected, selectedPlacement, changed, undo, undoLast, selectionSet, ensureEditable, zoneList, groupSelected } from './lib/config.svelte.js';
-  import { conn, toasts, watchEntities, states, subscribe } from './lib/ha.svelte.js';
+  import ViewIcon, { viewBadge } from './components/ViewIcon.svelte';
+  import { app, load, save, layout, fillsBottom, setPanelSide, DEVICES, MODE_SHORT, detectDevice, setView, removeSelected, duplicateSelected, selectedPlacement, changed, undo, undoLast, selectionSet, ensureEditable, zoneList, groupSelected } from './lib/config.svelte.js';
+  import { conn, toasts, watchEntities, states, subscribe, me } from './lib/ha.svelte.js';
   import { loadMoney } from './lib/money.svelte.js';
   import { HUB_CHARGING, MYENERGI_OWN } from './lib/octopus.js';
   import { GRID } from './lib/config.svelte.js';
   import { setKiosk } from './lib/kiosk.js';
+  import { safe, startSafeArea } from './lib/safearea.svelte.js';
   import { connectLive } from './lib/live.js';
   import { param, setParentHash } from './lib/params.js';
   import { cards as cardTypes } from './lib/registry.js';
-  import { reloadFromServer, startView } from './lib/config.svelte.js';
+  import { reloadFromServer, startView, shownViews, viewOn } from './lib/config.svelte.js';
 
   let vw = $state(innerWidth);
   const autoDevice = detectDevice();
@@ -22,7 +24,7 @@
   const panelOpen = $derived(app.editing && !!app.panel);
   const panelW = $derived(vw > 760 ? 360 : Math.min(360, Math.round(vw * 0.6)));
   const sideW = $derived(panelOpen && side !== 'bottom' ? panelW : 0);
-  const available = $derived(vw - sideW);
+  const available = $derived(vw - sideW - safe.left - safe.right);
   // Toolbar dock buttons: pick a side (opening the panel), or tap the current side again to hide it.
   function dock(s) {
     if (app.panel && side === s) app.panel = null;
@@ -74,12 +76,16 @@
   try { window.fully?.bind?.('screenOn', "window.dispatchEvent(new Event('panalume-wake'))"); } catch {}
   const noEditParam = param('noedit') != null && param('noedit') !== '0';
   // Only Home Assistant admins can edit (the server checks too).
-  fetch('api/me').then((r) => r.json()).then((m) => { app.canEdit = m.admin !== false; if (!app.canEdit) app.editing = false; }).catch(() => {});
+  fetch('api/me').then((r) => r.json()).then((m) => { app.canEdit = m.admin !== false; if (!app.canEdit) app.editing = false; me.id = m.id || ''; me.name = m.name || ''; }).catch(() => {}).finally(() => (me.known = true));
   const noEdit = $derived(noEditParam || !app.canEdit);
+  // Pad for the iPad / iPhone screen edges ourselves instead of Home Assistant's grey strip.
+  startSafeArea();
   // No sidebar and no Navigation card on this view: a small views menu instead,
   // so there's always a way to switch views.
   let viewsOpen = $state(false);
-  const needViews = $derived(!app.editing && app.config?.views.length > 1 && !layout().sidebar.enabled && !(layout().zones[app.view] || []).some((p) => app.config.cards[p.card]?.type === 'nav'));
+  const needViews = $derived(!app.editing && app.config && shownViews().length > 1 && !layout().sidebar.enabled && !(layout().zones[app.view] || []).some((p) => app.config.cards[p.card]?.type === 'nav'));
+  // A dot on the closed views menu while any view has a badge up.
+  const menuBadge = $derived(needViews ? shownViews().map(viewBadge).find(Boolean) : null);
   $effect(() => {
     if (!app.config) return;
     const on = kioskParam != null ? kioskParam !== '0' : !!app.config.layouts[app.device]?.kiosk;
@@ -93,7 +99,7 @@
     `--radius:${th.cardRadius}px`, `--pad:${th.cardPadding}px`, `--blur:${th.cardBlur}px`, `--sidebar-bg:${th.sidebarBg}`,
     `--font:${th.font}`, `--page-bg:${th.background}`,
   ].join(';') : '');
-  $effect(() => { document.documentElement.style.cssText = rootStyle; });
+  $effect(() => { document.documentElement.style.cssText = rootStyle + `; --sa-top: ${safe.top}px; --sa-right: ${safe.right}px; --sa-bottom: ${safe.bottom}px; --sa-left: ${safe.left}px; --sa-pad-bottom: ${fillsBottom() ? 0 : safe.bottom}px;`; });
 
   function toggleEdit() {
     app.editing = !app.editing;
@@ -139,6 +145,13 @@
     if (home && app.view !== home) setView(home);
   }, 10e3);
 
+  // A view this screen or person isn't offered (left out in Layout, or its Shown when is
+  // false), e.g. from a bookmark: go to this screen's own view instead.
+  $effect(() => {
+    if (!app.config || app.editing) return;
+    if (viewOn(app.config.views.find((v) => v.id === app.view)) === false) { const home = startView(); if (home && home !== app.view) setView(home); }
+  });
+
   // Keep the current view in Home Assistant's address bar (…/panalume#energy) for bookmarks and links.
   $effect(() => { if (app.config) setParentHash(app.view); });
 
@@ -178,10 +191,10 @@
   {/if}
   {#if needViews}
     <div class="views-fab" class:open={viewsOpen}>
-      <button class="vf" onclick={() => (viewsOpen = !viewsOpen)} aria-label="Views"><Icon icon={viewsOpen ? 'mdi:close' : 'mdi:menu'} size="1.1em" /></button>
+      <button class="vf" class:badged={menuBadge} onclick={() => (viewsOpen = !viewsOpen)} aria-label="Views"><Icon icon={viewsOpen ? 'mdi:close' : 'mdi:menu'} size="1.1em" />{#if menuBadge && !viewsOpen}<i class="vfb" style={menuBadge.color ? `background:${menuBadge.color}` : ''}></i>{/if}</button>
       {#if viewsOpen}
         <div class="vlist">
-          {#each app.config.views as v (v.id)}<button class:on={app.view === v.id} onclick={() => { setView(v.id); viewsOpen = false; }}><span class="vmark"><ViewIcon view={v} size="1.1em" box /></span> {v.name}</button>{/each}
+          {#each shownViews() as v (v.id)}<button class:on={app.view === v.id} onclick={() => { setView(v.id); viewsOpen = false; }}><span class="vmark"><ViewIcon view={v} size="1.1em" box badge /></span> {v.name}</button>{/each}
         </div>
       {/if}
     </div>
@@ -191,16 +204,17 @@
   {/if}
 {/if}
 
-{#if !conn.connected}<div class="offline"><Icon icon="mdi:lan-disconnect" size="1em" /> Connecting to Home Assistant…</div>{/if}
+{#if !conn.connected}<div class="offline"><Icon icon="mdi:lan-disconnect" size="1em" /> {conn.problem || 'Connecting to Home Assistant…'}</div>{/if}
 <div class="toasts">{#each toasts as t (t.id)}<div class="toast">{t.text}</div>{/each}</div>
 <Popup />
+{#if app.config}<Screensaver />{/if}
 
 <style>
-  .app { min-height: 100dvh; }
-  .app.editing { padding-bottom: calc(var(--bar-h) + 12px); } /* room to scroll the last cards clear of the toolbar */
-  .app.editing.sheet { padding-bottom: calc(var(--bar-h) + 45dvh + 12px); } /* …and of the panel when it's docked along the bottom */
+  .app { min-height: 100dvh; padding: var(--sa-top) var(--sa-right) var(--sa-pad-bottom) var(--sa-left); }
+  .app.editing { padding-bottom: calc(var(--bar-h) + 12px + var(--sa-bottom)); } /* room to scroll the last cards clear of the toolbar */
+  .app.editing.sheet { padding-bottom: calc(var(--bar-h) + 45dvh + 12px + var(--sa-bottom)); } /* …and of the panel when it's docked along the bottom */
   .noblur :global(.card) { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
-  .bar { position: fixed; left: 0; right: 0; bottom: 0; height: var(--bar-h); z-index: 850; display: flex; align-items: center; justify-content: center; justify-content: safe center; gap: 6px; padding: 0 10px; overflow-x: auto; background: rgba(20,24,36,.98); border-top: 1px solid rgba(255,255,255,.1); box-shadow: 0 -6px 24px rgba(0,0,0,.35); font-size: 13px; } /* always docked along the bottom edge, full width */
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; height: calc(var(--bar-h) + var(--sa-bottom)); border-bottom: var(--sa-bottom) solid transparent; z-index: 850; display: flex; align-items: center; justify-content: center; justify-content: safe center; gap: 6px; padding: 0 10px; overflow-x: auto; background: rgba(20,24,36,.98); border-top: 1px solid rgba(255,255,255,.1); box-shadow: 0 -6px 24px rgba(0,0,0,.35); font-size: 13px; } /* always docked along the bottom edge, full width */
   .bar > * { flex: none; }
   .bar select { width: auto; max-width: 11em; } /* not full width like other dropdowns */
   .docks { display: inline-flex; gap: 2px; padding: 2px; border-radius: 12px; background: rgba(255,255,255,.04); }
@@ -210,18 +224,21 @@
   .bar button:disabled { opacity: .35; }
   .bar .done { background: var(--accent); color: #000; font-weight: 600; }
   .st { color: var(--muted); padding: 0 6px; min-width: 56px; }
-  .edit-fab { position: fixed; top: 10px; right: 10px; z-index: 700; width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(255,255,255,.06); color: var(--muted); opacity: .25; display: grid; place-items: center; transition: opacity .2s; }
+  .edit-fab { position: fixed; top: calc(10px + var(--sa-top)); right: calc(10px + var(--sa-right)); z-index: 700; width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(255,255,255,.06); color: var(--muted); opacity: .25; display: grid; place-items: center; transition: opacity .2s; }
   .edit-fab:hover { opacity: 1; }
-  .views-fab { position: fixed; top: 10px; left: 10px; z-index: 700; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .views-fab { position: fixed; top: calc(10px + var(--sa-top)); left: calc(10px + var(--sa-left)); z-index: 700; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
   .vf { width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(255,255,255,.06); color: var(--muted); opacity: .5; display: grid; place-items: center; transition: opacity .2s; }
-  .vf:hover, .open .vf { opacity: 1; }
+  .vf:hover, .open .vf, .vf.badged { opacity: 1; }
+  /* Some view has a badge: a dot on the closed menu button, in the first such badge's colour. */
+  .vf { position: relative; }
+  .vfb { position: absolute; top: 5px; right: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
   .vlist { display: flex; flex-direction: column; gap: 2px; padding: 6px; border-radius: 14px; background: rgba(20,24,34,.95); box-shadow: 0 10px 30px rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.08); }
   .vlist button { display: flex; align-items: center; gap: 10px; padding: 9px 14px 9px 10px; border: 0; border-radius: 10px; background: none; color: var(--text); font: inherit; text-align: left; white-space: nowrap; }
   .vlist button.on { background: rgba(122,162,255,.18); }
   /* One fixed slot for the mark, so a wide image does not push its label right. */
   .vmark { flex: none; display: inline-grid; place-items: center; width: 1.9em; }
-  .offline { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); z-index: 950; background: rgba(255,120,80,.9); color: #000; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; display: flex; gap: 6px; align-items: center; }
-  .toasts { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); z-index: 960; display: flex; flex-direction: column; gap: 6px; }
+  .offline { position: fixed; top: calc(12px + var(--sa-top)); left: 50%; transform: translateX(-50%); z-index: 950; background: rgba(255,120,80,.9); color: #000; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; display: flex; gap: 6px; align-items: center; }
+  .toasts { position: fixed; bottom: calc(80px + var(--sa-bottom)); left: 50%; transform: translateX(-50%); z-index: 960; display: flex; flex-direction: column; gap: 6px; }
   .toast { background: #2a2f40; padding: 10px 16px; border-radius: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.4); font-size: 14px; }
   @media (max-width: 480px) {
     .bar { gap: 4px; padding: 0 6px; }

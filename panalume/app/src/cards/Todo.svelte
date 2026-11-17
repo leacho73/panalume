@@ -8,13 +8,15 @@
   export const meta = {
     type: 'todo', name: 'To-do list', icon: 'mdi:clipboard-check-outline', category: 'Info',
     size: { w: 320, h: 360 }, tap: 'none',
-    defaults: { entity: '', add: true, done: true },
+    defaults: { entity: '', add: true, done: true, staples: '' },
     autofill,
-    sections: [{ key: 'head', label: 'Title' }],
+    sections: [{ key: 'head', label: 'Title' }, { key: 'add', label: 'Adding items' }],
     fields: [
       { key: 'entity', label: 'List', type: 'entity', domain: 'todo', hint: 'Home Assistant\'s shopping list, a Local to-do list, Todoist, Google Tasks…' },
       { key: 'name', label: 'Title (blank = the list\'s name)', type: 'text' },
       { key: 'add', label: 'Add items from the card', type: 'bool' },
+      { key: 'staples', label: 'Quick-add items', type: 'text', hint: 'Comma separated, shown as one-tap chips: Milk, Eggs, Bread' },
+      { key: 'badges', label: 'Show quantities as badges', type: 'bool', hint: '"2 x Milk" or "Milk x2" shows as Milk with a small ×2.' },
       { key: 'done', label: 'Show ticked items (under "Done")', type: 'bool' },
     ],
   };
@@ -27,6 +29,7 @@
   import { t, ent } from '../lib/tpl.js';
   import { subscribe, callService, conn } from '../lib/ha.svelte.js';
   import { name } from '../lib/entity.js';
+  import { SvelteSet } from 'svelte/reactivity';
   let { props, h = 360 } = $props();
   const show = (k) => !props.hide?.[k];
 
@@ -58,14 +61,49 @@
     call('update_item', { item: item.uid || item.summary, status });
   }
   let text = $state('');
-  function add(ev) {
-    ev?.preventDefault();
-    const s = text.trim();
+  function add(want) {
+    const s = String(want ?? '').trim();
     if (!s || !canAdd) return;
     call('add_item', { item: s });
+  }
+  // A quick-add chip: an item already in Done comes back rather than being added twice.
+  // Once tapped it hides at once, so a double tap can't add it twice.
+  const tapped = new SvelteSet();
+  function quick(s) {
+    const key = s.toLowerCase();
+    if (tapped.has(key)) return;
+    tapped.add(key);
+    setTimeout(() => tapped.delete(key), 5000);
+    const old = done.find((i) => split(i).label.toLowerCase() === key || (i.summary || '').trim().toLowerCase() === key);
+    if (old && canTick) call('update_item', { item: old.uid || old.summary, status: 'needs_action' });
+    else add(s);
+  }
+  function submit(ev) {
+    ev?.preventDefault();
+    add(text);
     text = '';
   }
   const clearDone = () => call('remove_completed_items', {});
+
+  // "2 x milk" and "milk x2" both mean two of them; anything else keeps its name whole.
+  // The x needs a space on its far side, so "6x4 frames", "Firefox 3" and "1 xmas card" stay whole.
+  function split(item) {
+    const s = item.summary || '';
+    const m = s.match(/^(\d+(?:[.,]\d+)?)\s*[x×]\s+(.+)$/i) || s.match(/^(.+?)\s+[x×]\s*(\d+(?:[.,]\d+)?)$/i);
+    if (!m) return { qty: '', label: s };
+    const [qty, label] = /^\d/.test(m[1]) ? [m[1], m[2]] : [m[2], m[1]];
+    return { qty: `×${qty}`, label: label.trim() };
+  }
+
+  // A regular already on the list is not a chip; "2 x Milk" counts as Milk.
+  const staples = $derived.by(() => {
+    const have = new Set(open.flatMap((i) => [(i.summary || '').trim().toLowerCase(), split(i).label.toLowerCase()]));
+    return String(props.staples || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .filter((s) => !have.has(s.toLowerCase()) && !tapped.has(s.toLowerCase()));
+  });
 
   const today = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
   function due(item) {
@@ -96,17 +134,28 @@
     <div class="msg">List not found</div>
   {:else}
     {#if props.add !== false && canAdd && !small}
-      <form class="add" onsubmit={add} data-stop>
-        <input bind:value={text} placeholder="Add an item" enterkeyhint="done" />
-        <button type="submit" disabled={!text.trim()} aria-label="Add"><Icon icon="mdi:plus" size="1.2em" /></button>
-      </form>
+      {#if show('add') && staples.length}
+        <div class="chips" data-stop>
+          {#each staples as s (s)}
+            <button class="chip" onclick={() => quick(s)}>{s}</button>
+          {/each}
+        </div>
+      {/if}
+      {#if show('add')}
+        <form class="add" onsubmit={submit} data-stop>
+          <input bind:value={text} placeholder="Add an item" enterkeyhint="done" />
+          <button type="submit" disabled={!text.trim()} aria-label="Add"><Icon icon="mdi:plus" size="1.2em" /></button>
+        </form>
+      {/if}
     {/if}
     <div class="list" data-stop>
       {#each open as item (item.uid || item.summary)}
         {@const d = due(item)}
+        {@const q = props.badges ? split(item) : { qty: '' }}
         <button class="it" onclick={() => tick(item)} disabled={!canTick}>
           <span class="box"></span>
-          <span class="tx">{item.summary}{#if d}<small class:late={d.late}>{d.label}</small>{/if}</span>
+          <!-- Without a badge the row is plain text, exactly as before. -->
+          <span class="tx">{#if q.qty}<span class="nm"><span class="l">{q.label}</span><span class="qty">{q.qty}</span></span>{:else}{item.summary}{/if}{#if d}<small class:late={d.late}>{d.label}</small>{/if}</span>
         </button>
       {:else}
         {#if loaded}<div class="empty"><Icon icon="mdi:check-all" size="1.3em" />All done</div>{/if}
@@ -137,6 +186,9 @@
   .n { flex: none; min-width: 1.6em; height: 1.6em; padding: 0 .45em; border-radius: 1em; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 25%, transparent); font-size: .78em; }
   .msg { flex: 1; display: grid; place-items: center; text-align: center; color: var(--muted); font-size: .85em; }
   .add { display: flex; gap: 6px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 99px; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--text); font: inherit; font-size: .82em; padding: 5px 11px; cursor: pointer; }
+  .chip:active { background: color-mix(in srgb, var(--accent) 28%, transparent); }
   .add input { flex: 1; min-width: 0; padding: 8px 11px; border-radius: 10px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.05); color: inherit; font: inherit; font-size: .9em; }
   .add input:focus { outline: none; border-color: var(--accent); }
   .add button { flex: none; width: 2.4em; border: 0; border-radius: 10px; background: color-mix(in srgb, var(--accent) 30%, transparent); color: var(--text); display: grid; place-items: center; }
@@ -148,6 +200,9 @@
   .box { flex: none; width: 1.25em; height: 1.25em; border-radius: 50%; border: 2px solid rgba(255,255,255,.35); display: grid; place-items: center; color: #0b0f17; }
   .done .box { background: var(--accent); border-color: var(--accent); }
   .tx { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: .92em; overflow-wrap: anywhere; }
+  .nm { display: flex; align-items: center; gap: 6px; min-width: 0; }
+  .l { min-width: 0; overflow-wrap: anywhere; }
+  .qty { flex: none; font-size: .8em; font-weight: 600; padding: 1px 6px; border-radius: 99px; background: color-mix(in srgb, var(--accent) 26%, transparent); }
   .tx small { font-size: .75em; color: var(--muted); }
   .tx small.late { color: #ff8a8a; }
   .done .tx { color: var(--muted); text-decoration: line-through; }

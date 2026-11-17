@@ -1,6 +1,7 @@
 <script>
   import { untrack } from 'svelte';
   import { param } from '../lib/params.js';
+  import { safe } from '../lib/safearea.svelte.js';
   // The dashboard canvas. Laid out at the layout's design width and scaled
   // (CSS zoom) to fit the screen. In edit mode cards can be dragged anywhere
   // (including between the sidebar and main area) and resized from any edge or
@@ -8,10 +9,14 @@
   // Shift/Ctrl-click or drag a box on empty space to select several.
   // Positions snap to a 10px grid (hold Shift while dragging for 1px).
   import CardFrame from './CardFrame.svelte';
-  import { app, layout, GRID, changed, zoneList, ensureEditable, selectionSet, fitOverflow, usualGap, cardHidden, sideWidth, topHeight } from '../lib/config.svelte.js';
+  import { cards } from '../lib/registry.js';
+  import { app, layout, GRID, changed, zoneList, ensureEditable, selectionSet, fitOverflow, usualGap, cardHidden, sideWidth, topHeight, fillsBottom } from '../lib/config.svelte.js';
 
   let { available, autoDevice, offset = 0 } = $props(); // offset: space taken on the left (the editor panel when docked left)
-  let vh = $state(innerHeight);
+  // The window height, less the screen edges Panalume pads itself (safearea.svelte.js).
+  let winH = $state(innerHeight);
+  const padBottom = $derived(fillsBottom() ? 0 : safe.bottom);
+  const vh = $derived(winH - safe.top - padBottom);
   let scrollY = $state(0);
   let sbEl = $state();
   let topEl = $state();
@@ -496,6 +501,13 @@
 
   const HANDLES = ['n', 's', 'e', 'w', 'ne', 'nw', 'se', 'sw'];
 
+  // A card type can take the pointer for its own children while it is the selected
+  // one in the editor — picture elements drags an element across the picture. The
+  // card is lifted over the grab layer and made transparent to it except for those
+  // children, so dragging anywhere else still moves the placement.
+  const cardOwnsMarks = (card, name, i) =>
+    !!cards?.[card?.type]?.meta?.ownsDrag && app.editing && isPrimary(name, i) && sel.size === 1;
+
   /** Scale everything inside a card (text, buttons, toggles…) without changing its box. */
   function setScale(card, v) {
     card.style.scale = Math.min(250, Math.max(40, v));
@@ -504,7 +516,7 @@
   }
 </script>
 
-<svelte:window bind:innerHeight={vh} bind:scrollY />
+<svelte:window bind:innerHeight={winH} bind:scrollY />
 
 {#snippet zone(name, list)}
   {#each list as p, i (p.card + ':' + i)}
@@ -513,7 +525,7 @@
     {@const pw = Math.round(p.w * k)}
     {@const main = name !== 'sidebar' && lift}
     {#if card && !(main && lift.hid[i])}
-      <div class="place" class:sel={inSel(name, i)} class:primary={isPrimary(name, i) && sel.size === 1} class:grouped={app.editing && p.group}
+      <div class="place" class:sel={inSel(name, i)} class:primary={isPrimary(name, i) && sel.size === 1} class:grouped={app.editing && p.group} class:ownMarks={cardOwnsMarks(card, name, i)}
         style="left:{Math.round(p.x * k)}px;top:{main ? p.y - liftY(p.y) : name !== 'sidebar' ? p.y - groupUp(p) : p.y}px;width:{pw}px;height:{p.h}px;z-index:{(p.z || 0) + (op && inSel(name, i) ? 1000 : isPrimary(name, i) ? 500 : 0)}">
         <CardFrame {card} w={pw} h={p.h} editing={app.editing} />
         {#if app.editing}
@@ -560,7 +572,10 @@
       <div class="inner" role="presentation" style="height:{tb}px" onpointerdown={(e) => bgDown(e, 'sidebar')} onpointermove={move} onpointerup={end}>{@render zone('sidebar', sideList)}</div>
     </header>
   {:else if sb}
-    <aside class="zone sidebar" bind:this={sbEl} style="width:{sb}px;height:{vh / scale / sideZ}px;zoom:{sideZ}" onscroll={() => { if (!op) sbScroll = sbEl.scrollTop; }}>
+    <!-- Its background carries on down through the bottom screen edge (the
+         iPad / iPhone home bar), taken back off with a negative margin so the
+         page doesn't grow by it; its cards still stop above the edge. -->
+    <aside class="zone sidebar" bind:this={sbEl} style="width:{sb}px;height:{(vh + padBottom) / scale / sideZ}px;padding-bottom:{padBottom / scale / sideZ}px;margin-bottom:{-padBottom / scale / sideZ}px;zoom:{sideZ}" onscroll={() => { if (!op) sbScroll = sbEl.scrollTop; }}>
       <div class="inner" role="presentation" style="height:{sideH}px;--sb-scroll:{sbScroll}" onpointerdown={(e) => bgDown(e, 'sidebar')} onpointermove={move} onpointerup={end}>{@render zone('sidebar', sideList)}</div>
     </aside>
   {/if}
@@ -596,6 +611,8 @@
   .editing .place.grouped:not(.sel)::after { content: ''; position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; border-radius: 50%; background: rgba(122,162,255,.6); z-index: 3; pointer-events: none; }
   .place.sel { outline: 1px solid rgba(122,162,255,.7) !important; outline-offset: 2px; border-radius: var(--radius); }
   .place.primary { outline: 2px solid var(--accent) !important; }
+  .place.ownMarks > :global(.card) { z-index: 3; pointer-events: none; }
+  .place.ownMarks > :global(.card) :global(.mk) { pointer-events: auto; }
   .grab { position: absolute; inset: 0; cursor: move; touch-action: none; z-index: 2; }
   .h { position: absolute; z-index: 3; touch-action: none; }
   .h::after { content: ''; position: absolute; inset: 50% auto auto 50%; width: 12px; height: 12px; transform: translate(-50%, -50%); background: #fff; border: 2px solid var(--accent); border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
