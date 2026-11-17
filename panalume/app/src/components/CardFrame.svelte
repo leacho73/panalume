@@ -3,7 +3,7 @@
   // tap / hold actions.
   import { cards } from '../lib/registry.js';
   import { t, ent, truthy } from '../lib/tpl.js';
-  import { app, setView } from '../lib/config.svelte.js';
+  import { app, setView, viewBack, startView } from '../lib/config.svelte.js';
   import { callService } from '../lib/ha.svelte.js';
   import { toggle, canToggle, domain } from '../lib/entity.js';
   import { splitCss } from '../lib/css.js';
@@ -70,6 +70,9 @@
     else if (kind === 'fullscreen' && entity) app.popup = { entity };
     else if (kind === 'popup') app.popup = { cards: act.cards || [], title: act.title };
     else if (kind === 'navigate' && act.view) setView(act.view);
+    else if (kind === 'back') viewBack();
+    else if (kind === 'home') { const v = startView(); if (v) setView(v); }
+    else if (kind === 'ha-page' && act.path) haPage(String(t(act.path)).trim());
     else if (kind === 'url' && act.url) window.open(t(act.url), act.newTab === false ? '_self' : '_blank');
     else if (kind === 'service' && act.service) {
       const [d, sv] = act.service.split('.');
@@ -78,6 +81,19 @@
       callService(d, sv, data, entity && !data.entity_id ? { entity_id: entity } : undefined);
     }
   }
+
+  // A Home Assistant page such as /config/devices or /lovelace/energy. Inside Home
+  // Assistant, its frontend is asked to go there, as its own links would. A full
+  // address (needed on the direct port, with no Home Assistant around the dashboard)
+  // opens like a link.
+  function haPage(path) {
+    if (!path) return;
+    if (/^https?:/i.test(path)) window.open(path, '_self');
+    else if (window.parent !== window) window.parent.postMessage({ type: 'home-assistant/navigate', path: path.startsWith('/') ? path : '/' + path }, '*');
+  }
+
+  // Start rendering templated addresses now, so they're ready by the time of the tap.
+  $effect(() => { for (const a of [card.tap, card.hold]) if (a?.action === 'ha-page' || a?.action === 'url') t(a.path ?? a.url); });
 
   // Tap / hold detection that ignores interactive children (sliders, buttons).
   let holdTimer, held, startX, startY;
