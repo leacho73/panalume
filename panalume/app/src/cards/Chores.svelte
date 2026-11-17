@@ -17,7 +17,7 @@
     category: 'Info',
     size: { w: 560, h: 400 },
     tap: 'none',
-    defaults: { people: [], title: '', hide_empty: false, rank: true },
+    defaults: { people: [], title: '', hide_empty: false },
     autofill,
     sections: [
       { key: 'head', label: 'Title' },
@@ -26,7 +26,6 @@
     fields: [
       { key: 'people', label: 'People', type: 'people' },
       { key: 'title', label: 'Title (blank = "Chores")', type: 'text' },
-      { key: 'rank', label: 'Show the leaderboard', type: 'bool' },
       { key: 'hide_empty', label: 'Hide people with nothing left', type: 'bool' },
     ],
   };
@@ -50,7 +49,7 @@
       const points = p?.points ? String(t(p.points)).trim() : '';
       const e = todo ? states.get(todo) : undefined;
       const label = (p?.name ? String(t(p.name)).trim() : '') || entName(e) || todo || `Person ${i + 1}`;
-      return { key: todo || `row${i}`, todo, points, name: label, entity: e };
+      return { key: `${i}:${todo}`, todo, points, name: label, entity: e };
     }),
   );
   // Subscriptions follow the ids, not the whole person object, so a state update
