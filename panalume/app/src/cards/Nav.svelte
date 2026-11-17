@@ -8,6 +8,7 @@
       { key: 'show_icons', label: 'Icons', type: 'bool' },
       { key: 'icon_style', label: 'Icon style', type: 'select', options: [{ value: 'plain', label: 'Plain' }, { value: 'tile', label: 'Tile (Android-style)' }], hint: 'A tile is a rounded, tinted square behind each icon, filled with the accent colour for the view you are on.' },
       { key: 'show_names', label: 'Names', type: 'bool' },
+      { key: 'views', label: 'Views shown (none ticked = all)', type: 'views', hint: 'Leave out views you reach another way, such as a room view opened from a button on a Rooms view.' },
     ],
   };
 </script>
@@ -19,10 +20,15 @@
   // A wide, short nav card lays out horizontally whatever its setting (e.g. on phones).
   const dir = $derived(w > h * 3 ? 'horizontal' : props.direction);
   const tiles = $derived(props.icon_style === 'tile');
+  // Only the views picked for this card, if any (and all of them if those have since been deleted).
+  const views = $derived.by(() => {
+    const own = props.views?.length ? app.config.views.filter((v) => props.views.includes(v.id)) : [];
+    return own.length ? own : app.config.views;
+  });
 </script>
 
 <nav class="nav {dir}" class:tiles data-stop>
-  {#each app.config.views as v}
+  {#each views as v (v.id)}
     <button class:sel={app.view === v.id} onclick={() => setView(v.id)}>
       {#if props.show_icons !== false && (v.icon || v.image)}
         {#if tiles}
