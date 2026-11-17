@@ -1,11 +1,12 @@
 // Entity helpers: names, formatted states, default icons, toggling.
 import { callService } from './ha.svelte.js';
+import { haName } from './names.svelte.js';
 import { stateWord } from './i18n.svelte.js';
 
 export const domain = (id) => id?.split('.')[0] || '';
 
 export function name(e, fallback) {
-  return fallback || e?.attributes.friendly_name || e?.entity_id || '';
+  return fallback || haName(e?.entity_id) || e?.attributes.friendly_name || e?.entity_id || '';
 }
 
 const OFF = new Set(['off', 'closed', 'idle', 'standby', 'unavailable', 'unknown', 'not_home', 'paused', 'disarmed', 'docked', 'locked', 'none', '']);

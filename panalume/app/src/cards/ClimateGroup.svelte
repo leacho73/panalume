@@ -13,7 +13,7 @@
       { key: 'fan', label: 'Fan speed' }, { key: 'units', label: 'Each unit' },
     ],
     fields: [
-      { key: 'entities', label: 'Thermostats / AC units', type: 'entities', domain: 'climate' },
+      { key: 'entities', label: 'Thermostats / AC units', type: 'entities', domain: 'climate', names: true },
       { key: 'grow', label: 'Grow with the card', type: 'bool', hint: 'Make the card bigger and its buttons, text and dial grow with it, up to 1.6×. The − / + under the card (Content size) still works on top.' },
       { key: 'name', label: 'Name', type: 'text', placeholder: 'Air conditioning' },
       { key: 'icon', label: 'Icon', type: 'icon' },
@@ -117,6 +117,8 @@
   // A unit's name without the group's own words ("Upstairs AC" in "AC" → "Upstairs").
   const title = $derived(t(props.name) || 'Climate');
   function short(e) {
+    const mine = t(props.names?.[e.entity_id]);
+    if (mine) return mine;
     const n = name(e);
     const s = n.replace(new RegExp(`\\s*\\b${title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b\\s*`, 'i'), ' ').trim();
     return s || n;

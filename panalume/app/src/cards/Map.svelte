@@ -67,7 +67,7 @@
 
   import { states, haImage } from '../lib/ha.svelte.js';
   import { app } from '../lib/config.svelte.js';
-  import { stateText } from '../lib/entity.js';
+  import { stateText, name } from '../lib/entity.js';
   import { t } from '../lib/tpl.js';
 
   let { props } = $props();
@@ -140,7 +140,7 @@
           lon >= -180 &&
           lon <= 180,
 
-        name: customLabel || a.friendly_name || id,
+        name: customLabel || name(states.get(id)) || id,
 
         status: customStatus || stateText(e),
 

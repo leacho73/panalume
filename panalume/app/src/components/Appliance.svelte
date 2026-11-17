@@ -8,6 +8,7 @@
   import { clock } from '../lib/clock.svelte.js';
   import { hm, day } from '../lib/octopus.js';
   import { KINDS } from '../lib/appliance.js';
+  import { name } from '../lib/entity.js';
   let { kind, props, w = 420, h = 220 } = $props();
   const K = KINDS[kind];
   const show = (k) => !props.hide?.[k];
@@ -81,7 +82,7 @@
   const compact = $derived(h < 175);
   const devName = $derived(t(props.name) || K.name);
   const label = (id) => {
-    const f = ent(id)?.attributes.friendly_name || id;
+    const f = ent(id) ? name(ent(id)) : id;
     const n = (t(props.name) || '').trim();
     return (n && f.startsWith(n) ? f.slice(n.length) : f).replace(/^[\s:-]+/, '').trim() || f;
   };
