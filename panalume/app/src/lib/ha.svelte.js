@@ -104,6 +104,7 @@ function handle(msg) {
     conn.haVersion = msg.ha_version;
     backoff = 500;
     for (const s of subs.values()) startSub(s);
+    for (const f of connectHooks) f();
     return;
   }
   if (msg.type === 'event') {
@@ -132,6 +133,13 @@ function startSub(s) {
   s.id = nextId++;
   pending.set(s.id, { resolve() {}, reject: (e) => console.warn('subscription failed', s.msg, e) });
   ws.send(JSON.stringify({ ...s.msg, id: s.id }));
+}
+
+// Things to do each time the connection to Home Assistant is (re)made.
+const connectHooks = [];
+export function onConnect(f) {
+  connectHooks.push(f);
+  if (conn.connected) f();
 }
 
 /** Subscribe to a websocket subscription; returns an unsubscribe function. */

@@ -37,6 +37,7 @@
   import Slider from '../components/Slider.svelte';
   import { t, ent } from '../lib/tpl.js';
   import { callService, haImage } from '../lib/ha.svelte.js';
+  import { name } from '../lib/entity.js';
   let { props, w = 420, h = 320 } = $props();
   const show = (k) => !props.hide?.[k];
   const cut = (s, n) => (String(s ?? '').length > n ? String(s).slice(0, n - 1) + '…' : String(s ?? ''));
@@ -89,7 +90,7 @@
     if (off(e) && has(e, 128)) svc(r.id, 'turn_on');
     else if (has(e, 16384) || has(e, 1)) svc(r.id, 'media_play_pause');
   }
-  const names = (e) => members(e).map((m) => ent(m)?.attributes?.friendly_name || m.split('.')[1]).join(', ');
+  const names = (e) => members(e).map((m) => (ent(m) ? name(ent(m)) : m.split('.')[1])).join(', ');
 </script>
 
 <div class="hub" class:small={h < 240} class:tight={tight}>
@@ -97,7 +98,7 @@
     <div class="now">
       {#if art}<div class="art" style="background-image:url('{art}')"></div>{/if}
       <div class="txt">
-        <div class="label"><Icon icon={isGroup(focus) ? 'mdi:speaker-multiple' : 'mdi:speaker'} size="1em" /><span>{t(props.name) || focus?.attributes?.friendly_name || 'Nothing playing'}</span></div>
+        <div class="label"><Icon icon={isGroup(focus) ? 'mdi:speaker-multiple' : 'mdi:speaker'} size="1em" /><span>{t(props.name) || (focus && name(focus)) || 'Nothing playing'}</span></div>
         <div class="title">{cut(title, 80)}</div>
         {#if sub}<div class="sub">{cut(sub, 90)}</div>{/if}
       </div>
@@ -126,7 +127,7 @@
             <div class="who">
               <div class="nm">
                 {#if isGroup(e)}<span class="tag"><Icon icon="mdi:speaker-multiple" size=".95em" />{members(e).length > 1 ? `Group of ${members(e).length}` : 'Group'}</span>{/if}
-                <span class="n">{e.attributes.friendly_name || r.id.split('.')[1]}</span>
+                <span class="n">{name(e)}</span>
               </div>
               <div class="st">
                 {#if (playing(e) || e.state === 'paused') && trackOf(e)}<Icon icon="mdi:music" size=".9em" />{cut(trackOf(e), 46)}{:else}{st}{#if members(e).length > 1} · {cut(names(e), 40)}{/if}{/if}

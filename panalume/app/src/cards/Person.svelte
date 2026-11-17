@@ -4,7 +4,7 @@
     size: { w: 320, h: 110 }, tap: 'none',
     defaults: { entities: [], open: 'details' },
     fields: [
-      { key: 'entities', label: 'People', type: 'entities', domain: ['person', 'device_tracker'] },
+      { key: 'entities', label: 'People', type: 'entities', domain: ['person', 'device_tracker'], names: true },
       { key: 'status', label: 'Status line (template; entity_id is each person, blank shows home / away / zone)', type: 'text', placeholder: "{{ states('sensor.' ~ entity_id.split('.')[1] ~ '_travel_time') }} min away" },
       { key: 'label', label: 'Name (template; entity_id is each person, blank shows their name)', type: 'text' },
       { key: 'open', label: 'Tapping a person opens', type: 'select', options: [{ value: 'details', label: 'Their details' }, { value: 'map', label: 'A map of where they are' }] },
@@ -17,14 +17,14 @@
 <script>
   import { states, haImage } from '../lib/ha.svelte.js';
   import { app } from '../lib/config.svelte.js';
-  import { stateText } from '../lib/entity.js';
+  import { stateText, name } from '../lib/entity.js';
   import { t } from '../lib/tpl.js';
   import { personTap } from '../lib/location.js';
   let { props, card } = $props();
   // When the card has its own tap action (a pop-up of other cards, say), tapping a
   // person does that too, so the whole card behaves the same wherever it's tapped.
   const cardTap = $derived(!!card?.tap?.action && card.tap.action !== 'none');
-  const nameOf = (id, e) => (props.label && t(props.label, { entity_id: id })) || e?.attributes.friendly_name || id;
+  const nameOf = (id, e) => t(props.names?.[id]) || (props.label && t(props.label, { entity_id: id })) || (e ? name(e) : id);
   // Their map if chosen and they report a location; otherwise their details.
   const open = (id, e) => (app.popup = personTap(props, e) === 'map' ? { map: id, title: nameOf(id, e) } : { entity: id });
 </script>
@@ -38,7 +38,7 @@
     {@const home = e?.state === 'home'}
     <svelte:element this={cardTap ? 'div' : 'button'} class="p" data-stop={cardTap ? undefined : ''} onclick={cardTap ? undefined : () => open(id, e)} role={cardTap ? 'presentation' : undefined}>
       <div class="av" class:home>
-        {#if e?.attributes.entity_picture}<img src={haImage(e.attributes.entity_picture)} alt="" />{:else}{(e?.attributes.friendly_name || '?')[0]}{/if}
+        {#if e?.attributes.entity_picture}<img src={haImage(e.attributes.entity_picture)} alt="" />{:else}{(e ? name(e) : '?')[0]}{/if}
       </div>
       <span class="n">{nameOf(id, e)}</span>
       <span class="s">{props.status ? t(props.status, { entity_id: id }) : stateText(e)}</span>

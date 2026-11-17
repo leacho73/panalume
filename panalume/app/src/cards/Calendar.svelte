@@ -30,6 +30,7 @@
   import Icon from '../components/Icon.svelte';
   import { t } from '../lib/tpl.js';
   import { clock } from '../lib/clock.svelte.js';
+  import { name } from '../lib/entity.js';
   let { props, w = 360, h = 320 } = $props();
   const show = (k) => !props.hide?.[k];
   const COLORS = ['#4fb4ff', '#ff8fb1', '#5bd88f', '#ffc861', '#b48cff', '#ff9a3c', '#2ed3c4', '#ff6b6b'];
@@ -214,7 +215,7 @@
     return 'All day';
   };
   const isNow = (e) => !e.allDay && e.start <= now && e.end > now;
-  const calName = (id) => (states.get(id)?.attributes.friendly_name || id.slice(9)).replace(/\s*calendar$/i, '');
+  const calName = (id) => (states.get(id) ? name(states.get(id)) : id.slice(9)).replace(/\s*calendar$/i, '');
   let open = $state(null);
   const small = $derived(h < 170);
   const title = $derived(view !== 'list' ? [t(props.title), period].filter(Boolean).join(' · ') : t(props.title) || new Date(now).toLocaleDateString(lang, { weekday: 'long', day: 'numeric', month: 'long' }));
