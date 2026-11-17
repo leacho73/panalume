@@ -5,11 +5,11 @@
   import { cards, categories } from '../lib/registry.js';
   import {
     app, layout, DEVICES, DEFAULT_THEME, changed, addCard, selectedCard, selectedPlacement, removeSelected,
-    duplicateSelected, copyToView, copyLayout, importConfig, selectionSet, groupSelected, ungroupSelected, ensureEditable, setMode, MODES, DISPLAYS, zoneList, addView, removeView, setView, isPlacedAnywhere, placeExisting, zoneWidth, setMainWidth, screenHome, setScreenHome, screenDevice, setScreenDevice, groupCloses, setGroupCloses, setSidebarSide, addFilledView, changeType, otherLayouts, copyToLayout,
+    duplicateSelected, copyToView, copyLayout, importConfig, selectionSet, groupSelected, ungroupSelected, ensureEditable, setMode, MODES, DISPLAYS, zoneList, addView, removeView, setView, isPlacedAnywhere, placeExisting, zoneWidth, setMainWidth, screenHome, setScreenHome, screenHidden, setScreenHidden, screenDevice, setScreenDevice, groupCloses, setGroupCloses, setSidebarSide, addFilledView, changeType, otherLayouts, copyToLayout,
   } from '../lib/config.svelte.js';
   import { areas, areaCards } from '../lib/area.js';
   // Settings kept on this screen only (not in the shared layout).
-  const screenOpts = $state({ home: screenHome(), device: screenDevice() });
+  const screenOpts = $state({ home: screenHome(), device: screenDevice(), hidden: screenHidden() });
 
   import { fromFusion } from '../lib/fusion.js';
   import { toast } from '../lib/ha.svelte.js';
@@ -376,6 +376,7 @@
         <Field obj={app.config.layouts[app.device]} f={{ key: 'display', label: `Sizing on ${app.device === 'tablet' ? 'tablets' : DEVICES[app.device].label.toLowerCase() + 's'}`, type: 'select', options: Object.entries(DISPLAYS).map(([value, label]) => ({ value, label })) }} />
         <Field obj={app.config.layouts[app.device]} f={{ key: 'home_view', label: `Home view on ${app.device === 'tablet' ? 'tablets' : DEVICES[app.device].label.toLowerCase() + 's'}`, type: 'select', options: [{ value: '', label: 'The first view' }, ...app.config.views.map((v) => ({ value: v.id, label: v.name }))], hint: 'The view this device opens on and goes back to. ?view= in the address does the same and wins.' }} />
         <Field obj={screenOpts} f={{ key: 'home', label: 'Home view on this screen only', type: 'select', options: [{ value: '', label: 'Same as above' }, ...app.config.views.map((v) => ({ value: v.id, label: v.name }))], hint: 'Saved on this screen, e.g. the kitchen tablet going to Kitchen and the living-room one to Living room, even in kiosk apps that can\'t change the address.' }} onset={(v) => { screenOpts.home = v; setScreenHome(v); }} />
+        <Field obj={screenOpts} f={{ key: 'hidden', label: 'Views left out on this screen', type: 'views', hint: 'Saved on this screen only, e.g. a tablet for visitors that shouldn\'t offer the energy or calendar views. They\'re left out of the Navigation card and the views menu here. It tidies what the screen offers; it isn\'t a lock.' }} onset={(v) => { screenOpts.hidden = v; setScreenHidden(v); }} />
         <Field obj={app.config.layouts[app.device]} f={{ key: 'return_mins', label: 'Go back to the home view after (minutes without a touch, blank = never)', type: 'number', hint: 'For wall tablets left on another page. ?return=5 in the address does the same and wins.' }} />
         <Field obj={app.config.layouts[app.device]} f={{ key: 'popup_secs', label: 'Close pop-ups after (seconds without a touch, blank = never)', type: 'number', hint: 'Each touch inside the pop-up starts the count again.' }} />
         <Field obj={app.config.layouts[app.device]} f={{ key: 'fill_bottom', label: 'Use the screen right down to the bottom edge', type: 'bool', hint: 'For a wall iPad: cards go under the home bar line instead of stopping short of it. Leave off if you tap cards at the very bottom of the screen.' }} />
@@ -431,6 +432,7 @@
             <Field obj={v} f={{ key: 'background', label: 'Background (overrides theme)', type: 'text' }} />
             <Field obj={v} f={{ key: 'badge', label: 'Badge (template)', type: 'text', placeholder: "{{ is_state('binary_sensor.kitchen_motion', 'on') }}", hint: 'Shown on the view\'s icon in the Navigation card and the views menu: a dot when this is true, or an icon if it gives an icon name (mdi:walk). Empty or false shows nothing.' }} />
             {#if v.badge}<Field obj={v} f={{ key: 'badge_color', label: 'Badge colour (blank = accent)', type: 'color' }} />{/if}
+            <Field obj={v} f={{ key: 'visible', label: 'Shown when (template, blank = always)', type: 'text', placeholder: "{{ user_name != 'Babysitter' }}", hint: 'When false, the view is left out of the Navigation card and the views menu, and screens on it go to their own view. Templates can use user_name / user (who\'s signed in to Home Assistant) to show a view to some people only. It tidies what each person sees; it isn\'t a lock.' }} />
           </div>
         </div>
       {/each}
