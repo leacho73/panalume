@@ -92,8 +92,8 @@
           shelfError = 'Could not reach Home Assistant';
           return;
         }
-        id = list.find((e) => e.state === 'loaded')?.entry_id || '';
-        if (!id && list.length) {
+        id = (list || []).find((e) => e.state === 'loaded')?.entry_id || '';
+        if (!id && list?.length) {
           shelfError = 'Music Assistant is starting…';
           return;
         }
