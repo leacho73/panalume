@@ -22,7 +22,7 @@
       { key: 'home', label: 'Home power (blank = calculated)', type: 'entity', domain: 'sensor' },
       { key: 'ev', label: 'EV / charger power', type: 'entity', domain: 'sensor' },
       { key: 'ev_label', label: 'EV label', type: 'text', section: 'ev' },
-      { key: 'appliances', label: 'Appliances (power sensors, up to 4)', type: 'entities', domain: 'sensor', section: 'appliances', hint: 'Shown around the house, e.g. a heat pump or hot tub. Names come from the sensors; they\'re part of the home\'s use, not added to it.' },
+      { key: 'appliances', label: 'Appliances (power sensors, up to 4)', type: 'entities', domain: 'sensor', section: 'appliances', names: true, hint: 'Shown around the house, e.g. a heat pump or hot tub. Names come from the sensors; they\'re part of the home\'s use, not added to it.' },
     ],
   };
 </script>
@@ -63,7 +63,7 @@
   const corners = (tight) => (tight ? [[10, 10], [90, 10], [10, 90], [90, 90]] : [[12, 12], [88, 12], [12, 88], [88, 88]]);
   const appliances = $derived((show('appliances') && Array.isArray(props.appliances) ? props.appliances : []).filter(Boolean).slice(0, 4).map((id, i) => {
     const e = ent(id);
-    const label = (e ? name(e) : id).replace(/\s+(current\s+)?(power|consumption|load|usage|watts)$/i, '') || 'Appliance';
+    const label = t(props.names?.[id]) || (e ? name(e) : id).replace(/\s+(current\s+)?(power|consumption|load|usage|watts)$/i, '') || 'Appliance';
     const icon = e?.attributes.icon || APPLIANCE_ICONS.find(([re]) => re.test(label.toLowerCase()))?.[1] || 'mdi:power-plug';
     return { key: `app${i}`, w: Math.max(0, watts(id) ?? 0), label, icon, color: AC[i] };
   }));

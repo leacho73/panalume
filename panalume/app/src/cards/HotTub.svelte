@@ -67,6 +67,7 @@
   import { callService } from '../lib/ha.svelte.js';
   import { clock } from '../lib/clock.svelte.js';
   import { useHistory } from '../lib/history.svelte.js';
+  import { name } from '../lib/entity.js';
   let { props, w = 460, h = 380 } = $props();
   const show = (k) => !props.hide?.[k];
   const on = (id) => ent(id)?.state === 'on';
@@ -183,7 +184,7 @@
   {#if show('tub')}{@render tubPic(miniSize)}{/if}
   <div class="mside">
     <div class="tt">
-      <div class="name"><span class="mic" class:hot={heating}><Icon icon="mdi:hot-tub" size="1em" /></span>{t(props.name) || heater?.attributes.friendly_name || 'Hot tub'}</div>
+      <div class="name"><span class="mic" class:hot={heating}><Icon icon="mdi:hot-tub" size="1em" /></span>{t(props.name) || (heater && name(heater)) || 'Hot tub'}</div>
       {#if show('status')}<div class="st" class:bad={offline || err} class:hot={heating}>{status}{#if !show('tub') && Number.isFinite(cur)}{' · '}{cur.toFixed(1)}°{/if}</div>{/if}
     </div>
     {#if show('target') && Number.isFinite(target)}
@@ -224,7 +225,7 @@
   <div class="head">
     <span class="ic" class:hot={heating}><Icon icon="mdi:hot-tub" size="1.5em" /></span>
     <div class="tt">
-      <div class="name">{t(props.name) || heater?.attributes.friendly_name || 'Hot tub'}</div>
+      <div class="name">{t(props.name) || (heater && name(heater)) || 'Hot tub'}</div>
       {#if show('status')}<div class="st" class:bad={offline || err} class:hot={heating}>{status}</div>{/if}
     </div>
     {#if show('mode') && ent(props.watercare)}

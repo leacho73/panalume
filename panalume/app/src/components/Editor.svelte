@@ -2,6 +2,7 @@
   import { param } from '../lib/params.js';
   import Icon from './Icon.svelte';
   import Field from './Field.svelte';
+  import DefaultPage from './DefaultPage.svelte';
   import { cards, categories } from '../lib/registry.js';
   import {
     app, layout, DEVICES, DEFAULT_THEME, changed, addCard, selectedCard, selectedPlacement, removeSelected,
@@ -386,6 +387,7 @@
           {#if app.config.layouts[app.device].saver_photos}<Field obj={app.config.layouts[app.device]} f={{ key: 'saver_no_clock', label: 'Photos only (no clock over them)', type: 'bool' }} />{/if}
         {/if}
       </div>
+      <DefaultPage />
       {#if app.device === 'tablet' || app.config.layouts[app.device].mode === 'custom'}
         <div class="fields">
           <Field obj={layout()} f={{ key: 'width', label: 'Design width (px) — scaled to fit the screen', type: 'number' }} onset={(v) => setMainWidth((l) => (l.width = v))} />

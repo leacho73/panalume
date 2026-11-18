@@ -10,6 +10,7 @@
   import { states } from '../lib/ha.svelte.js';
   import { changed, app } from '../lib/config.svelte.js';
   import { isTpl } from '../lib/tpl.js';
+  import { name } from '../lib/entity.js';
   let { obj, f, onset, hide = null, ontoggle } = $props();
   const set = (v) => { if (onset) return onset(v); obj[f.key] = v; changed(); };
   // Ready-made colours for colour-button settings (click to add / remove, in order).
@@ -33,9 +34,12 @@
     <div class="ents">
       {#each obj[f.key] || [] as id, i}
         <div class="chip">
-          <span>{states.get(id)?.attributes.friendly_name || id}</span>
+          <span>{states.get(id) ? name(states.get(id)) : id}</span>
+          <!-- The card's own name for this entity, e.g. a short "Flow" where the card says the rest. -->
+          {#if f.names}<input class="own" type="text" placeholder="Name on card" title="Name on this card (blank = Home Assistant's name, template ok)" value={obj.names?.[id] ?? ''}
+            oninput={(e) => { const v = e.currentTarget.value; obj.names ??= {}; if (v) obj.names[id] = v; else delete obj.names[id]; changed(); }} />{/if}
           <button type="button" disabled={i === 0} onclick={() => { const a = obj[f.key]; [a[i - 1], a[i]] = [a[i], a[i - 1]]; changed(); }}><Icon icon="mdi:arrow-up" size="14px" /></button>
-          <button type="button" onclick={() => { obj[f.key].splice(i, 1); changed(); }}><Icon icon="mdi:close" size="14px" /></button>
+          <button type="button" onclick={() => { obj[f.key].splice(i, 1); if (obj.names?.[id] !== undefined && !obj[f.key].includes(id)) delete obj.names[id]; changed(); }}><Icon icon="mdi:close" size="14px" /></button>
         </div>
       {/each}
       <EntityPicker domain={f.domain} placeholder="Add entity…" onpick={(id) => { (obj[f.key] ??= []).push(id); changed(); }} />
@@ -115,4 +119,5 @@
   .chip span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .chip button { background: none; border: 0; color: var(--muted); padding: 4px; border-radius: 6px; display: grid; }
   .chip button:hover { background: rgba(255,255,255,.1); }
+  .chip .own { flex: 0 1 40%; min-width: 0; padding: 4px 7px; font-size: 12px; border-radius: 6px; }
 </style>

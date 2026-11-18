@@ -86,7 +86,7 @@
       <div class="ghead">Group with <button class="mini" onclick={() => (groupOpen = false)}><Icon icon="mdi:close" size="1.1em" /></button></div>
       {#each candidates as m}
         {@const me = states.get(m)}
-        <label class="gm"><input type="checkbox" checked={members.includes(m)} onchange={() => toggleMember(m)} /> {me?.attributes.friendly_name || m}<span class="gs">{me?.state}</span></label>
+        <label class="gm"><input type="checkbox" checked={members.includes(m)} onchange={() => toggleMember(m)} /> {me ? name(me) : m}<span class="gs">{me?.state}</span></label>
       {/each}
     </div>
   {/if}

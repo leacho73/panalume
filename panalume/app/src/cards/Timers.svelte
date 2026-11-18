@@ -12,8 +12,8 @@
     watch: (p) => [...(p.entities?.length ? p.entities : allTimers()), ...(p.finish || [])],
     fields: [
       { key: 'name', label: 'Name (blank = Timers)', type: 'text', section: 'head' },
-      { key: 'entities', label: 'Timers (blank = every timer in the house)', type: 'entities', domain: 'timer' },
-      { key: 'finish', label: 'Finish times too (optional)', type: 'entities', domain: 'sensor', hint: 'Sensors that say when something will be done, e.g. a washing machine\'s or dishwasher\'s finish or completion time. Shown while that time is still ahead.' },
+      { key: 'entities', label: 'Timers (blank = every timer in the house)', type: 'entities', domain: 'timer', names: true },
+      { key: 'finish', label: 'Finish times too (optional)', type: 'entities', domain: 'sensor', names: true, hint: 'Sensors that say when something will be done, e.g. a washing machine\'s or dishwasher\'s finish or completion time. Shown while that time is still ahead.' },
       { key: 'controls', label: 'Pause and cancel buttons', type: 'bool' },
     ],
   };
@@ -82,7 +82,7 @@
       {#each rows as r (r.id)}
         <div class="row" class:paused={r.paused}>
           <div class="line">
-            <span class="nm">{name(r.e)}</span>
+            <span class="nm">{name(r.e, t(props.names?.[r.id]))}</span>
             <span class="left">{r.paused ? 'Paused · ' : ''}{r.label}</span>
             {#if r.kind === 'timer' && props.controls !== false}
               <span class="ctl" data-stop>

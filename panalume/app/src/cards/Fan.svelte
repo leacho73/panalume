@@ -16,7 +16,7 @@
       { key: 'name', label: 'Name', type: 'text' },
       { key: 'icon', label: 'Icon', type: 'icon' },
       { key: 'light', label: 'Light (optional, e.g. a ceiling fan\'s light)', type: 'entity', domain: 'light', section: 'light' },
-      { key: 'sensors', label: 'Sensors to show (optional, e.g. PM2.5, humidity, filter life)', type: 'entities', domain: 'sensor', section: 'sensors' },
+      { key: 'sensors', label: 'Sensors to show (optional, e.g. PM2.5, humidity, filter life)', type: 'entities', domain: 'sensor', section: 'sensors', names: true },
     ],
   };
 </script>
@@ -59,7 +59,7 @@
 
   const sensors = $derived((props.sensors || []).map((id) => ent(id)).filter(Boolean));
   const val = (s) => { const n = Number(s.state); return Number.isFinite(n) ? `${formatNumber(n, Math.abs(n) < 10 && !Number.isInteger(n) ? 1 : 0)}${s.attributes.unit_of_measurement ? (s.attributes.unit_of_measurement === '%' ? '' : ' ') + s.attributes.unit_of_measurement : ''}` : stateWord('sensor', s.attributes.device_class, s.state) || s.state; };
-  const sname = (s) => { const full = name(s); const dev = name(e); return dev && full.startsWith(dev + ' ') ? full.slice(dev.length + 1) : full; };
+  const sname = (s) => { const mine = t(props.names?.[s.entity_id]); if (mine) return mine; const full = name(s); const dev = name(e); return dev && full.startsWith(dev + ' ') ? full.slice(dev.length + 1) : full; };
   const small = $derived(h < 170);
 </script>
 
