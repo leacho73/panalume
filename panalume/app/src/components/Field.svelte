@@ -6,6 +6,7 @@
   import PeopleEditor from './PeopleEditor.svelte';
   import HaViewPicker from './HaViewPicker.svelte';
   import MarkerEditor from './MarkerEditor.svelte';
+  import ChipEditor from './ChipEditor.svelte';
   import Icon from './Icon.svelte';
   import { states } from '../lib/ha.svelte.js';
   import { changed, app } from '../lib/config.svelte.js';
@@ -26,6 +27,8 @@
     <MediaFolderPicker value={obj[f.key] || ''} title={obj[f.key + '_title'] || ''} onpick={(id, title) => { obj[f.key + '_title'] = title; set(id); }} />
   {:else if f.type === 'markers'}
     <MarkerEditor values={obj[f.key] || []} onupdate={set} />
+  {:else if f.type === 'chips'}
+    <ChipEditor values={obj[f.key] || []} onupdate={set} />
   {:else if f.type === 'ha-view'}
     <HaViewPicker value={obj[f.key] || ''} onpick={set} />
   {:else if f.type === 'entity'}
