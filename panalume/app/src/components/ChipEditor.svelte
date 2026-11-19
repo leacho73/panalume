@@ -11,7 +11,7 @@
   let { values = [], onupdate } = $props();
 
   const list = $derived(Array.isArray(values) ? values : []);
-  const blank = () => ({ entity: '', icon: '', label: '', show: 'name', action: '', color: '', visible: '' });
+  const blank = () => ({ entity: '', icon: '', label: '', show: 'name', control: '', action: '', color: '', visible: '' });
   const clone = () => list.map((c) => ({ ...c }));
   const commit = (next) => onupdate?.(next);
 
@@ -75,14 +75,28 @@
           </select>
         </div>
         <div class="f">
-          <label for="cd-{i}-action">Tap does</label>
-          <select id="cd-{i}-action" value={c.action || ''} onchange={(e) => patch(i, 'action', e.currentTarget.value)}>
-            <option value="">Automatic (toggle, else more info)</option>
-            <option value="toggle">Toggle</option>
-            <option value="more-info">More info</option>
-            <option value="none">Nothing</option>
+          <label for="cd-{i}-control">Kind</label>
+          <select id="cd-{i}-control" value={c.control || ''} onchange={(e) => patch(i, 'control', e.currentTarget.value)}>
+            <option value="">Button (tap it)</option>
+            <option value="slider">Slider (drag it)</option>
           </select>
         </div>
+        {#if c.control === 'slider'}
+          <div class="f">
+            <label>Drags</label>
+            <div class="note">Brightness on a light, position on a cover, the set point on a thermostat, volume on a speaker, a number helper's value — over the entity's own range, with the arrow keys on a desk.</div>
+          </div>
+        {:else}
+          <div class="f">
+            <label for="cd-{i}-action">Tap does</label>
+            <select id="cd-{i}-action" value={c.action || ''} onchange={(e) => patch(i, 'action', e.currentTarget.value)}>
+              <option value="">Automatic (toggle, else more info)</option>
+              <option value="toggle">Toggle</option>
+              <option value="more-info">More info</option>
+              <option value="none">Nothing</option>
+            </select>
+          </div>
+        {/if}
         <div class="f full">
           <label for="cd-{i}-color">Colour (template ok, `entity_id` is this chip’s entity)</label>
           <div class="col">
@@ -113,6 +127,7 @@
   .cgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .f { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
   .f.full { grid-column: 1 / -1; }
+  .note { font-size: 11px; color: var(--muted); line-height: 1.35; opacity: .85; }
   label { font-size: 11px; color: var(--muted); }
   input, select { width: 100%; box-sizing: border-box; }
   .col { display: flex; gap: 6px; }

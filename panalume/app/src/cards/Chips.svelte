@@ -7,7 +7,7 @@
     size: { w: 480, h: 80 }, tap: 'none',
     defaults: { chips: [], align: 'center', overflow: 'count' },
     fields: [
-      { key: 'chips', label: 'Chips', type: 'chips', hint: 'One chip per thing. A chip can say the name, the state or both; its colour and its Visible when are templates, with `entity_id` set to the chip’s own entity. Chips are laid out in the space the card has — a slim bar keeps one row, a taller card wraps onto more — and anything that does not fit is counted in the last chip.' },
+      { key: 'chips', label: 'Chips', type: 'chips', hint: 'One chip per thing, as a button or as a slider you drag. A chip can say the name, the state or both; its colour and its Visible when are templates, with `entity_id` set to the chip’s own entity. Chips are laid out in the space the card has — a slim bar keeps one row, a taller card wraps onto more — and anything that does not fit is counted in the last chip.' },
       { key: 'overflow', label: 'When they do not all fit', type: 'select', options: [
         { value: 'count', label: 'Count the rest in a +N chip' },
         { value: 'slide', label: 'Slide the row sideways' },
@@ -26,7 +26,7 @@
   import { tick } from 'svelte';
   import Icon from '../components/Icon.svelte';
   import { t, ent, truthy } from '../lib/tpl.js';
-  import { states } from '../lib/ha.svelte.js';
+  import { states, callService } from '../lib/ha.svelte.js';
   import { name as eName, stateText, entityIcon, isActive, unavailable, lightColor, canToggle, toggle, domain } from '../lib/entity.js';
   import { app } from '../lib/config.svelte.js';
 
@@ -66,6 +66,96 @@
     if (act === 'toggle' && e && switchable(id)) return void toggle(e);
     app.popup = { entity: id };
   }
+
+  // ---- slider chips -------------------------------------------------------
+  // A chip can be a button or a slider. A slider writes the number the integration
+  // already uses: a light's brightness as a percentage, a cover's position, a
+  // thermostat's set point, a speaker's volume, a number helper's value. The range
+  // comes from the entity where it publishes one, so a thermostat is dragged between
+  // its own min and max rather than a made-up 0 to 100.
+  const isSlider = (c) => String(c.control || '').toLowerCase() === 'slider';
+  const num = (v, d) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : d;
+  };
+
+  function rangeOf(c, e) {
+    const d = domain(idOf(c));
+    const a = e?.attributes || {};
+    if (d === 'climate') return { min: num(a.min_temp, 7), max: num(a.max_temp, 35), step: num(a.target_temp_step, 0.5), unit: '°' };
+    if (d === 'humidifier') return { min: num(a.min_humidity, 0), max: num(a.max_humidity, 100), step: 1, unit: '%' };
+    if (d === 'number' || d === 'input_number') return { min: num(a.min, 0), max: num(a.max, 100), step: num(a.step, 1), unit: '' };
+    return { min: 0, max: 100, step: 1, unit: d === 'media_player' || d === 'light' || d === 'fan' || d === 'cover' ? '%' : '' };
+  }
+
+  function valueOf(c, e) {
+    if (!e) return 0;
+    const d = domain(idOf(c));
+    const a = e.attributes || {};
+    if (d === 'light') return e.state === 'off' ? 0 : Math.round((num(a.brightness, 255) / 255) * 100);
+    if (d === 'cover') return num(a.current_position, e.state === 'open' ? 100 : 0);
+    if (d === 'climate') return num(a.temperature, num(a.current_temperature, 20));
+    if (d === 'media_player') return Math.round(num(a.volume_level, 0) * 100);
+    if (d === 'fan') return num(a.percentage, e.state === 'on' ? 100 : 0);
+    if (d === 'humidifier') return num(a.humidity, 0);
+    return num(e.state, 0);
+  }
+
+  function setTo(c, v) {
+    const id = idOf(c);
+    if (!id) return;
+    const d = domain(id);
+    const t = { entity_id: id };
+    if (d === 'light') return v > 0
+      ? callService('light', 'turn_on', { brightness_pct: Math.round(v) }, t)
+      : callService('light', 'turn_off', {}, t);
+    if (d === 'cover') return callService('cover', 'set_cover_position', { position: Math.round(v) }, t);
+    if (d === 'fan') return callService('fan', 'set_percentage', { percentage: Math.round(v) }, t);
+    if (d === 'climate') return callService('climate', 'set_temperature', { temperature: Math.round(v * 10) / 10 }, t);
+    if (d === 'media_player') return callService('media_player', 'volume_set', { volume_level: Math.round(v) / 100 }, t);
+    if (d === 'humidifier') return callService('humidifier', 'set_humidity', { humidity: Math.round(v) }, t);
+    if (d === 'number') return callService('number', 'set_value', { value: v }, t);
+    if (d === 'input_number') return callService('input_number', 'set_value', { value: v }, t);
+    return undefined;
+  }
+
+  // Where the finger is, as a value: the chip is its own track, so the percentage is
+  // measured against the chip's box rather than the card's.
+  function chipValueAt(ev, el, c, e) {
+    const r = el.getBoundingClientRect();
+    const rg = rangeOf(c, e);
+    const f = Math.min(1, Math.max(0, (ev.clientX - r.left) / (r.width || 1)));
+    const raw = rg.min + f * (rg.max - rg.min);
+    return Math.round((raw - rg.min) / rg.step) * rg.step + rg.min;
+  }
+
+  let dragChip = $state(null);
+  function chipDown(ev, el, c, e, i) {
+    if (editing || !e || ev.button > 0) return;
+    ev.stopPropagation();     // the row does not scroll under a slider
+    ev.preventDefault();
+    el.setPointerCapture?.(ev.pointerId);
+    dragChip = { i, el, c, e, v: chipValueAt(ev, el, c, e) };
+  }
+  function chipMove(ev) {
+    if (!dragChip) return;
+    const v = chipValueAt(ev, dragChip.el, dragChip.c, dragChip.e);
+    if (v !== dragChip.v) dragChip = { ...dragChip, v };
+  }
+  function chipUp(ev) {
+    if (!dragChip) return;
+    const done = dragChip;
+    dragChip = null;
+    done.el.releasePointerCapture?.(ev?.pointerId);
+    setTo(done.c, done.v);
+  }
+  function chipKey(ev, c, e, rg) {
+    const step = ev.shiftKey ? Math.max(rg.step, Math.round((rg.max - rg.min) / 10 / rg.step) * rg.step) : rg.step;
+    const now = valueOf(c, e);
+    if (ev.key === 'ArrowRight' || ev.key === 'ArrowUp') { setTo(c, Math.min(rg.max, now + step)); ev.preventDefault(); }
+    if (ev.key === 'ArrowLeft' || ev.key === 'ArrowDown') { setTo(c, Math.max(rg.min, now - step)); ev.preventDefault(); }
+  }
+  const fmt = (v) => (Number.isInteger(Number(v)) ? String(Number(v)) : String(Math.round(Number(v) * 10) / 10));
 
   // Fit: the chips are measured after they paint rather than counted from a guessed
   // chip width, because a chip's width is its icon plus whatever its label says this
@@ -175,22 +265,45 @@
         {@const e = entOf(c)}
         {@const on = active(c, e)}
         {@const sh = shape(c)}
-        <button
-          type="button" class="ch" class:on data-stop
-          style:--c={colourOf(c, e)}
-          style:display={!slide && i >= shown ? 'none' : null}
-          bind:this={els[i]}
-          title={[labelOf(c, e), said(c, e)].filter(Boolean).join(' · ')}
-          onclick={() => fire(c)}>
-          <span class="ic"><Icon icon={iconOf(c, e)} size="1.1em" /></span>
-          {#if sh === 'state'}
-            <span class="lb">{said(c, e)}</span>
-          {:else if sh === 'both'}
-            <span class="lb">{labelOf(c, e)}<span class="st"> · {said(c, e)}</span></span>
-          {:else if sh !== 'icon'}
-            <span class="lb">{labelOf(c, e)}</span>
-          {/if}
-        </button>
+        {#if isSlider(c)}
+          {@const rg = rangeOf(c, e)}
+          {@const val = dragChip?.i === i ? dragChip.v : valueOf(c, e)}
+          {@const pctVal = Math.min(100, Math.max(0, ((val - rg.min) / (rg.max - rg.min || 1)) * 100))}
+          <div
+            class="ch slw" class:on={active(c, e)} data-stop role="slider" tabindex="0"
+            aria-label={labelOf(c, e)} aria-valuemin={rg.min} aria-valuemax={rg.max} aria-valuenow={val}
+            aria-valuetext={`${fmt(val)}${rg.unit}`}
+            style:--c={colourOf(c, e)} style:--fill={`${pctVal}%`}
+            style:display={!slide && i >= shown ? 'none' : null}
+            bind:this={els[i]}
+            title={`${labelOf(c, e)} · ${fmt(val)}${rg.unit}`}
+            onpointerdown={(ev) => chipDown(ev, ev.currentTarget, c, e, i)}
+            onpointermove={chipMove} onpointerup={chipUp} onpointercancel={chipUp}
+            onkeydown={(ev) => chipKey(ev, c, e, rg)}>
+            <span class="fill" aria-hidden="true"></span>
+            <span class="ic"><Icon icon={iconOf(c, e)} size="1.1em" /></span>
+            {#if sh !== 'icon'}
+              <span class="lb">{#if sh !== 'state'}{labelOf(c, e)}<span class="st"> · </span>{/if}<span class="v">{fmt(val)}{rg.unit}</span></span>
+            {/if}
+          </div>
+        {:else}
+          <button
+            type="button" class="ch" class:on data-stop
+            style:--c={colourOf(c, e)}
+            style:display={!slide && i >= shown ? 'none' : null}
+            bind:this={els[i]}
+            title={[labelOf(c, e), said(c, e)].filter(Boolean).join(' · ')}
+            onclick={() => fire(c)}>
+            <span class="ic"><Icon icon={iconOf(c, e)} size="1.1em" /></span>
+            {#if sh === 'state'}
+              <span class="lb">{said(c, e)}</span>
+            {:else if sh === 'both'}
+              <span class="lb">{labelOf(c, e)}<span class="st"> · {said(c, e)}</span></span>
+            {:else if sh !== 'icon'}
+              <span class="lb">{labelOf(c, e)}</span>
+            {/if}
+          </button>
+        {/if}
       {/each}
       {#if !slide && shown < list.length}
         <span class="ch tail" bind:this={tail} title="{list.length - shown} more chip{list.length - shown === 1 ? '' : 's'} than the card has room for">+{list.length - shown}</span>
@@ -229,6 +342,17 @@
     -webkit-tap-highlight-color: transparent;
   }
   .ch:active { transform: scale(.97); }
+  .slw { position: relative; overflow: hidden; cursor: ew-resize; touch-action: none; }
+  .slw.on { background: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .12); color: var(--text); }
+  .slw .v { color: var(--c, var(--on)); font-variant-numeric: tabular-nums; }
+  .slw:active { transform: none; }
+  .slw .fill {
+    position: absolute; inset: 0 auto 0 0; width: var(--fill, 0%);
+    background: color-mix(in srgb, var(--c, var(--on)) 32%, transparent);
+    border-right: 2px solid color-mix(in srgb, var(--c, var(--on)) 70%, transparent);
+    pointer-events: none; transition: width .12s ease;
+  }
+  .slw > .ic, .slw > .lb { position: relative; }
   .ch.on {
     color: var(--c, var(--on));
     background: color-mix(in srgb, var(--c, var(--on)) 22%, transparent);
