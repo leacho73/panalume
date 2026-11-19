@@ -219,28 +219,53 @@
     return r.height > 0 && r.bottom > box.bottom + 1;
   };
 
+  // One row with width to spare can take the card's height: the pills grow rather than
+  // float in dark air. Both answers are measured on the DOM as it actually paints — the
+  // row is shrunk one chip at a time until nothing pokes out of it, then asked whether
+  // the taller pill still sits on one line, and the answer to that is final.
+  let single = $state(false);
+  const liveChips = () => els.filter((el) => el && el.offsetParent !== null);
+  const lineCount = (list2) => new Set(list2.map((el) => Math.round(el.offsetTop))).size;
+  const spills = (list2, box) => list2.some((el) => {
+    const r = el.getBoundingClientRect();
+    return r.height > 0 && (r.top < box.top - 1 || r.bottom > box.bottom + 1);
+  });
+
   async function fit() {
     const mine = ++fitToken;          // a later run wins; an older one stops where it is
+    single = false;                   // measure the base size first
     const n = list.length;
     if (!n || !boxH || slide) { shown = n; measuring = false; requestAnimationFrame(measureEdges); return; }
     measuring = true;
-    shown = n;                        // measure with everything on the card
+    shown = n;                        // everything on the card, then take away what pokes out
     await tick();
     if (mine !== fitToken) return;
-    let over = -1;
-    for (let i = 0; i < n; i++) if (offBox(els[i])) { over = i; break; }
-    if (over === -1) { shown = n; measuring = false; return; }
-    let keep = over;                  // every chip that fitted; the "+N" then has to fit too
-    for (let pass = 0; pass < 4; pass++) {
-      shown = keep;
+    for (let guard = 0; guard <= n; guard++) {
+      if (!spills(liveChips(), rowEl.getBoundingClientRect())) break;
+      if (shown === 0) break;
+      shown -= 1;
       await tick();
       if (mine !== fitToken) return;
-      if (keep === 0 || !offBox(tail)) break;
-      keep -= 1;
     }
-    shown = keep;
     measuring = false;
+    await tick();
+    if (mine !== fitToken) return;
     requestAnimationFrame(measureEdges);
+
+    // room to grow?
+    const live = liveChips();
+    if (!live.length || lineCount(live) > 1) return;
+    const used = live.reduce((a, el) => a + el.getBoundingClientRect().width, 0);
+    if (used * 1.15 > rowEl.clientWidth) return;
+    const before = shown;
+    single = true;
+    await tick();
+    if (mine !== fitToken) return;
+    const grown = liveChips();
+    if (lineCount(grown) <= 1 && !spills(grown, rowEl.getBoundingClientRect())) return;
+    single = false;
+    shown = before;
+    await tick();
   }
 
   // Re-fit when the chips change, the card is resized, or a state arrives and changes
@@ -257,7 +282,7 @@
   {#if !list.length}
     <div class="empty">Pick a few chips</div>
   {:else}
-    <div class="row" class:measuring class:scroll={slide} class:fade-l={edges.l} class:fade-r={edges.r}
+    <div class="row" class:measuring class:scroll={slide} class:single class:fade-l={edges.l} class:fade-r={edges.r}
       bind:this={rowEl} style:justify-content={slide ? 'flex-start' : props.align || 'center'}
       onscroll={measureEdges} onpointerdown={down} onpointermove={move} onpointerup={up} onpointercancel={up}
       onwheel={wheel} onclickcapture={(e) => { if (suppress) { e.stopPropagation(); e.preventDefault(); } }}>
@@ -324,32 +349,35 @@
   .row.scroll::-webkit-scrollbar { display: none; }
   .row.scroll:active { cursor: grabbing; }
   .row.scroll .ch { scroll-snap-align: start; }
-  .row.fade-r { mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 2.6em), transparent 100%);
-    -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 2.6em), transparent 100%); }
-  .row.fade-l { mask-image: linear-gradient(90deg, transparent 0, #000 2.6em);
-    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 2.6em); }
+  .row.fade-r { mask-image: linear-gradient(to right, #000 88%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, #000 88%, transparent 100%); }
+  .row.fade-l { mask-image: linear-gradient(to right, transparent 0, #000 12%);
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 12%); }
   .row.fade-l.fade-r {
-    mask-image: linear-gradient(90deg, transparent 0, #000 2.6em, #000 calc(100% - 2.6em), transparent 100%);
-    -webkit-mask-image: linear-gradient(90deg, transparent 0, #000 2.6em, #000 calc(100% - 2.6em), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 12%, #000 88%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 12%, #000 88%, transparent 100%);
   }
   .row { display: flex; flex-wrap: wrap; align-content: center; align-items: center; gap: min(.45em, 6cqh); height: 100%; min-height: 0; overflow: hidden; }
+  /* One line and width to spare: the pills take the height the card already has, so a
+     slim bar does not read as a row of small pills floating in empty space. */
+  .row.single .ch { height: max(1.5em, min(2.6em, 84cqh)); font-size: clamp(9.5px, 31cqh, .95em); }
   .ch {
     display: flex; align-items: center; gap: .4em; flex: 0 0 auto; max-width: 100%; min-width: 0;
     height: max(1.35em, min(2.1em, 64cqh)); padding: 0 min(.75em, 3cqw);
     border-radius: 999px; border: 1px solid rgba(255, 255, 255, .1);
     background: rgba(255, 255, 255, .07); color: var(--text);
-    font: inherit; font-size: clamp(9px, 27cqh, .9em); line-height: 1; cursor: pointer;
+    font: inherit; font-size: clamp(9px, 27cqh, .9em); line-height: 1.35; cursor: pointer;
     -webkit-tap-highlight-color: transparent;
   }
   .ch:active { transform: scale(.97); }
-  .slw { position: relative; overflow: hidden; cursor: ew-resize; touch-action: none; }
+  .slw { position: relative; overflow: hidden; cursor: ew-resize; touch-action: none; text-shadow: 0 1px 3px rgba(0, 0, 0, .75); }
   .slw.on { background: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .12); color: var(--text); }
   .slw .v { color: var(--c, var(--on)); font-variant-numeric: tabular-nums; }
   .slw:active { transform: none; }
   .slw .fill {
     position: absolute; inset: 0 auto 0 0; width: var(--fill, 0%);
     background: color-mix(in srgb, var(--c, var(--on)) 32%, transparent);
-    border-right: 2px solid color-mix(in srgb, var(--c, var(--on)) 70%, transparent);
+    border-right: 2px solid color-mix(in srgb, var(--c, var(--on)) 45%, transparent);
     pointer-events: none; transition: width .12s ease;
   }
   .slw > .ic, .slw > .lb { position: relative; }
@@ -360,7 +388,7 @@
   }
   .ic { display: grid; flex: none; color: var(--c, var(--muted)); }
   .ch.on .ic { color: var(--c, var(--on)); }
-  .lb { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lb { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.35; padding-bottom: 1px; }
   .st { color: var(--muted); font-weight: 400; }
   .tail { cursor: default; color: var(--muted); background: rgba(255, 255, 255, .04); border-style: dashed; }
   @container (max-width: 300px) { .st { display: none; } }
