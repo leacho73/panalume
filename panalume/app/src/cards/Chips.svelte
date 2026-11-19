@@ -308,7 +308,7 @@
             <span class="fill" aria-hidden="true"></span>
             <span class="ic"><Icon icon={iconOf(c, e)} size="1.1em" /></span>
             {#if sh !== 'icon'}
-              <span class="lb">{#if sh !== 'state'}{labelOf(c, e)}<span class="st"> · </span>{/if}<span class="v">{fmt(val)}{rg.unit}</span></span>
+              <span class="lb">{#if sh !== 'state'}{labelOf(c, e)}<span class="st">·</span>{/if}<span class="v">{fmt(val)}{rg.unit}</span></span>
             {/if}
           </div>
         {:else}
@@ -323,7 +323,7 @@
             {#if sh === 'state'}
               <span class="lb">{said(c, e)}</span>
             {:else if sh === 'both'}
-              <span class="lb">{labelOf(c, e)}<span class="st"> · {said(c, e)}</span></span>
+              <span class="lb">{labelOf(c, e)}<span class="st">·</span><span class="stx">{said(c, e)}</span></span>
             {:else if sh !== 'icon'}
               <span class="lb">{labelOf(c, e)}</span>
             {/if}
@@ -373,6 +373,8 @@
   .slw { position: relative; overflow: hidden; cursor: ew-resize; touch-action: none; text-shadow: 0 1px 3px rgba(0, 0, 0, .75); }
   .slw.on { background: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .12); color: var(--text); }
   .slw .v { color: var(--c, var(--on)); font-variant-numeric: tabular-nums; }
+  .v { margin-left: .34em; }
+  .st + .v { margin-left: 0; }
   .slw:active { transform: none; }
   .slw .fill {
     position: absolute; inset: 0 auto 0 0; width: var(--fill, 0%);
@@ -389,7 +391,11 @@
   .ic { display: grid; flex: none; color: var(--c, var(--muted)); }
   .ch.on .ic { color: var(--c, var(--on)); }
   .lb { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.35; padding-bottom: 1px; }
-  .st { color: var(--muted); font-weight: 400; }
+  /* Space around the separator is CSS, not the spaces in the markup: a template label
+     can end or start with whitespace, and a slider's fill edge can land between them. */
+  .st { color: var(--muted); margin: 0 .34em; }
+  .stx { color: var(--muted); font-weight: 400; }
+  .lb > .v:only-child { margin-left: 0; }
   .tail { cursor: default; color: var(--muted); background: rgba(255, 255, 255, .04); border-style: dashed; }
-  @container (max-width: 300px) { .st { display: none; } }
+  @container (max-width: 300px) { .st, .stx { display: none; } }
 </style>
