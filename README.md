@@ -42,6 +42,7 @@ First-class cards for UK energy setups, with entities **auto-detected** when you
 | Card | What it shows |
 |---|---|
 | **Octopus rates** | Price now and next (FREE during Free Electricity and Power Ups, with Saving Session rewards), cheapest 2-hour window, half-hourly bars (Agile, Go, Intelligent) with export rate, Intelligent dispatches and Octoplus sessions overlaid |
+| **Tibber prices** | Price now and next, min / avg / max, cheapest window of your chosen length, 15-minute or hourly bars for today and tomorrow, coloured relative to the day or by fixed thresholds (Tibber integration, or any sensor with a `today` / `tomorrow` price list) |
 | **Octoplus sessions** | Live Saving Session / Power Down banner with baseline vs usage, upcoming Saving Sessions, Power Ups and Free Electricity with **Join** buttons, points and 12-month stats |
 | **Intelligent Octopus** | Dispatch status, planned and recent slots, smart / bump charge, ready-by time, charge target |
 | **Energy usage** | Home Assistant's energy graph, live: hourly grid / solar / battery / export bars, today's totals, cost and earnings, price paid per hour, what the house is using now |
