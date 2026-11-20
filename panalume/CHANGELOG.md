@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.41.1
+
+- **Fixes a blank screen after updating to 0.41.0.** Panalume crashed as it started unless the address had `?device=` in it. Sorry about that.
+
 ## 0.41.0
 
 - **Names that match Home Assistant 2026.11** (thanks, ViertelNach6). Cards without a name of their own now show the name Home Assistant shows: device name plus entity name, or just the device for its main entity. It updates when you rename things in Home Assistant, and older Home Assistant works as before.
