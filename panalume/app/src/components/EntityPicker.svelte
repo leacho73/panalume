@@ -2,7 +2,7 @@
   import Icon from './Icon.svelte';
   import { states } from '../lib/ha.svelte.js';
   import { entityIcon, name } from '../lib/entity.js';
-  let { value = $bindable(''), domain = null, onpick, placeholder = 'Search entities…' } = $props();
+  let { value = $bindable(''), domain = null, onpick, placeholder = 'Search entities…', inline = false } = $props();
   let q = $state('');
   let open = $state(false);
   const domains = $derived(domain ? (Array.isArray(domain) ? domain : [domain]) : null);
@@ -37,7 +37,7 @@
     <button type="button" class="clear" title="Remove" aria-label="Remove entity" onclick={() => (value = '')}><Icon icon="mdi:close" size="14px" /></button>
   {/if}
   {#if open && results.length}
-    <div class="list">
+    <div class="list" class:inline>
       {#each results as e (e.entity_id)}
         <button type="button" onmousedown={(ev) => ev.preventDefault()} onclick={() => pick(e.entity_id)}>
           <Icon icon={entityIcon(e)} size="1.1em" />
@@ -55,6 +55,7 @@
   .clear { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; padding: 0; justify-content: center; border-radius: 6px; color: var(--muted); }
   .clear:hover { color: var(--text); }
   .list { position: absolute; z-index: 50; left: 0; right: 0; top: calc(100% + 4px); max-height: 300px; overflow: auto; background: #1b2030; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.5); }
+  .list.inline { position: relative; z-index: auto; top: auto; margin-top: 4px; }
   button { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; background: none; border: 0; color: inherit; padding: 7px 10px; font: inherit; font-size: 13px; }
   button:hover { background: rgba(255,255,255,.07); }
   .n { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }

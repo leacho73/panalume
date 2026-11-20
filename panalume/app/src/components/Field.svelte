@@ -6,6 +6,7 @@
   import PeopleEditor from './PeopleEditor.svelte';
   import HaViewPicker from './HaViewPicker.svelte';
   import MarkerEditor from './MarkerEditor.svelte';
+  import AreaStatusEditor from './AreaStatusEditor.svelte';
   import Icon from './Icon.svelte';
   import { states } from '../lib/ha.svelte.js';
   import { changed, app } from '../lib/config.svelte.js';
@@ -19,10 +20,12 @@
   const hex = (v) => (/^#[0-9a-f]{6}$/i.test(v || '') ? v : '#7aa2ff');
 </script>
 
-<div class="field" class:wide={f.type === 'textarea' || f.type === 'entities' || f.type === 'cards' || f.type === 'people' || f.type === 'views'}>
+<div class="field" class:wide={f.type === 'textarea' || f.type === 'entities' || f.type === 'cards' || f.type === 'people' || f.type === 'views' || f.type === 'area-status'}>
   {#if f.type !== 'bool'}<label for={f.key}>{f.label}{#if isTpl(obj[f.key])}<span class="tpl">template</span>{/if}
     {#if ontoggle}<button type="button" class="eye" class:off={hide} title={hide ? 'Hidden on the card — click to show' : 'Shown on the card — click to hide'} onclick={ontoggle}><Icon icon={hide ? 'mdi:eye-off-outline' : 'mdi:eye'} size="15px" /></button>{/if}</label>{/if}
-  {#if f.type === 'media-folder'}
+  {#if f.type === 'area-status'}
+    <AreaStatusEditor {obj} />
+  {:else if f.type === 'media-folder'}
     <MediaFolderPicker value={obj[f.key] || ''} title={obj[f.key + '_title'] || ''} onpick={(id, title) => { obj[f.key + '_title'] = title; set(id); }} />
   {:else if f.type === 'markers'}
     <MarkerEditor values={obj[f.key] || []} onupdate={set} />
@@ -55,7 +58,7 @@
         {#each Object.values(app.config.cards) as c}<option value={c.id}>{c.type} · {c.props?.name || c.props?.entity || c.props?.title || c.id}</option>{/each}
       </select>
     </div>
-  {:else if f.type === 'views'}
+  {:else if f.type === 'views' || f.type === 'area-status'}
     <!-- A tick list of the dashboard's views; nothing ticked means all of them. -->
     <div class="views">
       {#each app.config.views as v (v.id)}
