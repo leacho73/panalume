@@ -76,7 +76,7 @@ export function detectDevice() {
   if (q && DEVICES[q]) return q;
   const saved = screenDevice();
   if (saved && DEVICES[saved]) return saved;
-  const w = Math.min(innerWidth, screen.width || innerWidth);
+  const w = Math.min(innerWidth, window.screen.width || innerWidth);
   if (w < 700) return 'phone';
   // Touch-only screens are tablets whatever their reported width (high-DPI
   // tablets can report 1400+ CSS px). Anything with a mouse is a desktop.
@@ -187,10 +187,10 @@ export function setScreenHome(id) {
   try { id ? localStorage.setItem('hd-home-view', id) : localStorage.removeItem('hd-home-view'); } catch {}
 }
 // Views this screen leaves out (Layout tab), kept in this browser only.
-const screen = $state({ hidden: (() => { try { return JSON.parse(localStorage.getItem('hd-hidden-views') || '[]'); } catch { return []; } })() });
-export const screenHidden = () => screen.hidden;
+const leftOut = $state({ hidden: (() => { try { return JSON.parse(localStorage.getItem('hd-hidden-views') || '[]'); } catch { return []; } })() });
+export const screenHidden = () => leftOut.hidden;
 export function setScreenHidden(ids) {
-  screen.hidden = ids;
+  leftOut.hidden = ids;
   try { ids.length ? localStorage.setItem('hd-hidden-views', JSON.stringify(ids)) : localStorage.removeItem('hd-hidden-views'); } catch {}
 }
 // Whether a view is offered on this screen: not left out here, and its "Shown when"
@@ -199,7 +199,7 @@ export function setScreenHidden(ids) {
 // view is offered. This tidies what each screen offers; it isn't a lock.
 export function viewOn(v) {
   if (app.editing) return true;
-  if (!v || screen.hidden.includes(v.id)) return false;
+  if (!v || leftOut.hidden.includes(v.id)) return false;
   if (!v.visible) return true;
   const r = isTpl(v.visible) ? rendered(v.visible) : v.visible;
   return r === undefined ? undefined : !String(r).startsWith('⚠') && truthy(r);
