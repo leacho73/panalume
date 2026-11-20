@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.41.0
+
+- **Names that match Home Assistant 2026.11** (thanks, ViertelNach6). Cards without a name of their own now show the name Home Assistant shows: device name plus entity name, or just the device for its main entity. It updates when you rename things in Home Assistant, and older Home Assistant works as before.
+- **Your own name for each entity on a card** (thanks, iz3man). Cards that list several entities (Entities, Glance, Graph, Timers, Batteries, Network, Climate group and others) have a **Name on card** box next to each one, so a card can just say *Flow* and *Return* where the rest is obvious.
+- **Open Home Assistant on Panalume** (thanks, 8ctvfhjs59-ctrl and Maltri). A button in the Layout tab makes Panalume the page Home Assistant opens on for you, in the companion app and in the browser. Each Home Assistant user sets their own, and the same button switches it back.
+- **Views for some people or screens only** (thanks, Blomzakske). Each view has a **Shown when** template, which can use who's signed in (`user_name`), and the Layout tab has **Views left out on this screen**. Those views drop out of the Navigation card and the views menu.
+- **Badges on views** (thanks, Pissbirne). A view can show a dot, or an icon such as `mdi:walk`, on its icon in the Navigation card and the views menu, from a template, e.g. when someone's moved in that room in the last few minutes.
+- **Navigation card: choose its views** (thanks, DaveCBr). Leave out views you reach another way, such as rooms opened from a Rooms view.
+- **New tap actions** (thanks, 8ctvfhjs59-ctrl and DaveCBr). **ha-page** opens a Home Assistant page, such as Energy or an app's page, in the same window; **back** goes to the previous view and **home** to this screen's home view.
+- **Mail & parcels card** (thanks, tismofied). Has the post come, from a letterbox sensor or a "post waiting" helper with a Collected button, plus parcels on the way and delivered today from the Mail and Packages integration, and its mail picture.
+- **Picture elements card** (thanks, mrclean5953, and jobjunire for asking). A picture, such as a floor plan, with lights, sensors and switches placed on it. Drag them into place in the editor.
+- **Chores card** (thanks, mrclean5953). A column per person from their to-do lists, ticked off on the card, with a leaderboard.
+- **Music card** (thanks, mgf909, and DaveCBr for asking). Music Assistant favourites, albums and radio as tiles, a search, and the speakers to play them on. Album art is off unless you turn it on, as it loads from Music Assistant or the music service.
+- **Money looks like money.** A Sensor card showing a cost in pounds, euros or dollars now shows £3.61, with the currency in front.
+
 ## 0.40.0
 
 - **Run it in Docker** (thanks, mbijker, for asking). If your Home Assistant runs in Docker or as Core, Panalume now has its own image, `ghcr.io/leacho73/panalume`, for PCs and 64-bit / 32-bit Raspberry Pi. It talks to Home Assistant with a long-lived token and has its own sign-in, as there's no Home Assistant login in front of it: set `PANALUME_PASSWORD`. See **Without the App Store** in the README.
