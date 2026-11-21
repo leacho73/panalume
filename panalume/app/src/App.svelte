@@ -47,6 +47,8 @@
       else if (v && typeof v === 'object') for (const x of Object.values(v)) walk(x);
     };
     walk(app.config.cards);
+    // Entities inferred from registries must join the existing filtered subscription.
+    for (const c of Object.values(app.config.cards)) for (const id of cardTypes[c.type]?.meta.watch?.(c.props || {}) || []) ids.add(id);
     // Extra entities a card reads without having them as settings (meta.watch).
     for (const c of Object.values(app.config.cards)) for (const id of cardTypes[c.type]?.meta.watch?.(c.props || {}) || []) ids.add(id);
     // Cards on the myenergi hub's combined charging sensor show the device's own
