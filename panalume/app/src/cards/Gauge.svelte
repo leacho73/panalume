@@ -13,6 +13,7 @@
       { key: 'green', label: 'Green from', type: 'text' },
       { key: 'yellow', label: 'Yellow from', type: 'text' },
       { key: 'red', label: 'Red from', type: 'text' },
+      { key: 'bands', label: 'Colour bands (instead of green / yellow / red)', type: 'text', placeholder: '0 red, 20 orange, 40 green', hint: 'Each colour applies from its number up to the next one, so low can be red (fuel, battery) and a range can be green in the middle, e.g. 0 red, 75 yellow, 77 green, 81 yellow, 83 red. Colour names or #hex; template ok.' },
       { key: 'color', label: 'Colour (fixed/template)', type: 'color' },
     ],
   };
@@ -28,8 +29,14 @@
   const max = $derived(Number(t(props.max)) || 100);
   const f = $derived(Number.isNaN(v) ? 0 : Math.min(1, Math.max(0, (v - min) / (max - min))));
   const num = (k) => (props[k] === '' || props[k] == null ? null : Number(t(props[k])));
+  // The house's own shades for the usual names; anything else is used as given.
+  const SHADE = { red: '#ff6b6b', orange: '#ff9a3c', amber: '#ffc861', yellow: '#ffc861', green: '#5bd88f', blue: '#4fb4ff' };
+  // "0 red, 20 orange, 40 green" → bands from each number upwards, lowest first.
+  const bands = $derived(String(t(props.bands) ?? '').split(',').map((b) => b.trim().match(/^(-?\d+(?:[.,]\d+)?)\s+(.+)$/)).filter(Boolean)
+    .map((m) => ({ from: Number(m[1].replace(',', '.')), color: SHADE[m[2].trim().toLowerCase()] || m[2].trim() })).sort((a, b) => a.from - b.from));
   const color = $derived.by(() => {
     if (props.color) return t(props.color);
+    if (bands.length) return Number.isNaN(v) ? 'var(--accent)' : [...bands].reverse().find((b) => v >= b.from)?.color || bands[0].color;
     const r = num('red'), y = num('yellow'), g = num('green');
     if (r != null && v >= r) return '#ff6b6b';
     if (y != null && v >= y) return '#ffc861';
