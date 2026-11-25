@@ -15,7 +15,7 @@
   import { connectLive } from './lib/live.js';
   import { param, setParentHash } from './lib/params.js';
   import { cards as cardTypes } from './lib/registry.js';
-  import { reloadFromServer, startView, shownViews, viewOn } from './lib/config.svelte.js';
+  import { reloadFromServer, startView, shownViews, viewOn, viewName } from './lib/config.svelte.js';
 
   let vw = $state(innerWidth);
   const autoDevice = detectDevice();
@@ -176,7 +176,7 @@
       <button class="done" onclick={toggleEdit} aria-label="Done"><Icon icon="mdi:check" size="1.2em" /><span class="lbl">Done</span></button>
       <button title="Undo (Ctrl+Z)" disabled={!undo.count && !app.dirty} onclick={undoLast}><Icon icon="mdi:undo" size="1.2em" /></button>
       <select value={app.view} onchange={(e) => setView(e.currentTarget.value)} title="View">
-        {#each app.config.views as v}<option value={v.id}>{v.name}</option>{/each}
+        {#each app.config.views as v}<option value={v.id}>{viewName(v)}</option>{/each}
       </select>
       <select value={app.device} onchange={(e) => { app.device = e.currentTarget.value; app.selected = null; app.multi = []; }} title="Preview / edit device">
         {#each Object.entries(DEVICES) as [k, d]}<option value={k}>{d.label}{k !== 'tablet' ? ` (${MODE_SHORT[app.config.layouts[k].mode] || app.config.layouts[k].mode})` : ''}</option>{/each}
