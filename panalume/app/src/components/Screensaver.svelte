@@ -7,6 +7,7 @@
   import PhotoFrame from '../cards/PhotoFrame.svelte';
   import { app } from '../lib/config.svelte.js';
   import { param } from '../lib/params.js';
+  import { attention } from '../lib/notify.svelte.js';
 
   const saverParam = Number(param('saver'));
   const L = $derived(app.config?.layouts[app.device] || {});
@@ -20,6 +21,8 @@
     const i = setInterval(() => { if (Date.now() - lastTouch >= mins * 60e3) on = true; }, 5e3);
     return () => clearInterval(i);
   });
+  // A banner from Home Assistant wakes the screen, like a touch would.
+  $effect(() => { if (attention.at) { on = false; lastTouch = Date.now(); } });
   function wake(e) {
     e.preventDefault(); e.stopPropagation();
     on = false; wokeAt = performance.now(); lastTouch = Date.now();

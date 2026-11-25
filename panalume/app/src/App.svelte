@@ -3,6 +3,7 @@
   import Editor from './components/Editor.svelte';
   import Popup from './components/Popup.svelte';
   import Screensaver from './components/Screensaver.svelte';
+  import Banner from './components/Banner.svelte';
   import Icon from './components/Icon.svelte';
   import DefaultPage from './components/DefaultPage.svelte';
   import ViewIcon, { viewBadge } from './components/ViewIcon.svelte';
@@ -216,6 +217,7 @@
 <div class="toasts">{#each toasts as t (t.id)}<div class="toast">{t.text}</div>{/each}</div>
 <Popup />
 {#if app.config}<Screensaver />{/if}
+<Banner />
 
 <style>
   .app { min-height: 100dvh; padding: var(--sa-top) var(--sa-right) var(--sa-pad-bottom) var(--sa-left); }
