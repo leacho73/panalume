@@ -393,13 +393,16 @@ export function placeExisting(cardId, zone = app.view) {
 }
 
 // The sidebar sits beside the views (left / right) or as a bar across the top of them.
+/** The sidebar (or top bar) shows on this view: it's switched on, and the view on screen
+ *  doesn't hide it (Views → Hide the sidebar on this view, e.g. room views with just a Back button). */
+export const sidebarOn = (l) => !!l.sidebar.enabled && !app.config?.views.find((v) => v.id === app.view)?.no_sidebar;
 /** How much width the sidebar takes from the views: 0 when it's off or across the top. */
-export const sideWidth = (l) => (l.sidebar.enabled && l.sidebar.side !== 'top' ? Number(l.sidebar.width) || 0 : 0);
+export const sideWidth = (l) => (sidebarOn(l) && l.sidebar.side !== 'top' ? Number(l.sidebar.width) || 0 : 0);
 /** How tall the bar across the top is (0 unless the sidebar is set to Top). */
-export const topHeight = (l) => (l.sidebar.enabled && l.sidebar.side === 'top' ? Math.max(40, Number(l.sidebar.height) || 100) : 0);
+export const topHeight = (l) => (sidebarOn(l) && l.sidebar.side === 'top' ? Math.max(40, Number(l.sidebar.height) || 100) : 0);
 
 export function zoneWidth(zone, l = layout()) {
-  if (zone === 'sidebar') return l.sidebar.side === 'top' ? (l.sidebar.enabled ? l.width : 0) : (l.sidebar.enabled ? l.sidebar.width : 0);
+  if (zone === 'sidebar') return l.sidebar.side === 'top' ? (sidebarOn(l) ? l.width : 0) : (sidebarOn(l) ? l.sidebar.width : 0);
   return l.width - sideWidth(l);
 }
 

@@ -16,7 +16,7 @@
   import { connectLive } from './lib/live.js';
   import { param, setParentHash } from './lib/params.js';
   import { cards as cardTypes } from './lib/registry.js';
-  import { reloadFromServer, startView, shownViews, viewOn, viewName } from './lib/config.svelte.js';
+  import { reloadFromServer, startView, shownViews, viewOn, viewName, sidebarOn } from './lib/config.svelte.js';
 
   let vw = $state(innerWidth);
   const autoDevice = detectDevice();
@@ -85,7 +85,7 @@
   // so there's always a way to switch views.
   let viewsOpen = $state(false);
   let mineOpen = $state(false), mineReady = $state(false);
-  const needViews = $derived(!app.editing && app.config && shownViews().length > 1 && !layout().sidebar.enabled && !(layout().zones[app.view] || []).some((p) => app.config.cards[p.card]?.type === 'nav'));
+  const needViews = $derived(!app.editing && app.config && shownViews().length > 1 && !sidebarOn(layout()) && !(layout().zones[app.view] || []).some((p) => app.config.cards[p.card]?.type === 'nav' || ['back', 'home', 'navigate'].includes(app.config.cards[p.card]?.tap?.action)));
   // A dot on the closed views menu while any view has a badge up.
   const menuBadge = $derived(needViews ? shownViews().map(viewBadge).find(Boolean) : null);
   $effect(() => {

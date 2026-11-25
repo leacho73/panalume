@@ -44,7 +44,7 @@ export function reflow(master, width, views, cards, skip = null) {
       }
       if (pending) y = pending.y + pending.h + GAP;
     };
-    place(navs.map((p) => ({ ...p, h: 56 })), W);
+    if (!v.no_sidebar) place(navs.map((p) => ({ ...p, h: 56 })), W); // not on views that hide the sidebar
     if (vi === 0) place(top.map((p) => ({ ...p, w: Math.max(p.w, W) })), W);
     // Consecutive ungrouped cards flow together (so small ones can pair up);
     // each group (room) is placed as its own block.
