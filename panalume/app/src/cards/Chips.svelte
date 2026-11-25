@@ -47,7 +47,7 @@
   // A chip's own colour wins; otherwise it takes the light's colour when it is on,
   // and stays quiet when it is not.
   const colourOf = (c, e) => {
-    const own = String(t(c.color) ?? '').trim();
+    const own = String(t(c.color, { entity_id: idOf(c) }) ?? '').trim();
     if (own) return own;
     return active(c, e) ? lightColor(e) || 'var(--on)' : 'var(--muted)';
   };
@@ -55,13 +55,16 @@
   const said = (c, e) => (unavailable(e) ? '—' : stateText(e));
   const shape = (c) => c.show || 'name';
   const switchable = (id) => canToggle(id) || ['scene', 'script', 'button', 'input_button'].includes(domain(id));
+  // What a plain tap may switch by itself: lights, switches and the like. Locks, doors,
+  // blinds and alarms open their details instead, so a stray tap can't open the garage.
+  const QUICK = ['light', 'switch', 'fan', 'input_boolean', 'scene', 'script', 'button', 'input_button', 'automation', 'humidifier', 'siren'];
 
   function fire(c) {
     if (editing) return;
     const id = idOf(c);
     if (!id) return;
     const e = ent(id);
-    const act = c.action || (switchable(id) ? 'toggle' : 'more-info');
+    const act = c.action || (switchable(id) && QUICK.includes(domain(id)) ? 'toggle' : 'more-info');
     if (act === 'none') return;
     if (act === 'toggle' && e && switchable(id)) return void toggle(e);
     app.popup = { entity: id };
@@ -241,7 +244,7 @@
     await tick();
     if (mine !== fitToken) return;
     for (let guard = 0; guard <= n; guard++) {
-      if (!spills(liveChips(), rowEl.getBoundingClientRect())) break;
+      if (!rowEl || !spills(liveChips(), rowEl.getBoundingClientRect())) break;
       if (shown === 0) break;
       shown -= 1;
       await tick();
@@ -254,7 +257,7 @@
 
     // room to grow?
     const live = liveChips();
-    if (!live.length || lineCount(live) > 1) return;
+    if (!rowEl || !live.length || lineCount(live) > 1) return;
     const used = live.reduce((a, el) => a + el.getBoundingClientRect().width, 0);
     if (used * 1.15 > rowEl.clientWidth) return;
     const before = shown;
@@ -262,7 +265,7 @@
     await tick();
     if (mine !== fitToken) return;
     const grown = liveChips();
-    if (lineCount(grown) <= 1 && !spills(grown, rowEl.getBoundingClientRect())) return;
+    if (!rowEl || (lineCount(grown) <= 1 && !spills(grown, rowEl.getBoundingClientRect()))) return;
     single = false;
     shown = before;
     await tick();
@@ -271,7 +274,9 @@
   // Re-fit when the chips change, the card is resized, or a state arrives and changes
   // how wide a chip is.
   $effect(() => {
-    void list.map((c) => `${c.entity}|${c.label}|${c.show}|${c.icon}`).join('~');
+    // What each chip draws (its words change with its state and templates), not just its settings.
+    void list.map((c) => { const e = entOf(c); return [labelOf(c, e), said(c, e), iconOf(c, e), c.control, c.show].join('|'); }).join('~');
+    void props.align;
     void boxW; void boxH; void states.size; void slide;
     const raf = requestAnimationFrame(() => fit());
     return () => cancelAnimationFrame(raf);

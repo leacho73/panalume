@@ -90,7 +90,7 @@
           <div class="f">
             <label for="cd-{i}-action">Tap does</label>
             <select id="cd-{i}-action" value={c.action || ''} onchange={(e) => patch(i, 'action', e.currentTarget.value)}>
-              <option value="">Automatic (toggle, else more info)</option>
+              <option value="">Automatic (lights and switches toggle; locks, doors and the rest open their details)</option>
               <option value="toggle">Toggle</option>
               <option value="more-info">More info</option>
               <option value="none">Nothing</option>
