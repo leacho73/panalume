@@ -33,7 +33,9 @@
 
 <script>
   import { t, ent } from '../lib/tpl.js';
-  import { money, pence, rateColor, ts, hm } from '../lib/octopus.js';
+  import { rateColor, ts, hm } from '../lib/octopus.js';
+  // Home Assistant's own currency and number format (£1.27 / 18.2p, 1,27 kr / 18,2 öre).
+  import { fmtMoney as money, fmtRate as pence, fmtNum } from '../lib/money.svelte.js';
   let { props } = $props();
   const show = (k) => !props.hide?.[k];
   let w = $state(400), h = $state(80);
@@ -56,19 +58,19 @@
   <div class="title">{t(props.title) || 'Electricity today'}{#if latest}<span class="dim">{' · '}to {hm(latest)}</span>{/if}</div>
   <div class="kpis">
     {#if show('cost')}<div><b>{money(cost)}</b><span>cost{#if costE?.attributes.standing_charge != null}{' ('}incl. {money(costE.attributes.standing_charge)} standing){/if}</span></div>{/if}
-    {#if show('kwh')}<div><b>{kwh != null ? kwh.toFixed(1) : '—'}</b><span>kWh imported</span></div>{/if}
+    {#if show('kwh')}<div><b>{fmtNum(kwh)}</b><span>kWh imported</span></div>{/if}
     {#if show('avg')}<div><b>{avgRate != null ? pence(avgRate) : '—'}</b><span>avg / kWh</span></div>{/if}
-    {#if exportKwh != null && show('export')}<div class="exp"><b>{exportKwh.toFixed(1)}</b><span>kWh exported{#if exportEarn != null}{' · '}{money(exportEarn)}{/if}</span></div>{/if}
-    {#if props.solar_kwh && show('solar')}<div class="sol"><b>{n(props.solar_kwh)?.toFixed(1) ?? '—'}</b><span>kWh solar</span></div>{/if}
+    {#if exportKwh != null && show('export')}<div class="exp"><b>{fmtNum(exportKwh)}</b><span>kWh exported{#if exportEarn != null}{' · '}{money(exportEarn)}{/if}</span></div>{/if}
+    {#if props.solar_kwh && show('solar')}<div class="sol"><b>{fmtNum(n(props.solar_kwh))}</b><span>kWh solar</span></div>{/if}
     {#if props.prev_cost && show('yesterday')}<div><b>{money(n(props.prev_cost))}</b><span>yesterday{#if props.export_prev}{' · '}export {money(n(props.export_prev))}{/if}</span></div>{/if}
   </div>
   {#if peak != null && off != null && peak + off > 0 && show('split')}
-    <div class="split"><div class="off" style="flex:{off}">{off.toFixed(1)} off-peak</div><div class="pk" style="flex:{Math.max(peak, (peak + off) * 0.12)}">{peak.toFixed(1)} peak</div></div>
+    <div class="split"><div class="off" style="flex:{off}">{fmtNum(off)} off-peak</div><div class="pk" style="flex:{Math.max(peak, (peak + off) * 0.12)}">{fmtNum(peak)} peak</div></div>
   {/if}
   {#if show('chart')}<div class="chart" bind:clientWidth={w} bind:clientHeight={h}>
     <svg width={w} height={h}>
       {#each charges as c}
-        <rect x={X(c.start)} y={h - 12 - (c.kwh / maxKwh) * (h - 14)} width={Math.max(1, X(c.end) - X(c.start) - 1.5)} height={(c.kwh / maxKwh) * (h - 14)} rx="2" fill={rateColor(c.rate)}><title>{hm(c.start)} {c.kwh} kWh · {pence(c.rate)}{' · '}£{c.cost}</title></rect>
+        <rect x={X(c.start)} y={h - 12 - (c.kwh / maxKwh) * (h - 14)} width={Math.max(1, X(c.end) - X(c.start) - 1.5)} height={(c.kwh / maxKwh) * (h - 14)} rx="2" fill={rateColor(c.rate)}><title>{hm(c.start)} {c.kwh} kWh · {pence(c.rate)}{' · '}{money(c.cost)}</title></rect>
       {/each}
       {#each [0, 6, 12, 18] as hr}<text x={X(day0 + hr * 36e5)} y={h} font-size="10" fill="currentColor" opacity=".5">{String(hr).padStart(2, '0')}</text>{/each}
     </svg>
