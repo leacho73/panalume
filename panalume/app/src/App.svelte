@@ -4,7 +4,7 @@
   import Popup from './components/Popup.svelte';
   import Screensaver from './components/Screensaver.svelte';
   import Icon from './components/Icon.svelte';
-  import ViewIcon from './components/ViewIcon.svelte';
+  import ViewIcon, { viewBadge } from './components/ViewIcon.svelte';
   import { app, load, save, layout, fillsBottom, setPanelSide, DEVICES, MODE_SHORT, detectDevice, setView, removeSelected, duplicateSelected, selectedPlacement, changed, undo, undoLast, selectionSet, ensureEditable, zoneList, groupSelected } from './lib/config.svelte.js';
   import { conn, toasts, watchEntities, states, subscribe, me } from './lib/ha.svelte.js';
   import { loadMoney } from './lib/money.svelte.js';
@@ -15,7 +15,7 @@
   import { connectLive } from './lib/live.js';
   import { param, setParentHash } from './lib/params.js';
   import { cards as cardTypes } from './lib/registry.js';
-  import { reloadFromServer, startView } from './lib/config.svelte.js';
+  import { reloadFromServer, startView, shownViews, viewOn } from './lib/config.svelte.js';
 
   let vw = $state(innerWidth);
   const autoDevice = detectDevice();
@@ -83,7 +83,9 @@
   // No sidebar and no Navigation card on this view: a small views menu instead,
   // so there's always a way to switch views.
   let viewsOpen = $state(false);
-  const needViews = $derived(!app.editing && app.config?.views.length > 1 && !layout().sidebar.enabled && !(layout().zones[app.view] || []).some((p) => app.config.cards[p.card]?.type === 'nav'));
+  const needViews = $derived(!app.editing && app.config && shownViews().length > 1 && !layout().sidebar.enabled && !(layout().zones[app.view] || []).some((p) => app.config.cards[p.card]?.type === 'nav'));
+  // A dot on the closed views menu while any view has a badge up.
+  const menuBadge = $derived(needViews ? shownViews().map(viewBadge).find(Boolean) : null);
   $effect(() => {
     if (!app.config) return;
     const on = kioskParam != null ? kioskParam !== '0' : !!app.config.layouts[app.device]?.kiosk;
@@ -143,6 +145,13 @@
     if (home && app.view !== home) setView(home);
   }, 10e3);
 
+  // A view this screen or person isn't offered (left out in Layout, or its Shown when is
+  // false), e.g. from a bookmark: go to this screen's own view instead.
+  $effect(() => {
+    if (!app.config || app.editing) return;
+    if (viewOn(app.config.views.find((v) => v.id === app.view)) === false) { const home = startView(); if (home && home !== app.view) setView(home); }
+  });
+
   // Keep the current view in Home Assistant's address bar (…/panalume#energy) for bookmarks and links.
   $effect(() => { if (app.config) setParentHash(app.view); });
 
@@ -182,10 +191,10 @@
   {/if}
   {#if needViews}
     <div class="views-fab" class:open={viewsOpen}>
-      <button class="vf" onclick={() => (viewsOpen = !viewsOpen)} aria-label="Views"><Icon icon={viewsOpen ? 'mdi:close' : 'mdi:menu'} size="1.1em" /></button>
+      <button class="vf" class:badged={menuBadge} onclick={() => (viewsOpen = !viewsOpen)} aria-label="Views"><Icon icon={viewsOpen ? 'mdi:close' : 'mdi:menu'} size="1.1em" />{#if menuBadge && !viewsOpen}<i class="vfb" style={menuBadge.color ? `background:${menuBadge.color}` : ''}></i>{/if}</button>
       {#if viewsOpen}
         <div class="vlist">
-          {#each app.config.views as v (v.id)}<button class:on={app.view === v.id} onclick={() => { setView(v.id); viewsOpen = false; }}><span class="vmark"><ViewIcon view={v} size="1.1em" box /></span> {v.name}</button>{/each}
+          {#each shownViews() as v (v.id)}<button class:on={app.view === v.id} onclick={() => { setView(v.id); viewsOpen = false; }}><span class="vmark"><ViewIcon view={v} size="1.1em" box badge /></span> {v.name}</button>{/each}
         </div>
       {/if}
     </div>
@@ -219,7 +228,10 @@
   .edit-fab:hover { opacity: 1; }
   .views-fab { position: fixed; top: calc(10px + var(--sa-top)); left: calc(10px + var(--sa-left)); z-index: 700; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
   .vf { width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(255,255,255,.06); color: var(--muted); opacity: .5; display: grid; place-items: center; transition: opacity .2s; }
-  .vf:hover, .open .vf { opacity: 1; }
+  .vf:hover, .open .vf, .vf.badged { opacity: 1; }
+  /* Some view has a badge: a dot on the closed menu button, in the first such badge's colour. */
+  .vf { position: relative; }
+  .vfb { position: absolute; top: 5px; right: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
   .vlist { display: flex; flex-direction: column; gap: 2px; padding: 6px; border-radius: 14px; background: rgba(20,24,34,.95); box-shadow: 0 10px 30px rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.08); }
   .vlist button { display: flex; align-items: center; gap: 10px; padding: 9px 14px 9px 10px; border: 0; border-radius: 10px; background: none; color: var(--text); font: inherit; text-align: left; white-space: nowrap; }
   .vlist button.on { background: rgba(122,162,255,.18); }

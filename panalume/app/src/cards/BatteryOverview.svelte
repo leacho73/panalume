@@ -15,7 +15,7 @@
     watch: (p) => (p.entities?.length ? p.entities : batteries()),
     fields: [
       { key: 'name', label: 'Name (blank = Batteries)', type: 'text' },
-      { key: 'entities', label: 'Sensors (blank = every battery in the house)', type: 'entities', domain: 'sensor' },
+      { key: 'entities', label: 'Sensors (blank = every battery in the house)', type: 'entities', domain: 'sensor', names: true },
       { key: 'threshold', label: 'Warn at or below (%)', type: 'number' },
       { key: 'max', label: 'Most rows (0 = all of them)', type: 'number' },
       { key: 'stale', label: 'Also list sensors with no reading', type: 'bool' },
@@ -40,7 +40,8 @@
     .filter(Boolean));
   const rated = $derived(list.filter((e) => level(e) != null).sort((a, b) => level(a) - level(b) || byName(a, b)));
   const stale = $derived(list.filter((e) => level(e) == null).sort(byName));
-  function byName(a, b) { return String(name(a)).localeCompare(String(name(b))); }
+  const own = (e) => t(props.names?.[e.entity_id]);
+  function byName(a, b) { return String(own(a) || name(a)).localeCompare(String(own(b) || name(b))); }
   const threshold = $derived(Number(props.threshold ?? 20));
   const low = $derived(rated.filter((e) => level(e) <= threshold));
   const max = $derived(Number(props.max) || 0);
@@ -50,7 +51,7 @@
   // Sensors that are in the list but not reporting: counted, not listed, unless asked for.
   const silent = $derived(props.stale ? 0 : stale.length);
   // "Alicias Phone Battery Level" reads better as "Alicias Phone" in a list.
-  const short = (e) => String(name(e)).replace(/\s+battery(\s+level)?\s*$/i, '').trim() || String(name(e));
+  const short = (e) => own(e) || String(name(e)).replace(/\s+battery(\s+level)?\s*$/i, '').trim() || String(name(e));
   const colour = (v) => (v == null ? 'var(--muted)' : v <= threshold ? '#ff7a90' : v <= threshold * 2 ? '#ffc861' : '#5bd88f');
   const icon = (v) => {
     if (v == null) return 'mdi:battery-unknown';
@@ -73,7 +74,7 @@
   <div class="rows">
     {#each rows as e (e.entity_id)}
       {@const v = level(e)}
-      <div class="row" class:low={v != null && v <= threshold} class:stale={v == null} title={name(e)}>
+      <div class="row" class:low={v != null && v <= threshold} class:stale={v == null} title={own(e) || name(e)}>
         <span class="ic" style="color:{colour(v)}"><Icon icon={icon(v)} size="1.25em" /></span>
         <span class="n">{short(e)}</span>
         {#if show('bar')}

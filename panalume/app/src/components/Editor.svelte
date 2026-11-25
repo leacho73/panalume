@@ -2,14 +2,15 @@
   import { param } from '../lib/params.js';
   import Icon from './Icon.svelte';
   import Field from './Field.svelte';
+  import DefaultPage from './DefaultPage.svelte';
   import { cards, categories } from '../lib/registry.js';
   import {
     app, layout, DEVICES, DEFAULT_THEME, changed, addCard, selectedCard, selectedPlacement, removeSelected,
-    duplicateSelected, copyToView, copyLayout, importConfig, selectionSet, groupSelected, ungroupSelected, ensureEditable, setMode, MODES, DISPLAYS, zoneList, addView, removeView, setView, isPlacedAnywhere, placeExisting, zoneWidth, setMainWidth, screenHome, setScreenHome, screenDevice, setScreenDevice, groupCloses, setGroupCloses, setSidebarSide, addFilledView, changeType, otherLayouts, copyToLayout,
+    duplicateSelected, copyToView, copyLayout, importConfig, selectionSet, groupSelected, ungroupSelected, ensureEditable, setMode, MODES, DISPLAYS, zoneList, addView, removeView, setView, isPlacedAnywhere, placeExisting, zoneWidth, setMainWidth, screenHome, setScreenHome, screenHidden, setScreenHidden, screenDevice, setScreenDevice, groupCloses, setGroupCloses, setSidebarSide, addFilledView, changeType, otherLayouts, copyToLayout,
   } from '../lib/config.svelte.js';
   import { areas, areaCards } from '../lib/area.js';
   // Settings kept on this screen only (not in the shared layout).
-  const screenOpts = $state({ home: screenHome(), device: screenDevice() });
+  const screenOpts = $state({ home: screenHome(), device: screenDevice(), hidden: screenHidden() });
 
   import { fromFusion } from '../lib/fusion.js';
   import { toast } from '../lib/ha.svelte.js';
@@ -77,13 +78,14 @@
     { key: 'scale', label: 'Content size % (text, buttons, everything — also the −/+ under the card)', type: 'number' },
     { key: 'css', label: 'Custom CSS', type: 'textarea', hint: 'Declarations style the card, e.g. border-radius: 30px. Rules style parts inside it, e.g. & .name { white-space: normal }.' },
   ];
-  const ACTIONS = ['default', 'toggle', 'more-info', 'fullscreen', 'popup', 'navigate', 'service', 'url', 'none'];
+  const ACTIONS = ['default', 'toggle', 'more-info', 'fullscreen', 'popup', 'navigate', 'back', 'home', 'ha-page', 'service', 'url', 'none'];
   const actFields = (a) => [
     { key: 'action', label: 'Action', type: 'select', options: ACTIONS },
     ...(a?.action === 'more-info' || a?.action === 'toggle' || a?.action === 'fullscreen' ? [{ key: 'entity', label: 'Entity (blank: the card’s own)', type: 'entity' }] : []),
     ...(a?.action === 'popup' ? [{ key: 'title', label: 'Pop-up title', type: 'text' }, { key: 'cards', label: 'Cards in pop-up', type: 'cards' }] : []),
     ...(a?.action === 'navigate' ? [{ key: 'view', label: 'View', type: 'select', options: app.config.views.map((v) => ({ value: v.id, label: v.name })) }] : []),
     ...(a?.action === 'service' ? [{ key: 'service', label: 'Service (domain.service)', type: 'text', placeholder: 'light.turn_on' }, { key: 'data', label: 'Data (JSON, template ok)', type: 'textarea', hint: 'e.g. {"brightness_pct": 50}. For a script, call it directly (script.my_script) and put its fields here, with no "data" wrapper.' }] : []),
+    ...(a?.action === 'ha-page' ? [{ key: 'path', label: 'Home Assistant page', type: 'text', placeholder: '/config/devices/dashboard', hint: 'The part of the address after the Home Assistant host, e.g. /lovelace/energy or /history. Template ok. Where Panalume isn\'t opened through Home Assistant (direct port, Docker), use the full address instead.' }] : []),
     ...(a?.action === 'url' ? [{ key: 'url', label: 'URL', type: 'text' }] : []),
   ];
   const THEME = [
@@ -375,6 +377,7 @@
         <Field obj={app.config.layouts[app.device]} f={{ key: 'display', label: `Sizing on ${app.device === 'tablet' ? 'tablets' : DEVICES[app.device].label.toLowerCase() + 's'}`, type: 'select', options: Object.entries(DISPLAYS).map(([value, label]) => ({ value, label })) }} />
         <Field obj={app.config.layouts[app.device]} f={{ key: 'home_view', label: `Home view on ${app.device === 'tablet' ? 'tablets' : DEVICES[app.device].label.toLowerCase() + 's'}`, type: 'select', options: [{ value: '', label: 'The first view' }, ...app.config.views.map((v) => ({ value: v.id, label: v.name }))], hint: 'The view this device opens on and goes back to. ?view= in the address does the same and wins.' }} />
         <Field obj={screenOpts} f={{ key: 'home', label: 'Home view on this screen only', type: 'select', options: [{ value: '', label: 'Same as above' }, ...app.config.views.map((v) => ({ value: v.id, label: v.name }))], hint: 'Saved on this screen, e.g. the kitchen tablet going to Kitchen and the living-room one to Living room, even in kiosk apps that can\'t change the address.' }} onset={(v) => { screenOpts.home = v; setScreenHome(v); }} />
+        <Field obj={screenOpts} f={{ key: 'hidden', label: 'Views left out on this screen', type: 'views', hint: 'Saved on this screen only, e.g. a tablet for visitors that shouldn\'t offer the energy or calendar views. They\'re left out of the Navigation card and the views menu here. It tidies what the screen offers; it isn\'t a lock.' }} onset={(v) => { screenOpts.hidden = v; setScreenHidden(v); }} />
         <Field obj={app.config.layouts[app.device]} f={{ key: 'return_mins', label: 'Go back to the home view after (minutes without a touch, blank = never)', type: 'number', hint: 'For wall tablets left on another page. ?return=5 in the address does the same and wins.' }} />
         <Field obj={app.config.layouts[app.device]} f={{ key: 'popup_secs', label: 'Close pop-ups after (seconds without a touch, blank = never)', type: 'number', hint: 'Each touch inside the pop-up starts the count again.' }} />
         <Field obj={app.config.layouts[app.device]} f={{ key: 'fill_bottom', label: 'Use the screen right down to the bottom edge', type: 'bool', hint: 'For a wall iPad: cards go under the home bar line instead of stopping short of it. Leave off if you tap cards at the very bottom of the screen.' }} />
@@ -384,6 +387,7 @@
           {#if app.config.layouts[app.device].saver_photos}<Field obj={app.config.layouts[app.device]} f={{ key: 'saver_no_clock', label: 'Photos only (no clock over them)', type: 'bool' }} />{/if}
         {/if}
       </div>
+      <DefaultPage />
       {#if app.device === 'tablet' || app.config.layouts[app.device].mode === 'custom'}
         <div class="fields">
           <Field obj={layout()} f={{ key: 'width', label: 'Design width (px) — scaled to fit the screen', type: 'number' }} onset={(v) => setMainWidth((l) => (l.width = v))} />
@@ -428,6 +432,9 @@
             <Field obj={v} f={{ key: 'icon', label: 'Icon', type: 'icon' }} />
             <Field obj={v} f={{ key: 'image', label: 'Image (URL or path — shown instead of the icon)', type: 'text' }} />
             <Field obj={v} f={{ key: 'background', label: 'Background (overrides theme)', type: 'text' }} />
+            <Field obj={v} f={{ key: 'badge', label: 'Badge (template)', type: 'text', placeholder: "{{ is_state('binary_sensor.kitchen_motion', 'on') }}", hint: 'Shown on the view\'s icon in the Navigation card and the views menu: a dot when this is true, or an icon if it gives an icon name (mdi:walk). Empty or false shows nothing.' }} />
+            {#if v.badge}<Field obj={v} f={{ key: 'badge_color', label: 'Badge colour (blank = accent)', type: 'color' }} />{/if}
+            <Field obj={v} f={{ key: 'visible', label: 'Shown when (template, blank = always)', type: 'text', placeholder: "{{ user_name != 'Babysitter' }}", hint: 'When false, the view is left out of the Navigation card and the views menu, and screens on it go to their own view. Templates can use user_name / user (who\'s signed in to Home Assistant) to show a view to some people only. It tidies what each person sees; it isn\'t a lock.' }} />
           </div>
         </div>
       {/each}

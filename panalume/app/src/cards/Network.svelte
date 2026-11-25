@@ -39,7 +39,7 @@
       { key: 'download', label: 'Download', type: 'entity', domain: 'sensor', section: 'speed' },
       { key: 'upload', label: 'Upload', type: 'entity', domain: 'sensor', section: 'speed' },
       { key: 'ping', label: 'Ping', type: 'entity', domain: 'sensor', section: 'speed' },
-      { key: 'clients', label: 'Clients (blank = every network device tracker)', type: 'entities', domain: 'device_tracker', section: 'clients' },
+      { key: 'clients', label: 'Clients (blank = every network device tracker)', type: 'entities', domain: 'device_tracker', section: 'clients', names: true },
       { key: 'count', label: 'Connected client count (optional)', type: 'entity', domain: 'sensor', section: 'clients' },
       { key: 'max', label: 'Most clients listed', type: 'number', section: 'clients' },
     ],
@@ -87,7 +87,8 @@
     .filter((e) => e && (props.clients?.length || e.attributes?.source_type !== 'gps')));
   const offline = $derived(all.filter((e) => !STALE.includes(String(e.state).toLowerCase()) && e.state !== 'home').sort(byName));
   const stale = $derived(all.filter((e) => STALE.includes(String(e.state).toLowerCase()) && e.state !== '').sort(byName));
-  function byName(a, b) { return String(name(a)).localeCompare(String(name(b))); }
+  const nm = (e) => name(e, t(props.names?.[e.entity_id]));
+  function byName(a, b) { return String(nm(a)).localeCompare(String(nm(b))); }
   const max = $derived(Number(props.max) || 5);
   const rows = $derived([...offline, ...(show('stale') ? stale : [])].slice(0, max));
   const more = $derived(offline.length + (show('stale') ? stale.length : 0) - rows.length);
@@ -133,9 +134,9 @@
   {#if show('clients')}
     <div class="rows">
       {#each rows as e (e.entity_id)}
-        <div class="row" class:stale={STALE.includes(String(e.state).toLowerCase())} title={name(e)}>
+        <div class="row" class:stale={STALE.includes(String(e.state).toLowerCase())} title={nm(e)}>
           <span class="ic"><Icon icon={STALE.includes(String(e.state).toLowerCase()) ? 'mdi:help-network-outline' : entityIcon(e)} size="1.15em" /></span>
-          <span class="n">{name(e)}</span>
+          <span class="n">{nm(e)}</span>
           <span class="s">{word(e)}{#if show('when') && e.last_changed}<i>{relTime(e.last_changed)}</i>{/if}</span>
         </div>
       {/each}

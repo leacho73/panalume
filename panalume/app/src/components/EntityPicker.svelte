@@ -1,7 +1,7 @@
 <script>
   import Icon from './Icon.svelte';
   import { states } from '../lib/ha.svelte.js';
-  import { entityIcon } from '../lib/entity.js';
+  import { entityIcon, name } from '../lib/entity.js';
   let { value = $bindable(''), domain = null, onpick, placeholder = 'Search entities…' } = $props();
   let q = $state('');
   let open = $state(false);
@@ -12,7 +12,7 @@
     const out = [];
     for (const [id, e] of states) {
       if (domains && !domains.includes(id.split('.')[0])) continue;
-      const hay = (id + ' ' + (e.attributes.friendly_name || '')).toLowerCase();
+      const hay = (id + ' ' + name(e) + ' ' + (e.attributes.friendly_name || '')).toLowerCase();
       if (terms.every((t) => hay.includes(t))) out.push(e);
       if (out.length >= 60) break;
     }
@@ -41,7 +41,7 @@
       {#each results as e (e.entity_id)}
         <button type="button" onmousedown={(ev) => ev.preventDefault()} onclick={() => pick(e.entity_id)}>
           <Icon icon={entityIcon(e)} size="1.1em" />
-          <span class="n">{e.attributes.friendly_name || e.entity_id}<small>{e.entity_id}</small></span>
+          <span class="n">{name(e)}<small>{e.entity_id}</small></span>
           <span class="s">{e.state}</span>
         </button>
       {/each}

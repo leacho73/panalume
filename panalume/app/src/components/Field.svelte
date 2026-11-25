@@ -3,11 +3,14 @@
   import EntityPicker from './EntityPicker.svelte';
   import IconPicker from './IconPicker.svelte';
   import MediaFolderPicker from './MediaFolderPicker.svelte';
+  import PeopleEditor from './PeopleEditor.svelte';
   import HaViewPicker from './HaViewPicker.svelte';
+  import MarkerEditor from './MarkerEditor.svelte';
   import Icon from './Icon.svelte';
   import { states } from '../lib/ha.svelte.js';
   import { changed, app } from '../lib/config.svelte.js';
   import { isTpl } from '../lib/tpl.js';
+  import { name } from '../lib/entity.js';
   let { obj, f, onset, hide = null, ontoggle } = $props();
   const set = (v) => { if (onset) return onset(v); obj[f.key] = v; changed(); };
   // Ready-made colours for colour-button settings (click to add / remove, in order).
@@ -16,11 +19,13 @@
   const hex = (v) => (/^#[0-9a-f]{6}$/i.test(v || '') ? v : '#7aa2ff');
 </script>
 
-<div class="field" class:wide={f.type === 'textarea' || f.type === 'entities' || f.type === 'cards'}>
+<div class="field" class:wide={f.type === 'textarea' || f.type === 'entities' || f.type === 'cards' || f.type === 'people' || f.type === 'views'}>
   {#if f.type !== 'bool'}<label for={f.key}>{f.label}{#if isTpl(obj[f.key])}<span class="tpl">template</span>{/if}
     {#if ontoggle}<button type="button" class="eye" class:off={hide} title={hide ? 'Hidden on the card — click to show' : 'Shown on the card — click to hide'} onclick={ontoggle}><Icon icon={hide ? 'mdi:eye-off-outline' : 'mdi:eye'} size="15px" /></button>{/if}</label>{/if}
   {#if f.type === 'media-folder'}
     <MediaFolderPicker value={obj[f.key] || ''} title={obj[f.key + '_title'] || ''} onpick={(id, title) => { obj[f.key + '_title'] = title; set(id); }} />
+  {:else if f.type === 'markers'}
+    <MarkerEditor values={obj[f.key] || []} onupdate={set} />
   {:else if f.type === 'ha-view'}
     <HaViewPicker value={obj[f.key] || ''} onpick={set} />
   {:else if f.type === 'entity'}
@@ -29,9 +34,12 @@
     <div class="ents">
       {#each obj[f.key] || [] as id, i}
         <div class="chip">
-          <span>{states.get(id)?.attributes.friendly_name || id}</span>
+          <span>{states.get(id) ? name(states.get(id)) : id}</span>
+          <!-- The card's own name for this entity, e.g. a short "Flow" where the card says the rest. -->
+          {#if f.names}<input class="own" type="text" placeholder="Name on card" title="Name on this card (blank = Home Assistant's name, template ok)" value={obj.names?.[id] ?? ''}
+            oninput={(e) => { const v = e.currentTarget.value; obj.names ??= {}; if (v) obj.names[id] = v; else delete obj.names[id]; changed(); }} />{/if}
           <button type="button" disabled={i === 0} onclick={() => { const a = obj[f.key]; [a[i - 1], a[i]] = [a[i], a[i - 1]]; changed(); }}><Icon icon="mdi:arrow-up" size="14px" /></button>
-          <button type="button" onclick={() => { obj[f.key].splice(i, 1); changed(); }}><Icon icon="mdi:close" size="14px" /></button>
+          <button type="button" onclick={() => { obj[f.key].splice(i, 1); if (obj.names?.[id] !== undefined && !obj[f.key].includes(id)) delete obj.names[id]; changed(); }}><Icon icon="mdi:close" size="14px" /></button>
         </div>
       {/each}
       <EntityPicker domain={f.domain} placeholder="Add entity…" onpick={(id) => { (obj[f.key] ??= []).push(id); changed(); }} />
@@ -47,6 +55,16 @@
         {#each Object.values(app.config.cards) as c}<option value={c.id}>{c.type} · {c.props?.name || c.props?.entity || c.props?.title || c.id}</option>{/each}
       </select>
     </div>
+  {:else if f.type === 'views'}
+    <!-- A tick list of the dashboard's views; nothing ticked means all of them. -->
+    <div class="views">
+      {#each app.config.views as v (v.id)}
+        <label class="chk"><input type="checkbox" checked={(obj[f.key] || []).includes(v.id)}
+          onchange={(e) => { const on = e.currentTarget.checked, ids = (obj[f.key] || []).filter((x) => x !== v.id); set(on ? app.config.views.map((x) => x.id).filter((x) => x === v.id || ids.includes(x)) : ids); }} /> {v.name}</label>
+      {/each}
+    </div>
+  {:else if f.type === 'people'}
+    <PeopleEditor values={obj[f.key] || []} onupdate={set} />
   {:else if f.type === 'bool'}
     <label class="chk"><input type="checkbox" checked={!!obj[f.key]} onchange={(e) => set(e.currentTarget.checked)} /> {f.label}</label>
   {:else if f.type === 'select'}
@@ -93,6 +111,7 @@
   .pc.on { border-color: #fff; box-shadow: 0 0 0 2px rgba(0,0,0,.4); }
   .tpl { background: rgba(122,162,255,.2); color: #a9c1ff; border-radius: 6px; padding: 0 5px; font-size: 10px; }
   .chk { color: var(--text); font-size: 13px; cursor: pointer; }
+  .views { display: flex; flex-wrap: wrap; gap: 6px 14px; }
   .color { display: flex; gap: 6px; }
   .color input[type='color'] { width: 34px; padding: 0; flex: none; height: 34px; border: 0; background: none; }
   .ents { display: flex; flex-direction: column; gap: 4px; }
@@ -100,4 +119,5 @@
   .chip span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .chip button { background: none; border: 0; color: var(--muted); padding: 4px; border-radius: 6px; display: grid; }
   .chip button:hover { background: rgba(255,255,255,.1); }
+  .chip .own { flex: 0 1 40%; min-width: 0; padding: 4px 7px; font-size: 12px; border-radius: 6px; }
 </style>

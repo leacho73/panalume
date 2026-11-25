@@ -5,7 +5,7 @@
     defaults: { title: '', entities: [] },
     fields: [
       { key: 'title', label: 'Title', type: 'text' },
-      { key: 'entities', label: 'Entities', type: 'entities' },
+      { key: 'entities', label: 'Entities', type: 'entities', names: true },
     ],
   };
 </script>
@@ -31,7 +31,7 @@
       {@const e = states.get(id)}
       <div class="row" role="button" tabindex="0" data-stop onclick={() => (app.popup = { entity: id })} onkeydown={() => {}}>
         <span class="ic" class:on={isActive(e)} style={lightColor(e) ? `color:${lightColor(e)}` : ''}><Icon icon={entityIcon(e)} size="1.3em" /></span>
-        <span class="n">{name(e, null) || id}</span>
+        <span class="n">{name(e, t(props.names?.[id])) || id}</span>
         {#if e && canToggle(id) && !['media_player', 'climate', 'cover', 'water_heater', 'vacuum'].includes(domain(id))}
           <Toggle on={isActive(e)} onclick={(ev) => { ev.stopPropagation(); toggle(e); }} />
         {:else if e && ACTION.has(domain(id))}

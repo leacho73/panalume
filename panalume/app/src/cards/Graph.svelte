@@ -5,7 +5,7 @@
     defaults: { entities: [], hours: 24, fill: true },
     fields: [
       { key: 'title', label: 'Title', type: 'text' },
-      { key: 'entities', label: 'Entities', type: 'entities' },
+      { key: 'entities', label: 'Entities', type: 'entities', names: true },
       { key: 'colors', label: 'Colours (comma separated)', type: 'text' },
       { key: 'curves', label: 'Line styles (comma separated: smooth, straight or step)', type: 'text', placeholder: 'smooth, step', hint: 'One per entity, in the same order. Step suits things that switch, like heating on / off or a set temperature. Blank = smooth.' },
       { key: 'hours', label: 'Hours', type: 'number' },
@@ -37,7 +37,7 @@
 <div class="g">
   {#if props.title}<div class="title">{t(props.title)}</div>{/if}
   <div class="legend">
-    {#each ids as id, i}<span><i style="background:{color(i)}"></i>{name(states.get(id), null) || id} <b>{stateText(states.get(id))}</b></span>{/each}
+    {#each ids as id, i}<span><i style="background:{color(i)}"></i>{name(states.get(id), t(props.names?.[id])) || id} <b>{stateText(states.get(id))}</b></span>{/each}
   </div>
   <div class="chart"><Chart {series} hours={Number(props.hours) || 24} fill={props.fill} showAxis min={t(props.min)} max={t(props.max)} /></div>
 </div>

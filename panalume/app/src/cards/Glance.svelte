@@ -5,7 +5,7 @@
     defaults: { entities: [], show_name: true, show_state: true },
     fields: [
       { key: 'title', label: 'Title', type: 'text' },
-      { key: 'entities', label: 'Entities', type: 'entities' },
+      { key: 'entities', label: 'Entities', type: 'entities', names: true },
       { key: 'show_name', label: 'Show names', type: 'bool' },
       { key: 'show_state', label: 'Show states', type: 'bool' },
       { key: 'icon_color', label: 'Icon colour (template ok, entity_id is each entity)', type: 'color' },
@@ -37,7 +37,7 @@
       {@const c = iconColor(id) || lightColor(e)}
       <button class="it" data-stop onclick={() => (props.tap === 'toggle' && e ? toggle(e) : (app.popup = { entity: id }))}>
         <span class="ic" class:on={isActive(e)} style={c ? `color:${c}` : ''}><Icon icon={entityIcon(e)} size="1.6em" /></span>
-        {#if props.show_name}<span class="n">{name(e, null) || id}</span>{/if}
+        {#if props.show_name}<span class="n">{name(e, t(props.names?.[id])) || id}</span>{/if}
         {#if props.show_state}<span class="s">{stateText(e)}</span>{/if}
       </button>
     {/each}
