@@ -20,6 +20,7 @@
     fields: [
       { key: 'entity', label: 'Media player', type: 'entity', domain: 'media_player' },
       { key: 'name', label: 'Name (blank = the player’s own name)', type: 'text' },
+      { key: 'volume', label: 'Volume slider', type: 'bool' },
       { key: 'art', label: 'Artwork', type: 'select', options: ['fill', 'cover', 'none'], hint: 'fill covers the tile with the picture. cover puts a square beside the text, over a blurred copy. none is text only, for players that never have artwork.' },
     ],
   };
@@ -39,6 +40,8 @@
   import { t, ent } from '../lib/tpl.js';
   import { name } from '../lib/entity.js';
   import { callService, haImage } from '../lib/ha.svelte.js';
+  import Slider from '../components/Slider.svelte';
+  import { mediaPosition, clockTime as clock, queueOwner } from '../lib/media.js';
 
   let { props, w = 300, h = 300 } = $props();
   const show = (k) => !props.hide?.[k];
@@ -74,20 +77,11 @@
     const i = setInterval(() => { nowMs = Date.now(); }, 1000);
     return () => clearInterval(i);
   });
-  const pos = $derived.by(() => {
-    const base = Number(a.media_position);
-    if (!Number.isFinite(base)) return null;
-    const started = Date.parse(a.media_position_updated_at || '');
-    if (!playing || Number.isNaN(started)) return base;
-    return Math.min(dur || Infinity, base + (nowMs - started) / 1000);
-  });
+  const pos = $derived(mediaPosition(a, playing, nowMs));
   const pct = $derived(dur > 0 && pos != null ? Math.max(0, Math.min(100, (pos / dur) * 100)) : 0);
-  const clock = (s) => {
-    const v = Math.max(0, Math.round(s));
-    const m = Math.floor(v / 60), sec = v % 60, hh = Math.floor(m / 60);
-    return hh ? `${hh}:${String(m % 60).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${m}:${String(sec).padStart(2, '0')}`;
-  };
   const svc = (s, d = {}) => callService('media_player', s, d, { entity_id: e?.entity_id });
+  // Skip goes to the group's leader when this player is in a group.
+  const queue = (s, d = {}) => callService('media_player', s, d, { entity_id: queueOwner(e?.entity_id, a) });
   const landscape = $derived(w > h * 1.5);
   const small = $derived(h < 200 || w < 200);
 </script>
@@ -122,11 +116,17 @@
 
   {#if show('controls') && e}
     <div class="controls" data-stop>
-      {#if has(16)}<button onclick={() => svc('media_previous_track')} aria-label="Previous"><Icon icon="mdi:skip-previous" size="1.5em" /></button>{:else}<span class="gap"></span>{/if}
+      {#if has(16)}<button onclick={() => queue('media_previous_track')} aria-label="Previous"><Icon icon="mdi:skip-previous" size="1.5em" /></button>{:else}<span class="gap"></span>{/if}
       <button class="play" onclick={() => (e.state === 'off' && has(128) ? svc('turn_on') : svc('media_play_pause'))} aria-label={playing ? 'Pause' : 'Play'}>
         <Icon icon={e.state === 'off' ? 'mdi:power' : playing ? 'mdi:pause' : 'mdi:play'} size="1.6em" />
       </button>
-      {#if has(32)}<button onclick={() => svc('media_next_track')} aria-label="Next"><Icon icon="mdi:skip-next" size="1.5em" /></button>{:else}<span class="gap"></span>{/if}
+      {#if has(32)}<button onclick={() => queue('media_next_track')} aria-label="Next"><Icon icon="mdi:skip-next" size="1.5em" /></button>{:else}<span class="gap"></span>{/if}
+    </div>
+  {/if}
+  {#if props.volume && e && has(4) && !small}
+    <div class="vol" data-stop>
+      <button onclick={() => svc('volume_mute', { is_volume_muted: !a.is_volume_muted })} aria-label={a.is_volume_muted ? 'Unmute' : 'Mute'}><Icon icon={a.is_volume_muted ? 'mdi:volume-off' : 'mdi:volume-high'} size="1.1em" /></button>
+      <div class="vs"><Slider value={Math.round((a.volume_level ?? 0) * 100)} unit="%" height={26} color="rgba(255,255,255,.85)" onchange={(v) => svc('volume_set', { volume_level: v / 100 })} /></div>
     </div>
   {/if}
 </div>
@@ -169,6 +169,8 @@
   .small .play { width: min(40px, 20cqh); height: min(40px, 20cqh); }
   .small .gap, .small .controls button:not(.play) { display: none; }
   .small .src { display: none; }
+  .vol { display: flex; align-items: center; gap: 6px; }
+  .vs { flex: 1; }
   .landscape .mid { align-items: center; }
   .landscape .title { font-size: min(1.2em, 4.6cqw); }
 </style>
