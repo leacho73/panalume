@@ -3,6 +3,7 @@
   import Icon from './Icon.svelte';
   import Field from './Field.svelte';
   import DefaultPage from './DefaultPage.svelte';
+  import { screenName, setScreenName } from '../lib/notify.svelte.js';
   import { cards, categories } from '../lib/registry.js';
   import {
     app, layout, DEVICES, DEFAULT_THEME, changed, addCard, selectedCard, selectedPlacement, removeSelected,
@@ -10,7 +11,7 @@
   } from '../lib/config.svelte.js';
   import { areas, areaCards } from '../lib/area.js';
   // Settings kept on this screen only (not in the shared layout).
-  const screenOpts = $state({ home: screenHome(), device: screenDevice(), hidden: screenHidden() });
+  const screenOpts = $state({ home: screenHome(), device: screenDevice(), hidden: screenHidden(), name: screenName() });
 
   import { fromFusion } from '../lib/fusion.js';
   import { toast } from '../lib/ha.svelte.js';
@@ -377,6 +378,7 @@
         <Field obj={app.config.layouts[app.device]} f={{ key: 'display', label: `Sizing on ${app.device === 'tablet' ? 'tablets' : DEVICES[app.device].label.toLowerCase() + 's'}`, type: 'select', options: Object.entries(DISPLAYS).map(([value, label]) => ({ value, label })) }} />
         <Field obj={app.config.layouts[app.device]} f={{ key: 'home_view', label: `Home view on ${app.device === 'tablet' ? 'tablets' : DEVICES[app.device].label.toLowerCase() + 's'}`, type: 'select', options: [{ value: '', label: 'The first view' }, ...app.config.views.map((v) => ({ value: v.id, label: viewName(v) }))], hint: 'The view this device opens on and goes back to. ?view= in the address does the same and wins.' }} />
         <Field obj={screenOpts} f={{ key: 'home', label: 'Home view on this screen only', type: 'select', options: [{ value: '', label: 'Same as above' }, ...app.config.views.map((v) => ({ value: v.id, label: viewName(v) }))], hint: 'Saved on this screen, e.g. the kitchen tablet going to Kitchen and the living-room one to Living room, even in kiosk apps that can\'t change the address.' }} onset={(v) => { screenOpts.home = v; setScreenHome(v); }} />
+        <Field obj={screenOpts} f={{ key: 'name', label: 'This screen\'s name (for messages)', type: 'text', placeholder: 'hallway', hint: 'Saved on this screen only. A panalume_notify event from Home Assistant with screen: hallway shows its banner on this screen and no other.' }} onset={(v) => { screenOpts.name = v; setScreenName(v); }} />
         <Field obj={screenOpts} f={{ key: 'hidden', label: 'Views left out on this screen', type: 'views', hint: 'Saved on this screen only, e.g. a tablet for visitors that shouldn\'t offer the energy or calendar views. They\'re left out of the Navigation card and the views menu here. It tidies what the screen offers; it isn\'t a lock.' }} onset={(v) => { screenOpts.hidden = v; setScreenHidden(v); }} />
         <Field obj={app.config.layouts[app.device]} f={{ key: 'return_mins', label: 'Go back to the home view after (minutes without a touch, blank = never)', type: 'number', hint: 'For wall tablets left on another page. ?return=5 in the address does the same and wins.' }} />
         <Field obj={app.config.layouts[app.device]} f={{ key: 'popup_secs', label: 'Close pop-ups after (seconds without a touch, blank = never)', type: 'number', hint: 'Each touch inside the pop-up starts the count again.' }} />
