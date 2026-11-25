@@ -4,6 +4,7 @@
   import Popup from './components/Popup.svelte';
   import Screensaver from './components/Screensaver.svelte';
   import Icon from './components/Icon.svelte';
+  import DefaultPage from './components/DefaultPage.svelte';
   import ViewIcon, { viewBadge } from './components/ViewIcon.svelte';
   import { app, load, save, layout, fillsBottom, setPanelSide, DEVICES, MODE_SHORT, detectDevice, setView, removeSelected, duplicateSelected, selectedPlacement, changed, undo, undoLast, selectionSet, ensureEditable, zoneList, groupSelected } from './lib/config.svelte.js';
   import { conn, toasts, watchEntities, states, subscribe, me } from './lib/ha.svelte.js';
@@ -83,6 +84,7 @@
   // No sidebar and no Navigation card on this view: a small views menu instead,
   // so there's always a way to switch views.
   let viewsOpen = $state(false);
+  let mineOpen = $state(false), mineReady = $state(false);
   const needViews = $derived(!app.editing && app.config && shownViews().length > 1 && !layout().sidebar.enabled && !(layout().zones[app.view] || []).some((p) => app.config.cards[p.card]?.type === 'nav'));
   // A dot on the closed views menu while any view has a badge up.
   const menuBadge = $derived(needViews ? shownViews().map(viewBadge).find(Boolean) : null);
@@ -201,6 +203,12 @@
   {/if}
   {#if !app.editing && !noEdit}
     <button class="edit-fab" onclick={toggleEdit} aria-label="Edit dashboard"><Icon icon="mdi:pencil" size="1.1em" /></button>
+  {:else if !app.editing && !app.canEdit && !noEditParam}
+    <!-- People who can't edit still get to make Panalume their own default page (inside Home Assistant only). -->
+    <div class="mine" class:shown={mineReady}>
+      {#if mineOpen}<div class="mine-pop"><DefaultPage bind:available={mineReady} /></div>{:else}<div hidden><DefaultPage bind:available={mineReady} /></div>{/if}
+      <button class="edit-fab" onclick={() => (mineOpen = !mineOpen)} aria-label="Settings"><Icon icon={mineOpen ? 'mdi:close' : 'mdi:cog-outline'} size="1.1em" /></button>
+    </div>
   {/if}
 {/if}
 
@@ -226,6 +234,8 @@
   .st { color: var(--muted); padding: 0 6px; min-width: 56px; }
   .edit-fab { position: fixed; top: calc(10px + var(--sa-top)); right: calc(10px + var(--sa-right)); z-index: 700; width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(255,255,255,.06); color: var(--muted); opacity: .25; display: grid; place-items: center; transition: opacity .2s; }
   .edit-fab:hover { opacity: 1; }
+  .mine:not(.shown) .edit-fab { display: none; }
+  .mine-pop { position: fixed; top: calc(52px + var(--sa-top)); right: calc(10px + var(--sa-right)); z-index: 700; max-width: min(320px, calc(100vw - 20px)); padding: 12px 14px; border-radius: 14px; background: #161b25; border: 1px solid rgba(255,255,255,.08); box-shadow: 0 10px 30px rgba(0,0,0,.4); }
   .views-fab { position: fixed; top: calc(10px + var(--sa-top)); left: calc(10px + var(--sa-left)); z-index: 700; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
   .vf { width: 36px; height: 36px; border-radius: 50%; border: 0; background: rgba(255,255,255,.06); color: var(--muted); opacity: .5; display: grid; place-items: center; transition: opacity .2s; }
   .vf:hover, .open .vf, .vf.badged { opacity: 1; }
