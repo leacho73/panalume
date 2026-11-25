@@ -9,10 +9,10 @@
     defaults: { source: 'service', window: 'next24', hourly: false, cheapest_hours: 2, colors: 'auto', cheap: 25, peak: 35 },
     autofill: () => {
       const ids = [...states.keys()];
-      return {
-        home: ids.find((id) => /^sensor\.electricity_price_/.test(id)) || '',
-        prices: ids.find((id) => id.startsWith('sensor.') && id.includes('tibber') && hasList(id)) || '',
-      };
+      const home = ids.find((id) => /^sensor\.electricity_price_/.test(id)) || '';
+      const prices = ids.find((id) => id.startsWith('sensor.') && id.includes('tibber') && hasList(id)) || '';
+      // Only a price-list sensor and no Tibber integration: read the prices from the sensor.
+      return { home, prices, ...(prices && !home ? { source: 'sensor' } : {}) };
     },
     sections: [{ key: 'now', label: 'Current price' }, { key: 'stats', label: 'Min / avg / max' }, { key: 'cheapest', label: 'Cheapest window' }, { key: 'chart', label: 'Chart' }, { key: 'legend', label: 'Legend' }],
     fields: [
@@ -77,7 +77,7 @@
   // --- Source 1: the Tibber integration's tibber.get_prices action -----------
   let fetched = $state([]), error = $state('');
   async function load() {
-    if (props.source === 'sensor' || !conn.connected) return;
+    if (props.source === 'sensor' || !conn.connected) { error = ''; return; }
     const d = new Date(); d.setHours(0, 0, 0, 0);
     const start = new Date(+d - 864e5), end = new Date(+d + 2 * 864e5);
     try {
@@ -133,7 +133,7 @@
     if (props.window === 'today') return [mid, mid + 864e5];
     if (props.window === 'both') return [mid, mid + 2 * 864e5];
     const s = Math.floor(now / 9e5) * 9e5 - 2 * 36e5;
-    return [s, s + 24 * 36e5];
+    return [s, s + 26 * 36e5]; // the last two hours, then the next 24
   });
   const slots = $derived(all.filter((r) => r.end > range[0] && r.start < range[1]));
   // Current price: from the list (the exact 15-minute slot), else the sensor's state.
