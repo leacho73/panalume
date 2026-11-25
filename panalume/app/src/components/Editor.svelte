@@ -6,7 +6,7 @@
   import { cards, categories } from '../lib/registry.js';
   import {
     app, layout, DEVICES, DEFAULT_THEME, changed, addCard, selectedCard, selectedPlacement, removeSelected,
-    duplicateSelected, copyToView, copyLayout, importConfig, selectionSet, groupSelected, ungroupSelected, ensureEditable, setMode, MODES, DISPLAYS, zoneList, addView, removeView, setView, isPlacedAnywhere, placeExisting, zoneWidth, setMainWidth, screenHome, setScreenHome, screenHidden, setScreenHidden, screenDevice, setScreenDevice, groupCloses, setGroupCloses, setSidebarSide, addFilledView, changeType, otherLayouts, copyToLayout,
+    duplicateSelected, viewName, copyToView, copyLayout, importConfig, selectionSet, groupSelected, ungroupSelected, ensureEditable, setMode, MODES, DISPLAYS, zoneList, addView, removeView, setView, isPlacedAnywhere, placeExisting, zoneWidth, setMainWidth, screenHome, setScreenHome, screenHidden, setScreenHidden, screenDevice, setScreenDevice, groupCloses, setGroupCloses, setSidebarSide, addFilledView, changeType, otherLayouts, copyToLayout,
   } from '../lib/config.svelte.js';
   import { areas, areaCards } from '../lib/area.js';
   // Settings kept on this screen only (not in the shared layout).
@@ -83,7 +83,7 @@
     { key: 'action', label: 'Action', type: 'select', options: ACTIONS },
     ...(a?.action === 'more-info' || a?.action === 'toggle' || a?.action === 'fullscreen' ? [{ key: 'entity', label: 'Entity (blank: the card’s own)', type: 'entity' }] : []),
     ...(a?.action === 'popup' ? [{ key: 'title', label: 'Pop-up title', type: 'text' }, { key: 'cards', label: 'Cards in pop-up', type: 'cards' }] : []),
-    ...(a?.action === 'navigate' ? [{ key: 'view', label: 'View', type: 'select', options: app.config.views.map((v) => ({ value: v.id, label: v.name })) }] : []),
+    ...(a?.action === 'navigate' ? [{ key: 'view', label: 'View', type: 'select', options: app.config.views.map((v) => ({ value: v.id, label: viewName(v) })) }] : []),
     ...(a?.action === 'service' ? [{ key: 'service', label: 'Service (domain.service)', type: 'text', placeholder: 'light.turn_on' }, { key: 'data', label: 'Data (JSON, template ok)', type: 'textarea', hint: 'e.g. {"brightness_pct": 50}. For a script, call it directly (script.my_script) and put its fields here, with no "data" wrapper.' }] : []),
     ...(a?.action === 'ha-page' ? [{ key: 'path', label: 'Home Assistant page', type: 'text', placeholder: '/config/devices/dashboard', hint: 'The part of the address after the Home Assistant host, e.g. /lovelace/energy or /history. Template ok. Where Panalume isn\'t opened through Home Assistant (direct port, Docker), use the full address instead.' }] : []),
     ...(a?.action === 'url' ? [{ key: 'url', label: 'URL', type: 'text' }] : []),
@@ -264,7 +264,7 @@
         {/each}
         <p class="hint">Drag any selected card to move them all. Shift/Ctrl-click to add or remove cards; drag a box on empty space to select.</p>
         <div class="row danger">
-          <select class="sm" value="" onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ''; if (v) copyToView(v); }} title="Copy to another view"><option value="">Copy to view…</option>{#each app.config.views as v (v.id)}<option value={v.id}>{v.name}{v.id === app.view ? ' (this view)' : ''}</option>{/each}</select>
+          <select class="sm" value="" onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ''; if (v) copyToView(v); }} title="Copy to another view"><option value="">Copy to view…</option>{#each app.config.views as v (v.id)}<option value={v.id}>{viewName(v)}{v.id === app.view ? ' (this view)' : ''}</option>{/each}</select>
           {#if otherLayouts().length}<select class="sm" value="" onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ''; if (v) copyToLayout(v); }} title="Put it on another device's layout too"><option value="">Copy to layout…</option>{#each otherLayouts() as d (d)}<option value={d}>{DEVICES[d].label}</option>{/each}</select>{/if}
           <button class="sm" onclick={() => removeSelected(false)} title="Takes them off this device's layout only. They stay on other layouts and in pop-ups."><Icon icon="mdi:eye-off-outline" size="1em" /> Remove from this layout</button>
           <button class="sm red" onclick={() => confirm(`Delete ${multiCount} cards from every layout?`) && removeSelected(true)}><Icon icon="mdi:delete-outline" size="1em" /> Delete</button>
@@ -349,7 +349,7 @@
         {/if}
         <div class="row danger">
           <button class="sm" onclick={duplicateSelected}><Icon icon="mdi:content-copy" size="1em" /> Duplicate</button>
-          <select class="sm" value="" onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ''; if (v) copyToView(v); }} title="Copy to another view"><option value="">Copy to view…</option>{#each app.config.views as v (v.id)}<option value={v.id}>{v.name}{v.id === app.view ? ' (this view)' : ''}</option>{/each}</select>
+          <select class="sm" value="" onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ''; if (v) copyToView(v); }} title="Copy to another view"><option value="">Copy to view…</option>{#each app.config.views as v (v.id)}<option value={v.id}>{viewName(v)}{v.id === app.view ? ' (this view)' : ''}</option>{/each}</select>
           {#if otherLayouts().length}<select class="sm" value="" onchange={(e) => { const v = e.currentTarget.value; e.currentTarget.value = ''; if (v) copyToLayout(v); }} title="Put it on another device's layout too"><option value="">Copy to layout…</option>{#each otherLayouts() as d (d)}<option value={d}>{DEVICES[d].label}</option>{/each}</select>{/if}
           <button class="sm" onclick={() => removeSelected(false)} title="Takes it off this device's layout only. It stays on other layouts and in pop-ups."><Icon icon="mdi:eye-off-outline" size="1em" /> Remove from this layout</button>
           <button class="sm red" onclick={() => (multiCount < 2 || confirm(`Delete all ${multiCount} cards in this group?`)) && removeSelected(true)}><Icon icon="mdi:delete-outline" size="1em" /> Delete{multiCount > 1 ? ` group (${multiCount})` : ''}</button>
@@ -375,8 +375,8 @@
       <div class="fields">
         <Field obj={app.config.layouts[app.device]} f={{ key: 'kiosk', label: `Hide Home Assistant's header bar on ${app.device === 'tablet' ? 'tablets' : DEVICES[app.device].label.toLowerCase() + 's'}`, type: 'bool' }} />
         <Field obj={app.config.layouts[app.device]} f={{ key: 'display', label: `Sizing on ${app.device === 'tablet' ? 'tablets' : DEVICES[app.device].label.toLowerCase() + 's'}`, type: 'select', options: Object.entries(DISPLAYS).map(([value, label]) => ({ value, label })) }} />
-        <Field obj={app.config.layouts[app.device]} f={{ key: 'home_view', label: `Home view on ${app.device === 'tablet' ? 'tablets' : DEVICES[app.device].label.toLowerCase() + 's'}`, type: 'select', options: [{ value: '', label: 'The first view' }, ...app.config.views.map((v) => ({ value: v.id, label: v.name }))], hint: 'The view this device opens on and goes back to. ?view= in the address does the same and wins.' }} />
-        <Field obj={screenOpts} f={{ key: 'home', label: 'Home view on this screen only', type: 'select', options: [{ value: '', label: 'Same as above' }, ...app.config.views.map((v) => ({ value: v.id, label: v.name }))], hint: 'Saved on this screen, e.g. the kitchen tablet going to Kitchen and the living-room one to Living room, even in kiosk apps that can\'t change the address.' }} onset={(v) => { screenOpts.home = v; setScreenHome(v); }} />
+        <Field obj={app.config.layouts[app.device]} f={{ key: 'home_view', label: `Home view on ${app.device === 'tablet' ? 'tablets' : DEVICES[app.device].label.toLowerCase() + 's'}`, type: 'select', options: [{ value: '', label: 'The first view' }, ...app.config.views.map((v) => ({ value: v.id, label: viewName(v) }))], hint: 'The view this device opens on and goes back to. ?view= in the address does the same and wins.' }} />
+        <Field obj={screenOpts} f={{ key: 'home', label: 'Home view on this screen only', type: 'select', options: [{ value: '', label: 'Same as above' }, ...app.config.views.map((v) => ({ value: v.id, label: viewName(v) }))], hint: 'Saved on this screen, e.g. the kitchen tablet going to Kitchen and the living-room one to Living room, even in kiosk apps that can\'t change the address.' }} onset={(v) => { screenOpts.home = v; setScreenHome(v); }} />
         <Field obj={screenOpts} f={{ key: 'hidden', label: 'Views left out on this screen', type: 'views', hint: 'Saved on this screen only, e.g. a tablet for visitors that shouldn\'t offer the energy or calendar views. They\'re left out of the Navigation card and the views menu here. It tidies what the screen offers; it isn\'t a lock.' }} onset={(v) => { screenOpts.hidden = v; setScreenHidden(v); }} />
         <Field obj={app.config.layouts[app.device]} f={{ key: 'return_mins', label: 'Go back to the home view after (minutes without a touch, blank = never)', type: 'number', hint: 'For wall tablets left on another page. ?return=5 in the address does the same and wins.' }} />
         <Field obj={app.config.layouts[app.device]} f={{ key: 'popup_secs', label: 'Close pop-ups after (seconds without a touch, blank = never)', type: 'number', hint: 'Each touch inside the pop-up starts the count again.' }} />
@@ -425,7 +425,7 @@
           <div class="row">
             <button class="sm" onclick={() => setView(v.id)}>Open</button>
             <button class="sm" disabled={i === 0} onclick={() => { const a = app.config.views; [a[i - 1], a[i]] = [a[i], a[i - 1]]; changed(); }}><Icon icon="mdi:arrow-up" size="1em" /></button>
-            <button class="sm red" disabled={app.config.views.length < 2} onclick={() => confirm(`Delete view ${v.name}?`) && removeView(v.id)}><Icon icon="mdi:delete-outline" size="1em" /></button>
+            <button class="sm red" disabled={app.config.views.length < 2} onclick={() => confirm(`Delete view ${viewName(v)}?`) && removeView(v.id)}><Icon icon="mdi:delete-outline" size="1em" /></button>
           </div>
           <div class="fields">
             <Field obj={v} f={{ key: 'name', label: 'Name', type: 'text' }} />

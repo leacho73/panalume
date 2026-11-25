@@ -8,7 +8,7 @@
   import MarkerEditor from './MarkerEditor.svelte';
   import Icon from './Icon.svelte';
   import { states } from '../lib/ha.svelte.js';
-  import { changed, app } from '../lib/config.svelte.js';
+  import { changed, app, viewName } from '../lib/config.svelte.js';
   import { isTpl } from '../lib/tpl.js';
   import { name } from '../lib/entity.js';
   let { obj, f, onset, hide = null, ontoggle } = $props();
@@ -60,7 +60,7 @@
     <div class="views">
       {#each app.config.views as v (v.id)}
         <label class="chk"><input type="checkbox" checked={(obj[f.key] || []).includes(v.id)}
-          onchange={(e) => { const on = e.currentTarget.checked, ids = (obj[f.key] || []).filter((x) => x !== v.id); set(on ? app.config.views.map((x) => x.id).filter((x) => x === v.id || ids.includes(x)) : ids); }} /> {v.name}</label>
+          onchange={(e) => { const on = e.currentTarget.checked, ids = (obj[f.key] || []).filter((x) => x !== v.id); set(on ? app.config.views.map((x) => x.id).filter((x) => x === v.id || ids.includes(x)) : ids); }} /> {viewName(v)}</label>
       {/each}
     </div>
   {:else if f.type === 'people'}

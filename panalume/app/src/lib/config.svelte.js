@@ -229,13 +229,13 @@ function init(cfg) {
   // ?view= (a view's id or name) picks the starting view, e.g. upstairs tablets.
   if (firstInit) {
     const want = (param('view') || '').toLowerCase();
-    const v = want && cfg.views.find((x) => x.id.toLowerCase() === want || x.name.toLowerCase() === want);
+    const v = want && cfg.views.find((x) => x.id.toLowerCase() === want || String(x.name || '').toLowerCase() === want);
     homeView = v?.id ?? null;
     const own = [screenHome(), cfg.layouts[app.device]?.home_view].find((id) => id && cfg.views.some((x) => x.id === id));
     // A view named in Home Assistant's address (…/panalume#energy, e.g. a bookmark) opens that
     // view this time; the home view (for going back) stays as it is.
     const linked = (parentHash() || '').toLowerCase();
-    const l = linked && cfg.views.find((x) => x.id.toLowerCase() === linked || x.name.toLowerCase() === linked);
+    const l = linked && cfg.views.find((x) => x.id.toLowerCase() === linked || String(x.name || '').toLowerCase() === linked);
     if (v) app.view = v.id;
     else if (l) app.view = l.id;
     else if (own) app.view = own;
@@ -309,6 +309,13 @@ export function setScreenDevice(d) {
 
 // Views visited on this screen, newest last, for a Back button.
 const visited = [];
+/** A view's name for menus and messages; a view without one (icons or pictures only)
+ *  gets "View 2" and so on, by its place in the list. */
+export function viewName(v) {
+  const n = typeof v?.name === 'string' ? v.name.trim() : '';
+  return n || `View ${app.config.views.indexOf(v) + 1}`;
+}
+
 export function setView(id) {
   if (app.view && app.view !== id) {
     visited.push(app.view);
@@ -535,7 +542,7 @@ export function copyToView(view) {
     dst.push(...copies);
   }
   changed();
-  const name = app.config.views.find((v) => v.id === view)?.name || view;
+  const name = viewName(app.config.views.find((v) => v.id === view)) || view;
   toast(`Copied ${ids.size > 1 ? ids.size + ' cards' : 'the card'} to ${name}`);
 }
 
