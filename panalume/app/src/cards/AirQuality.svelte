@@ -23,7 +23,7 @@
       { key: 'extra2', label: 'Third reading' }],
     fields: [
       { key: 'entity', label: 'Index sensor', type: 'entity', domain: 'sensor', hint: 'Any sensor whose state is an air quality index: Environment Canada’s AQHI, WAQI, AirVisual, PurpleAir, IQAir.' },
-      { key: 'scale', label: 'Scale', type: 'select', options: [{ value: 'auto', label: 'Work it out from the sensor' }, { value: 'aqhi', label: 'AQHI (Canada, 1–10+)' }, { value: 'us', label: 'US AQI (0–500)' }], hint: 'The words and the colours come from the scale. On “work it out”, a sensor named for the AQHI is read as AQHI and everything else as US AQI; a reading above 10 is always US AQI.' },
+      { key: 'scale', label: 'Scale', type: 'select', options: [{ value: 'auto', label: 'Work it out from the sensor' }, { value: 'aqhi', label: 'AQHI (Canada, 1–10+)' }, { value: 'us', label: 'US AQI (0–500)' }], hint: 'The words and the colours come from the scale. On “work it out”, a sensor named for the AQHI is read as AQHI (where 10+ is very high) and everything else as US AQI.' },
       { key: 'extra', label: 'Another reading', type: 'entity', domain: 'sensor', hint: 'Optional, e.g. PM2.5. Shown as a small tile with its own unit.' },
       { key: 'extra2', label: 'One more reading', type: 'entity', domain: 'sensor', hint: 'Optional, e.g. ozone or PM10.' },
     ],
@@ -78,20 +78,21 @@
   const bands = $derived(scaleKey === 'us' ? US : AQHI);
   const band = $derived(v == null ? null : bands.find((b) => v <= b.max));
   // Position on the band scale, for the marker.
-  const top = $derived(scaleKey === 'us' ? 300 : 10);
-  const pct = $derived(v == null ? 0 : Math.max(2, Math.min(100, (v / top) * 100)));
+  const scaleTop = $derived(scaleKey === 'us' ? 300 : 10);
+  const pct = $derived(v == null ? 0 : Math.max(2, Math.min(100, (v / scaleTop) * 100)));
   // Band edges as a share of the same scale, so the colours line up with the marker.
   const AQHI_TRACK = 'linear-gradient(90deg, #2f9e44 0 30%, #f08c00 30% 60%, #e8590c 60% 100%)';
   const US_TRACK = 'linear-gradient(90deg, #2f9e44 0 16.7%, #f08c00 16.7% 33.3%, #e8590c 33.3% 50%, #c92a2a 50% 66.7%, #862e9c 66.7% 100%)';
 
-  const extra = (id) => {
+  const extra = (id, slot) => {
     const x = ent(id);
     if (!x || ['unknown', 'unavailable'].includes(x.state)) return null;
     const unit = x.attributes?.unit_of_measurement || '';
-    return { key: id, label: entName(x) || '', value: `${x.state}${unit ? ' ' + unit : ''}` };
+    return { key: slot, label: entName(x) || '', value: `${x.state}${unit ? ' ' + unit : ''}` };
   };
-  const extras = $derived([show('extra') ? extra(props.extra) : null, show('extra2') ? extra(props.extra2) : null].filter(Boolean));
-  const updated = $derived(e?.attributes?.observation_time || e?.last_changed || '');
+  const extras = $derived([show('extra') ? extra(props.extra, 'extra') : null, show('extra2') ? extra(props.extra2, 'extra2') : null].filter(Boolean));
+  // Home Assistant's own times come as seconds here; a time that won't read is left out.
+  const updated = $derived.by(() => { const raw = e?.attributes?.observation_time || e?.last_changed; const ms = typeof raw === 'number' ? raw * 1000 : Date.parse(raw); return Number.isFinite(ms) ? ms : null; });
 </script>
 
 <div class="wrap" style:--tone={band?.color || 'var(--muted)'}>
