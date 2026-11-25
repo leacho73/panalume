@@ -6,7 +6,7 @@
   import { cards, categories } from '../lib/registry.js';
   import {
     app, layout, DEVICES, DEFAULT_THEME, changed, addCard, selectedCard, selectedPlacement, removeSelected,
-    duplicateSelected, viewName, copyToView, copyLayout, importConfig, selectionSet, groupSelected, ungroupSelected, ensureEditable, setMode, MODES, DISPLAYS, zoneList, addView, removeView, setView, isPlacedAnywhere, placeExisting, zoneWidth, setMainWidth, screenHome, setScreenHome, screenHidden, setScreenHidden, screenDevice, setScreenDevice, groupCloses, setGroupCloses, setSidebarSide, addFilledView, changeType, otherLayouts, copyToLayout,
+    duplicateSelected, viewName, sidebarOn, copyToView, copyLayout, importConfig, selectionSet, groupSelected, ungroupSelected, ensureEditable, setMode, MODES, DISPLAYS, zoneList, addView, removeView, setView, isPlacedAnywhere, placeExisting, zoneWidth, setMainWidth, screenHome, setScreenHome, screenHidden, setScreenHidden, screenDevice, setScreenDevice, groupCloses, setGroupCloses, setSidebarSide, addFilledView, changeType, otherLayouts, copyToLayout,
   } from '../lib/config.svelte.js';
   import { areas, areaCards } from '../lib/area.js';
   // Settings kept on this screen only (not in the shared layout).
@@ -211,7 +211,7 @@
     {#if app.panel === 'add'}
       <div class="row seg">
         <button class:on={addTo === 'main'} onclick={() => (addTo = 'main')}>Main area</button>
-        <button class:on={addTo === 'sidebar'} disabled={!layout().sidebar.enabled} onclick={() => (addTo = 'sidebar')}>Sidebar</button>
+        <button class:on={addTo === 'sidebar'} disabled={!sidebarOn(layout())} onclick={() => (addTo = 'sidebar')}>Sidebar</button>
       </div>
       {#each categories as cat}
         {@const list = Object.values(cards).filter((c) => c.meta.category === cat)}
@@ -219,7 +219,7 @@
           <h4>{cat}</h4>
           <div class="types">
             {#each list as c}
-              <button onclick={() => addCard(c.meta.type, c.meta, addTo === 'sidebar' && layout().sidebar.enabled ? 'sidebar' : app.view)}>
+              <button onclick={() => addCard(c.meta.type, c.meta, addTo === 'sidebar' && sidebarOn(layout()) ? 'sidebar' : app.view)}>
                 <Icon icon={c.meta.icon} size="1.5em" /><span>{c.meta.name}</span>
               </button>
             {/each}
@@ -229,7 +229,7 @@
       {#if unplaced.length}
         <h4>Existing cards not on this device</h4>
         {#each unplaced as c}
-          <div class="line"><span>{label(c)}</span><button class="sm" onclick={() => placeExisting(c.id, addTo === 'sidebar' && layout().sidebar.enabled ? 'sidebar' : app.view)}>Place</button></div>
+          <div class="line"><span>{label(c)}</span><button class="sm" onclick={() => placeExisting(c.id, addTo === 'sidebar' && sidebarOn(layout()) ? 'sidebar' : app.view)}>Place</button></div>
         {/each}
       {/if}
     {:else if app.panel === 'card'}
@@ -434,6 +434,7 @@
             <Field obj={v} f={{ key: 'background', label: 'Background (overrides theme)', type: 'text' }} />
             <Field obj={v} f={{ key: 'badge', label: 'Badge (template)', type: 'text', placeholder: "{{ is_state('binary_sensor.kitchen_motion', 'on') }}", hint: 'Shown on the view\'s icon in the Navigation card and the views menu: a dot when this is true, or an icon if it gives an icon name (mdi:walk). Empty or false shows nothing.' }} />
             {#if v.badge}<Field obj={v} f={{ key: 'badge_color', label: 'Badge colour (blank = accent)', type: 'color' }} />{/if}
+            <Field obj={v} f={{ key: 'no_sidebar', label: 'Hide the sidebar on this view', type: 'bool', hint: 'For views you reach another way, e.g. a room opened from a Rooms view, with a Back button instead. The view gets the full width.' }} />
             <Field obj={v} f={{ key: 'visible', label: 'Shown when (template, blank = always)', type: 'text', placeholder: "{{ user_name != 'Babysitter' }}", hint: 'When false, the view is left out of the Navigation card and the views menu, and screens on it go to their own view. Templates can use user_name / user (who\'s signed in to Home Assistant) to show a view to some people only. It tidies what each person sees; it isn\'t a lock.' }} />
           </div>
         </div>
