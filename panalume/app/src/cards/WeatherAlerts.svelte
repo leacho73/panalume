@@ -3,7 +3,7 @@
   export const meta = {
     type: 'weather-alerts', name: 'Weather alerts', icon: 'mdi:alert-outline', category: 'Info',
     size: { w: 520, h: 240 }, tap: 'none',
-    defaults: { entities: [], entity: '', title: '', show_empty: true, calm: true },
+    defaults: { entities: [], entity: '', title: '' },
     autofill: () => {
       // One sensor each for warnings, watches, advisories, statements and endings, else
       // anything that names itself as an alert source (Meteoalarm, NWS Alerts).
@@ -18,7 +18,6 @@
     fields: [
       { key: 'entities', label: 'Alert sensors', type: 'entities', domain: ['sensor', 'binary_sensor'], hint: 'Any sensor that publishes warnings. Environment Canada gives five, one each for warnings, watches, advisories, statements and endings, with `alert_1`, `alert_2` … in the attributes; NWS Alerts gives one sensor with an `Alerts` list; Meteoalarm gives a binary sensor whose attributes describe the one alert in effect. Pick as many as you have — one row is drawn per alert.' },
       { key: 'title', label: 'Title (blank = “Alerts”)', type: 'text' },
-      { key: 'show_empty', label: 'Say so when there is nothing in effect', type: 'bool' },
     ],
   };
   const ORDER = ['warning', 'watch', 'advisory', 'statement', 'ending'];
@@ -172,7 +171,7 @@
     <div class="calm">
       <Icon icon="mdi:shield-check-outline" size="1.15em" />
       <div>
-        <b>{t('No alerts in effect')}</b>
+        <b>No alerts in effect</b>
         {#if tall}<small>{ids.length ? t('Nothing in effect for these sensors') : t('Pick the alert sensors')}</small>{/if}
       </div>
     </div>
@@ -184,7 +183,7 @@
   .head { display: flex; align-items: center; gap: .4em; font-weight: 600; color: var(--tone); flex: none; }
   .t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .n { flex: none; font-size: .78em; background: color-mix(in srgb, var(--tone) 22%, transparent); color: var(--tone); padding: .05em .45em; border-radius: .5em; }
-  .list { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: .3em; overflow: hidden; }
+  .list { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: .3em; overflow: auto; }
   .row { display: flex; gap: .5em; align-items: flex-start; background: rgba(255, 255, 255, .04); border-radius: .5em; padding: .35em .55em; min-width: 0; flex: none; }
   .flag { flex: none; width: .28em; align-self: stretch; border-radius: .2em; background: var(--tone); }
   .body { display: flex; flex-direction: column; gap: .08em; min-width: 0; }
