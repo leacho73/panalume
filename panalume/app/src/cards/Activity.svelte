@@ -68,7 +68,8 @@
     const by = x.context_name || (x.context_user_id ? 'someone in the app' : x.context_event_type === 'automation_triggered' ? 'an automation' : '');
     return {
       key: `${i}:${x.when}`, id: x.entity_id,
-      icon: (e && entityIcon({ ...e, state: x.state })) || x.icon || 'mdi:information-outline',
+      // The icon for the state then; for things the dashboard isn't watching, from the kind of entity.
+      icon: x.icon || (x.entity_id ? entityIcon(e ? { ...e, state: x.state } : then) : '') || 'mdi:information-outline',
       who: x.entity_id ? (e ? name(e, t(props.names?.[x.entity_id])) : t(props.names?.[x.entity_id]) || haName(x.entity_id) || tidy(x.entity_id)) : x.name || x.domain || '',
       what, by, when: x.when,
     };
