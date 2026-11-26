@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.42.0
+
+- **Banners from Home Assistant** (thanks, [@Pissbirne](https://github.com/Pissbirne)). An automation fires a `panalume_notify` event and every screen shows a message over the whole dashboard, whatever view is open: a title, an icon, info / warning / critical, and how many seconds it stays. Messages that arrive together queue, a banner wakes the screensaver, and one can go to a single named screen (**Layout → This screen's name**) or to one Home Assistant user.
+- **Activity card** (thanks, [@clarencedonath](https://github.com/clarencedonath)). Home Assistant's activity, live and newest first: what changed, what caused it (an automation, or someone in the app) and how long ago. Everything, or only the things or the area you pick.
+- **Time picker card** (thanks, [@dhcrees](https://github.com/dhcrees)). Change the times on your time helpers, such as when the heating comes on and goes off: the time large, with up and down for the hours and minutes, sent once you stop tapping.
+- **Chips card** (thanks, [@mrclean5953](https://github.com/mrclean5953), and [@DeWildeDaan](https://github.com/DeWildeDaan) for asking). A row of chips that centre and wrap, each a button or a slider for a light's brightness, a blind's position, a thermostat or a speaker's volume. A plain tap switches lights and switches; locks, doors and blinds open their details instead.
+- **Tibber prices card** (thanks, [@bytec77](https://github.com/bytec77)). Tibber's 15-minute prices for today and tomorrow, the cheapest window, and the price now.
+- **Weather alerts card** (thanks, [@mrclean5953](https://github.com/mrclean5953)). Every weather alert in effect, worst first, from Environment Canada, the US National Weather Service or Meteoalarm.
+- **Air quality card** (thanks, [@mrclean5953](https://github.com/mrclean5953)). The air quality index on its own scale (Canada's AQHI or the US AQI), what the band means for your health, and extra readings such as PM2.5.
+- **Daylight milestones card** (thanks, [@pawelkw](https://github.com/pawelkw)). The shortest and longest days, the equinoxes and how much daylight you're gaining or losing, worked out for your home's location.
+- **Media cards** (thanks, [@DaveCBr](https://github.com/DaveCBr)). The Media player card has a progress bar (tap it to jump) and a **Fill the card** artwork option, and Now playing has a volume slider. Skip, shuffle and repeat on a grouped speaker now go to the group's lead speaker, which should fix skipping with Music Assistant.
+- **Hide the sidebar on a view** (thanks, [@DaveCBr](https://github.com/DaveCBr)). For views you reach another way, such as a room opened from a Rooms view with just a Back button. That view gets the full width.
+- **Default page for everyone** (thanks, [@8ctvfhjs59-ctrl](https://github.com/8ctvfhjs59-ctrl)). Admins can make Panalume the page Home Assistant opens on for every user, and people who can't edit the dashboard get the button for themselves (a small settings button where the pencil would be).
+- **Gauge colour bands** (thanks, [@belindo152](https://github.com/belindo152)). Low can be red, for fuel or a battery, and a range can be green in the middle: `0 red, 20 orange, 40 green`.
+- **Energy cost today in your own currency** (thanks, [@Jyrrga](https://github.com/Jyrrga)). It now uses Home Assistant's currency and number format, like the other energy cards: 2,80 kr and 8,1 öre in Sweden.
+- **Views without a name** (thanks, [@JizzMann](https://github.com/JizzMann)) show as "View 1", "View 2" and so on in the menus, instead of blank lines.
+
 ## 0.41.1
 
 - **Fixes a blank screen after updating to 0.41.0.** Panalume crashed as it started unless the address had `?device=` in it. Sorry about that.
